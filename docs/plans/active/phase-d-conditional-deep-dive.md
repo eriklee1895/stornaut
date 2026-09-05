@@ -120,8 +120,11 @@
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
 > Task 39 remains incomplete, but the user authorized one fresh replacement
-> privileged campaign v9 on 2026-09-05. v9 is in non-privileged preflight and
-> has not executed. Task 40 remains blocked under the approved sequential plan; Task 44 remains blocked
+> privileged campaign v9 on 2026-09-05. Its first launcher invocation was
+> cancelled at the unauthenticated lifecycle-install prompt before credential,
+> install, evidence creation or durable arm, with zero residue verified; v9
+> remains unconsumed in post-repair preflight. Task 40 remains blocked under the
+> approved sequential plan; Task 44 remains blocked
 > from `go` until a fresh successful machine cohort is separately authorized and
 > admitted. Local findings remain within their owning
 > checkpoint; no recursively named new Task is created. L3c4 alone owns final

@@ -916,8 +916,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   exact 9-path scope、physical compact-frame path、nine negative mutations 与
   final no-unresolved-P0–P2 review 均已关闭。唯一 privileged v8 attempt 后续
   已消费并以 transport loss 终止，现已只读固化为 non-admitting/non-retryable；
-  Task 39 已从纯外部阻塞恢复到 authorized/preflight 状态；replacement v9 尚未
-  执行，L3c3d/L3c4 仍未证明；
+  Task 39 已从纯外部阻塞恢复到 authorized/preflight 状态；replacement v9 的
+  首次 launcher 启动已在未认证的 lifecycle install 提示处取消，未输入凭据、
+  未安装、未创建 evidence、未 durable arm，且已证明零固定运行时残留；v9 仍
+  未消费，L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

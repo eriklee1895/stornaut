@@ -11777,9 +11777,44 @@ function verify_iicb2b2_source_contract() {
     /bin/zsh -n "${p[7]}"; /bin/zsh -n "${p[8]}"; /bin/zsh -n "${p[9]}"
     /usr/bin/python3 -I - "${p[@]}" <<'PY'
 from pathlib import Path
-import re, sys
+import hashlib, re, sys
 if len(sys.argv) != 10: raise SystemExit("ii-c-b2b2 source cardinality drifted")
 package, executable, transport, fixture, tests, boundary, gate, release, contract = (Path(x).read_text() for x in sys.argv[1:])
+active_executable = re.sub(r'(?m)^\s*//.*$', '', executable)
+actor_marker = '    private actor CampaignDarwinSystem:'
+if executable.count(actor_marker) != 1:
+    raise SystemExit("ii-c-b2b2 lifecycle call-graph drifted")
+actor_source = executable.split(actor_marker, 1)[1]
+if '//' in actor_source or '/*' in actor_source or '*/' in actor_source:
+    raise SystemExit("ii-c-b2b2 executable comment surface drifted")
+actor_end = '\n    }\n}\n\n\n@main\nstruct StornautInvestigationMachineCampaignCommand'
+if executable.count(actor_end) != 1:
+    raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
+actor_block = executable[executable.index(actor_marker):
+                         executable.index(actor_end, executable.index(actor_marker)) + len('\n    }')]
+if hashlib.sha256(actor_block.encode()).hexdigest() != \
+        'f88e90dad64c01921d7a7b4bc13a3f0406ab3aa48f28ef74b9885940eee726d4':
+    raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
+def require_body_digest(start, end, expected):
+    if executable.count(start) != 1 or executable.count(end) != 1:
+        raise SystemExit("ii-c-b2b2 lifecycle call-graph drifted")
+    begin = executable.index(start)
+    finish = executable.index(end, begin)
+    observed = hashlib.sha256(executable[begin:finish].encode()).hexdigest()
+    if observed != expected:
+        raise SystemExit("ii-c-b2b2 lifecycle call-graph drifted")
+require_body_digest(
+    '    package static func run() async -> Int32 {',
+    '\n\n    private static func legacyFixtureBinding',
+    '28abaf3aa77391cc679715a824f3f5df3af44d78d5b66bef458f21416215d615')
+require_body_digest(
+    '        func installProduction() throws {',
+    '\n\n        func finishProduction',
+    '037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7')
+require_body_digest(
+    '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
+    '\n\n        private func writePostArm',
+    '55d00e353316486b21b659d46d3dfd30824f3e4e2c263f7d54872db80a626423')
 target = '''        .executableTarget(
             name: "StornautInvestigationMachineCampaign",
             dependencies: [
@@ -11789,9 +11824,9 @@ target = '''        .executableTarget(
         ),'''
 if package.count(target) != 1 or package.split("targets: [",1)[0].find("StornautInvestigationMachineCampaign") >= 0: raise SystemExit("ii-c-b2b2 package-only executable drifted")
 if package.count('"StornautInvestigationMachineCampaign"') != 2: raise SystemExit("ii-c-b2b2 product or reverse dependency drifted")
-if not executable.startswith("import CInvestigationIdentitySupport\nimport CInvestigationMachineCampaignSupport\nimport Darwin\nimport Dispatch\nimport Foundation\nimport StornautInvestigationHandoffContract\n\n#if DEBUG\nimport StornautInvestigationMachineCampaignSupport\n"): raise SystemExit("ii-c-b2b2 executable import boundary drifted")
+if not active_executable.startswith("import CInvestigationIdentitySupport\nimport CInvestigationMachineCampaignSupport\nimport Darwin\nimport Dispatch\nimport Foundation\nimport StornautInvestigationHandoffContract\n\n#if DEBUG\nimport StornautInvestigationMachineCampaignSupport\n"): raise SystemExit("ii-c-b2b2 executable import boundary drifted")
 for marker in ("CommandLine.argc == 1", "CampaignDarwinSystem", "stornaut_investigation_campaign_spawn_fixed", "stornaut_investigation_campaign_bootstrap_fixed", "bootstrapVerified", "proc_pidinfo", "proc_listallpids", "waitpid", "kill(-groupID, SIGKILL)", "static func main() { exit(78) }"):
-    if marker not in executable: raise SystemExit("ii-c-b2b2 executable lifecycle drifted")
+    if marker not in active_executable: raise SystemExit("ii-c-b2b2 executable lifecycle drifted")
 for marker in ("stornaut_campaign_preserve_terminal_output_bytes",
                "attributes.c_oflag &= (tcflag_t)~ONLCR",
                "stornaut_campaign_preserve_terminal_output_bytes(descriptors[1])"):
@@ -11802,15 +11837,65 @@ if transport.index("stornaut_campaign_preserve_terminal_output_bytes(descriptors
 allowed_sudo = (
     'Self.runFixed("/usr/bin/sudo", ["-knv"], maximum: 4_096)',
     '["command":"/usr/bin/sudo -knv",',
-    'runFixed("/usr/bin/sudo",\n            ["-k","--","/bin/zsh","-f","-s","--","--held-source",script.root,action]+script.hashes+[script.plist],standardInput:script.bytes,maximum:16_384)',
+    'runFixed("/usr/bin/sudo",\n            ["-k","-p",action.prompt,"--","/bin/zsh","-f","-s","--","--held-source",script.root,action.rawValue]+script.hashes+[script.plist],standardInput:script.bytes,maximum:16_384)',
 )
-if any(executable.count(marker) != 1 for marker in allowed_sudo):
+if any(active_executable.count(marker) != 1 for marker in allowed_sudo):
     raise SystemExit("ii-c-b2b2 fixed sudo contract drifted")
 for marker in ("guard probe.status != 0 else { throw Failure.invalid }",
                "standardInput:script.bytes", "maximum:16_384"):
-    if executable.count(marker) != 1:
+    if active_executable.count(marker) != 1:
         raise SystemExit("ii-c-b2b2 fixed sudo contract drifted")
-authority_surface = executable
+lifecycle = re.search(
+    r'private enum LifecycleAction: String \{(.*?)\n        \}\n'
+    r'        private struct CommandCapture', active_executable, re.S)
+if not lifecycle:
+    raise SystemExit("ii-c-b2b2 lifecycle prompt contract drifted")
+lifecycle_source = lifecycle.group(1)
+expected_lifecycle_source = '''
+            case install
+            case uninstall
+
+            var prompt: String {
+                switch self {
+                case .install:
+                    "Stornaut Task 39 ii-c install authorization: "
+                case .uninstall:
+                    "Stornaut Task 39 ii-c uninstall authorization: "
+                }
+            }'''
+if (lifecycle_source != expected_lifecycle_source
+        or active_executable.count('action.prompt') != 1
+        or active_executable.count('action.rawValue') != 1):
+    raise SystemExit("ii-c-b2b2 lifecycle prompt contract drifted")
+typed_lifecycle_signature = (
+    'private static func runLifecycle(_ script:'
+    '(root:String,bytes:Data,hashes:[String],plist:String),'
+    'action:LifecycleAction)throws->CommandCapture{try runFixed')
+typed_lifecycle_calls = (
+    'Self.runLifecycle(script, action: .install)',
+    'Self.runLifecycle(script, action: .uninstall)',
+    'Self.runLifecycle(\n                            lifecyclePayload, action: .uninstall)',
+)
+if (active_executable.count(typed_lifecycle_signature) != 1
+        or active_executable.count('Self.runLifecycle(') != 3
+        or active_executable.count('runLifecycle(') != 4
+        or active_executable.count('Self.runFixed(') != 2
+        or active_executable.count('runFixed(') != 4
+        or active_executable.count('posix_spawn(') != 1
+        or active_executable.count('/usr/bin/sudo') != 3
+        or any(active_executable.count(call) != 1 for call in typed_lifecycle_calls)
+        or any(marker in active_executable for marker in (
+            'Password:', 'action:String', 'ProcessInfo', 'getenv(', 'environ',
+            'Foundation.Process(', 'NSTask'))):
+    raise SystemExit("ii-c-b2b2 lifecycle action binding drifted")
+debug_end = '\n#else\n'
+if executable.count(debug_end) != 1:
+    raise SystemExit("ii-c-b2b2 debug executable drifted")
+debug_executable = executable[:executable.index(debug_end)]
+if hashlib.sha256(debug_executable.encode()).hexdigest() != \
+        '3e4fc893ac38a0066a3019174bc48165b1b60882b2f8ee0c42f2deec060abbff':
+    raise SystemExit("ii-c-b2b2 debug executable drifted")
+authority_surface = active_executable
 for marker in allowed_sudo:
     authority_surface = authority_surface.replace(marker, "", 1)
 for forbidden in ("StornautCore","StornautCodex","StornautExecution","CoordinatorSupport","MachineLaunchSupport","NSXPC","URLSession","sudo","launchctl","MoveToTrash","RegisteredAction"):
@@ -12435,6 +12520,10 @@ M={
 "fixture-capability-bypass":("main",'let fixture=Self.consumeFixtureCapability(executable)','let fixture=Self.fixtureCandidatePath(executable)'),
 "held-lifecycle":("main",'standardInput:script.bytes','standardInput:nil'),
 "probe-argv":("main",'["-knv"], maximum: 4_096)','["-nv"], maximum: 4_096)'),
+"lifecycle-open-action":("main",'action:LifecycleAction)throws->CommandCapture','action:String)throws->CommandCapture'),
+"lifecycle-generic-prompt":("main",'"Stornaut Task 39 ii-c install authorization: "','"Password: "'),
+"lifecycle-environment-prompt":("main",'"Stornaut Task 39 ii-c install authorization: "','ProcessInfo.processInfo.environment["STORNAUT_PROMPT"] ?? "Stornaut Task 39 ii-c install authorization: "'),
+"lifecycle-extra-call":("main",'let script = try Self.lifecycleScript(); lifecyclePayload=script','let script = try Self.lifecycleScript(); lifecyclePayload=script; _ = try Self.runLifecycle(script,action:.install)'),
 "lifecycle-seal":("lifecycle",'set -euo pipefail','set -euo pipefail\nprint injected'),
 "prepared-event-order":("main",'_ = try writer.appendAttemptEvent(kind: .prepared,\n                payload: try event(.prepared, preArm: preArm),\n                observedAt: try nextEvidenceTime())\n            preparedPublished = true','preparedPublished = true\n            _ = try writer.appendAttemptEvent(kind: .prepared,\n                payload: try event(.prepared, preArm: preArm),\n                observedAt: try nextEvidenceTime())'),
 "arm-order":("harness",'try await system.durablyPublishArmedConsumed(\n                    preArm, absoluteDeadlineNanoseconds: deadline\n                )\n                try await system.sendArmAfterDurablePublish(\n                    preArm, terminalDescriptor: spawned.terminalDescriptor,\n                    absoluteDeadlineNanoseconds: deadline\n                )','try await system.sendArmAfterDurablePublish(\n                    preArm, terminalDescriptor: spawned.terminalDescriptor,\n                    absoluteDeadlineNanoseconds: deadline\n                )\n                try await system.durablyPublishArmedConsumed(\n                    preArm, absoluteDeadlineNanoseconds: deadline\n                )'),
@@ -12454,7 +12543,7 @@ M["teardown-uncertainty"]=("main",'catch { throw Failure.installedStateUncertain
 M["receipt-backpressure"]=("coordinator",'case .interrupted, .wouldBlock: continue','case .interrupted: continue')
 M["receipt-deadline"]=("coordinator",'guard current < deadline.rawValue else { return .expiredOrFailed }','guard true else { return .expiredOrFailed }')
 M["contract-aggregate-call-drop"]=("contract",aggregate_call,': # ii-c-c aggregate disabled')
-if len(M)!=25: raise SystemExit("ii-c-c mutation inventory drifted")
+if len(M)!=29: raise SystemExit("ii-c-c mutation inventory drifted")
 if mode=="true":
     if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha): raise SystemExit("ii-c-c mutation contract drifted")
     old,new=M[name][1:]; i=slots.index(slot)
@@ -12465,7 +12554,72 @@ if mode=="true":
 elif mode!="false" or name or slot or sha: raise SystemExit("ii-c-c mutation mode drifted")
 elif source_arguments!=canonical_arguments or sources!=canonical: raise SystemExit("ii-c-c canonical source path drifted")
 main,harness,evidence,coordinator,composition,bridge,protocol,entry,writer,lifecycle,verifier,tests,gate,gate_fixture,gate_test,boundary,contract=(sources[s] for s in slots)
-required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
+expected_lifecycle_action = '''private enum LifecycleAction: String {
+            case install
+            case uninstall
+
+            var prompt: String {
+                switch self {
+                case .install:
+                    "Stornaut Task 39 ii-c install authorization: "
+                case .uninstall:
+                    "Stornaut Task 39 ii-c uninstall authorization: "
+                }
+            }
+        }'''
+if main.count(expected_lifecycle_action) != 1:
+    raise SystemExit("ii-c-c lifecycle action contract drifted")
+if mode != "true" or name.startswith("lifecycle-"):
+    actor_marker = '    private actor CampaignDarwinSystem:'
+    if main.count(actor_marker) != 1:
+        raise SystemExit("ii-c-c lifecycle call-graph drifted")
+    actor_source = main.split(actor_marker, 1)[1]
+    if '//' in actor_source or '/*' in actor_source or '*/' in actor_source:
+        raise SystemExit("ii-c-c executable comment surface drifted")
+    actor_end = '\n    }\n}\n\n\n@main\nstruct StornautInvestigationMachineCampaignCommand'
+    if main.count(actor_end) != 1:
+        raise SystemExit("ii-c-c lifecycle actor drifted")
+    actor_block = main[main.index(actor_marker):
+                       main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
+    if hashlib.sha256(actor_block.encode()).hexdigest() != \
+            'f88e90dad64c01921d7a7b4bc13a3f0406ab3aa48f28ef74b9885940eee726d4':
+        raise SystemExit("ii-c-c lifecycle actor drifted")
+    def require_body_digest(start, end, expected):
+        if main.count(start) != 1 or main.count(end) != 1:
+            raise SystemExit("ii-c-c lifecycle call-graph drifted")
+        begin = main.index(start)
+        finish = main.index(end, begin)
+        observed = hashlib.sha256(main[begin:finish].encode()).hexdigest()
+        if observed != expected:
+            raise SystemExit("ii-c-c lifecycle call-graph drifted")
+    require_body_digest(
+        '    package static func run() async -> Int32 {',
+        '\n\n    private static func legacyFixtureBinding',
+        '28abaf3aa77391cc679715a824f3f5df3af44d78d5b66bef458f21416215d615')
+    require_body_digest(
+        '        func installProduction() throws {',
+        '\n\n        func finishProduction',
+        '037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7')
+    require_body_digest(
+        '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
+        '\n\n        private func writePostArm',
+        '55d00e353316486b21b659d46d3dfd30824f3e4e2c263f7d54872db80a626423')
+if (main.count('Self.runLifecycle(') != 3
+        or main.count('runLifecycle(') != 4
+        or main.count('Self.runFixed(') != 2
+        or main.count('runFixed(') != 4
+        or main.count('posix_spawn(') != 1
+        or main.count('/usr/bin/sudo') != 3):
+    raise SystemExit("ii-c-c lifecycle action binding drifted")
+if mode != "true" or name.startswith("lifecycle-"):
+    debug_end = '\n#else\n'
+    if main.count(debug_end) != 1:
+        raise SystemExit("ii-c-c debug executable drifted")
+    debug_executable = main[:main.index(debug_end)]
+    if hashlib.sha256(debug_executable.encode()).hexdigest() != \
+            '3e4fc893ac38a0066a3019174bc48165b1b60882b2f8ee0c42f2deec060abbff':
+        raise SystemExit("ii-c-c debug executable drifted")
+required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
  (coordinator,(M[n][1] for n in ("extra-env","gate-before-arm","receipt-backpressure","receipt-deadline"))),
  (protocol,(M[n][1] for n in ("eight-epoch","epoch-identity-join"))),
@@ -12755,16 +12909,16 @@ for marker in (
     if marker not in report_source:
         raise SystemExit("ii-c-c failure disposition report drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "4c908d496c3df9655fdf228c42136e7de0519c842e9909425c0509b798953d43"),
-    (Path("README.md"), "ed942fa2df27e5a44a2e20affd38a6ae06a8dade2558e45a55c48cd3e81574b8"),
-    (Path("docs/README.md"), "e71772aba0823f04d60130b429e9df6c4fb32ee20593f81f37a04905b6966f96"),
-    (Path("docs/agent/coding-agent-handoff.md"), "41a04c5504903fb4f022e8a2c7840c0c4b4c54aee568403c3e25c62128ff7574"),
-    (Path("docs/plans/active/README.md"), "af2b8be6792bbb020955b2d1601c5fb2653d1618c092f2ed014bcf6753b8b624"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "a9ec4e81cd331ba7ba8f25cd1728a6e851025746f1bec1c9aa87e82d90e52e46"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "5ca68b73555196f4508e173432a785062b4a564966e096e9306f209896fbccba"),
+    (Path("AGENTS.md"), "7978b9bf4266bb1bbc1220fef2ce9cdbd87a9b7028882c01b654e1ee3c29a4db"),
+    (Path("README.md"), "7ac2fe61c7dcc155ea40194b6206a18a8bc75506c1ec9dc39869ed78a832c195"),
+    (Path("docs/README.md"), "38dc526526703bacae3524dc9437d3c66ab3729944782d0e2222679ec761bcd7"),
+    (Path("docs/agent/coding-agent-handoff.md"), "0d094ac8f305b77fc3492b562901f786c19703dc7ec7aaf9c8130639e76330ab"),
+    (Path("docs/plans/active/README.md"), "d8b4388eebb32c9181ff2cc38fb6abf82d6c50c3f32879fdb3cfa7284a047b7d"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "dbce2f21fa932b41456423b38ed640c4927e50ed5fbf4d0bd1b2b887eb4c198a"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "2f52947ace84f272d55a6ef7efcec83da3bf1dfc81bd037ecc052c5cd563a307"),
     (Path("docs/plans/active/task-40-implementation-brief.md"), "198559a2e202083b765993563418f5df98a46e077f5768c4b565bcc6841b26db"),
-    (Path("docs/plans/roadmap.md"), "a548c9f3d036e0393361774615b5276687d30974fa66b998e5682c3298b1a96a"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "bc5cc1fa381b1221404da539536b7d94837e9828a88207b1353f88fcbb76edfe"),
+    (Path("docs/plans/roadmap.md"), "98b1801e65a180b8e1d74f7452cc16a3618dc994c1d39b6830bf363c0d775108"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "8cffd0c92ecffedd8fb7e4aa5ba7447ac65dbed2d5984ca8c0db12ce37f4f4da"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),

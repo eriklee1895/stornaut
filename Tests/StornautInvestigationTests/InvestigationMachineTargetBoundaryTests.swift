@@ -311,7 +311,65 @@ struct InvestigationMachineTargetBoundaryTests {
             "bootstrapVerified", "proc_listallpids",
             "StornautInvestigationMachineCampaignCoordinator",
             "deadlineWindowNanoseconds", "static func main() { exit(78) }",
+            "private enum LifecycleAction: String",
+            "Stornaut Task 39 ii-c install authorization: ",
+            "Stornaut Task 39 ii-c uninstall authorization: ",
+            "[\"-k\",\"-p\",action.prompt,\"--\"",
+            "script.root,action.rawValue",
         ] { #expect(executable.contains(marker)) }
+        for marker in [
+            "action:LifecycleAction)throws->CommandCapture{try runFixed",
+            "Self.runLifecycle(script, action: .install)",
+            "Self.runLifecycle(script, action: .uninstall)",
+            "lifecyclePayload, action: .uninstall",
+        ] { #expect(executable.contains(marker)) }
+        #expect(executable.components(separatedBy: "Self.runLifecycle(").count - 1 == 3)
+        #expect(executable.components(separatedBy: "runLifecycle(").count - 1 == 4)
+        #expect(executable.components(separatedBy: "Self.runFixed(").count - 1 == 2)
+        #expect(executable.components(separatedBy: "runFixed(").count - 1 == 4)
+        #expect(executable.components(separatedBy: "posix_spawn(").count - 1 == 1)
+        #expect(executable.components(separatedBy: "/usr/bin/sudo").count - 1 == 3)
+        #expect(!executable.contains("Password:"))
+        #expect(!executable.contains("action:String"))
+        for forbidden in [
+            "ProcessInfo", "getenv(", "environ", "Foundation.Process(", "NSTask",
+        ] { #expect(!executable.contains(forbidden)) }
+        for marker in [
+            "expected_lifecycle_source = '''",
+            "lifecycle_source != expected_lifecycle_source",
+            "ii-c-b2b2 lifecycle action binding drifted",
+            "ii-c-b2b2 lifecycle call-graph drifted",
+            "ii-c-b2b2 debug executable drifted",
+            "debug_executable = executable[:executable.index(debug_end)]",
+            "3e4fc893ac38a0066a3019174bc48165b1b60882b2f8ee0c42f2deec060abbff",
+            "actor_source = executable.split(actor_marker, 1)[1]",
+            "ii-c-b2b2 lifecycle actor drifted",
+            "actor_block = executable[executable.index(actor_marker):",
+            "f88e90dad64c01921d7a7b4bc13a3f0406ab3aa48f28ef74b9885940eee726d4",
+            "require_body_digest(",
+            "28abaf3aa77391cc679715a824f3f5df3af44d78d5b66bef458f21416215d615",
+            "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
+            "55d00e353316486b21b659d46d3dfd30824f3e4e2c263f7d54872db80a626423",
+            "active_executable.count('Self.runLifecycle(') != 3",
+            "active_executable.count('runFixed(') != 4",
+            "active_executable.count('posix_spawn(') != 1",
+            "active_executable.count('/usr/bin/sudo') != 3",
+            "'ProcessInfo', 'getenv(', 'environ'",
+            "expected_lifecycle_action = '''private enum LifecycleAction: String {",
+            "ii-c-c lifecycle action contract drifted",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "lifecycle-open-action", "lifecycle-generic-prompt",
+            "lifecycle-environment-prompt",
+            "lifecycle-extra-call",
+            "lifecycle-open-route",
+            "lifecycle-inline-comment",
+            "lifecycle-unreachable-call",
+            "lifecycle-string-camouflage",
+            "lifecycle-init-spawn-alias",
+            "lifecycle-outer-main-spawn-alias",
+            "len(M)!=29", "assert len(m)==29",
+        ] { #expect(boundary.contains(marker) || contract.contains(marker)) }
         for marker in [
             "CAMPAIGN_FIXTURE_TRUNCATED", "CAMPAIGN_FIXTURE_TRAILING",
             "CAMPAIGN_FIXTURE_MISSING_EOF", "CAMPAIGN_FIXTURE_NONZERO",
@@ -525,16 +583,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"4c908d496c3df9655fdf228c42136e7de0519c842e9909425c0509b798953d43\")",
-            "(Path(\"README.md\"), \"ed942fa2df27e5a44a2e20affd38a6ae06a8dade2558e45a55c48cd3e81574b8\")",
-            "(Path(\"docs/README.md\"), \"e71772aba0823f04d60130b429e9df6c4fb32ee20593f81f37a04905b6966f96\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"41a04c5504903fb4f022e8a2c7840c0c4b4c54aee568403c3e25c62128ff7574\")",
-            "(Path(\"docs/plans/active/README.md\"), \"af2b8be6792bbb020955b2d1601c5fb2653d1618c092f2ed014bcf6753b8b624\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"a9ec4e81cd331ba7ba8f25cd1728a6e851025746f1bec1c9aa87e82d90e52e46\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"5ca68b73555196f4508e173432a785062b4a564966e096e9306f209896fbccba\")",
+            "(Path(\"AGENTS.md\"), \"7978b9bf4266bb1bbc1220fef2ce9cdbd87a9b7028882c01b654e1ee3c29a4db\")",
+            "(Path(\"README.md\"), \"7ac2fe61c7dcc155ea40194b6206a18a8bc75506c1ec9dc39869ed78a832c195\")",
+            "(Path(\"docs/README.md\"), \"38dc526526703bacae3524dc9437d3c66ab3729944782d0e2222679ec761bcd7\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"0d094ac8f305b77fc3492b562901f786c19703dc7ec7aaf9c8130639e76330ab\")",
+            "(Path(\"docs/plans/active/README.md\"), \"d8b4388eebb32c9181ff2cc38fb6abf82d6c50c3f32879fdb3cfa7284a047b7d\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"dbce2f21fa932b41456423b38ed640c4927e50ed5fbf4d0bd1b2b887eb4c198a\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"2f52947ace84f272d55a6ef7efcec83da3bf1dfc81bd037ecc052c5cd563a307\")",
             "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"198559a2e202083b765993563418f5df98a46e077f5768c4b565bcc6841b26db\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"a548c9f3d036e0393361774615b5276687d30974fa66b998e5682c3298b1a96a\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"bc5cc1fa381b1221404da539536b7d94837e9828a88207b1353f88fcbb76edfe\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"98b1801e65a180b8e1d74f7452cc16a3618dc994c1d39b6830bf363c0d775108\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"8cffd0c92ecffedd8fb7e4aa5ba7447ac65dbed2d5984ca8c0db12ce37f4f4da\")",
             "len(active_status_entries) != 10",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",

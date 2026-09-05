@@ -112,7 +112,8 @@ implementation、cross-UID/PID-reuse corrections 与 mutation-oracle fix 也已
 `armedConsumed` 后以 transport loss 失败；独立只读
 failure-disposition verifier 已固定其 non-admitting/non-retryable 结论与当前
 零 Stornaut runtime 残留。用户已于 2026-09-05 批准一次全新 replacement
-campaign v9；当前处于非提权 preflight，v9 尚未执行，L3c3d/L3c4
+campaign v9；首次 launcher 启动已在未认证 install 提示处取消，未安装、未建
+evidence、未 arm 且零残留，v9 仍未消费；当前处于修复后 preflight，L3c3d/L3c4
 仍未证明，最终 authoritative full 未运行；Task 40 仍受批准计划的顺序前置
 条件阻塞，production Deep Dive 仍 unavailable。
 见文档：

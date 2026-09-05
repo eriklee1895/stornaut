@@ -64,7 +64,7 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — authorized/preflight；v8 immutable，replacement v9 尚未执行；L3c3d/L3c4 未证明，final full 未运行；production Deep Dive unavailable |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — authorized/preflight；v8 immutable；v9 首次启动在未认证 install 提示处取消且零残留，仍未消费；L3c3d/L3c4 未证明，final full 未运行 |
 | Phase D Task 39B2c v8 Failure Disposition | [Read-only Failure Audit](reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) — consumed / non-admitting / non-retryable；原 evidence 未修改；当前 fixed runtime absent |
 | Phase D Task 39B2c v9 Authorization | [Replacement Campaign Amendment](reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) — one fresh campaign；operator-only credential entry；failure stops without automatic retry |
 | Phase D Task 39 v8 Gate Result | [Historical Blocked/No-Go Audit](reports/phase-d-task-39-blocked-review.md) — v8 negative gate complete；replacement v9 later authorized；Task 39 remains incomplete |

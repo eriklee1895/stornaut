@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=f573795a848acb90b3fc50f69a666f61006cb48979e7e71cda33a5507948fc81
+# ib2_self_sha=5def77cac52d78edc692c4cbfd00351d6c4b82f8aa79f3e8b2e409981dd75397
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3883,6 +3883,10 @@ m=(
 ("fixture-capability-bypass","main",'let fixture=Self.consumeFixtureCapability(executable)','let fixture=Self.fixtureCandidatePath(executable)'),
 ("held-lifecycle","main",'standardInput:script.bytes','standardInput:nil'),
 ("probe-argv","main",'["-knv"], maximum: 4_096)','["-nv"], maximum: 4_096)'),
+("lifecycle-open-action","main",'action:LifecycleAction)throws->CommandCapture','action:String)throws->CommandCapture'),
+("lifecycle-generic-prompt","main",'"Stornaut Task 39 ii-c install authorization: "','"Password: "'),
+("lifecycle-environment-prompt","main",'"Stornaut Task 39 ii-c install authorization: "','ProcessInfo.processInfo.environment["STORNAUT_PROMPT"] ?? "Stornaut Task 39 ii-c install authorization: "'),
+("lifecycle-extra-call","main",'let script = try Self.lifecycleScript(); lifecyclePayload=script','let script = try Self.lifecycleScript(); lifecyclePayload=script; _ = try Self.runLifecycle(script,action:.install)'),
 ("lifecycle-seal","lifecycle",'set -euo pipefail','set -euo pipefail\nprint injected'),
 ("prepared-event-order","main",'_ = try writer.appendAttemptEvent(kind: .prepared,\n                payload: try event(.prepared, preArm: preArm),\n                observedAt: try nextEvidenceTime())\n            preparedPublished = true','preparedPublished = true\n            _ = try writer.appendAttemptEvent(kind: .prepared,\n                payload: try event(.prepared, preArm: preArm),\n                observedAt: try nextEvidenceTime())'),
 ("arm-order","harness",'try await system.durablyPublishArmedConsumed(\n                    preArm, absoluteDeadlineNanoseconds: deadline\n                )\n                try await system.sendArmAfterDurablePublish(\n                    preArm, terminalDescriptor: spawned.terminalDescriptor,\n                    absoluteDeadlineNanoseconds: deadline\n                )','try await system.sendArmAfterDurablePublish(\n                    preArm, terminalDescriptor: spawned.terminalDescriptor,\n                    absoluteDeadlineNanoseconds: deadline\n                )\n                try await system.durablyPublishArmedConsumed(\n                    preArm, absoluteDeadlineNanoseconds: deadline\n                )'),
@@ -3902,13 +3906,17 @@ m+=(("teardown-uncertainty","main",'catch { throw Failure.installedStateUncertai
 m+=(("receipt-backpressure","coordinator",'case .interrupted, .wouldBlock: continue','case .interrupted: continue'),)
 m+=(("receipt-deadline","coordinator",'guard current < deadline.rawValue else { return .expiredOrFailed }','guard true else { return .expiredOrFailed }'),)
 m+=(("contract-aggregate-call-drop","contract",aggregate_call,': # ii-c-c aggregate disabled'),)
-assert len(m)==25
+assert len(m)==29
 with (out/"mutations").open("w") as manifest:
  for name,slot,old,new in m:
   source=paths[slots.index(slot)].read_text(); assert source.count(old)==1, name
   target=out/(name+".source"); target.write_text(source.replace(old,new,1))
   expected={
    "lifecycle-seal":"ii-c-c lifecycle source seal drifted",
+   "lifecycle-open-action":"ii-c-c lifecycle actor drifted",
+   "lifecycle-generic-prompt":"ii-c-c lifecycle action contract drifted",
+   "lifecycle-environment-prompt":"ii-c-c lifecycle action contract drifted",
+   "lifecycle-extra-call":"ii-c-c lifecycle actor drifted",
    "sudo-option":"ii-c-c sudo option contract drifted",
   }.get(name,"ii-c-c exact source contract drifted: "+old)
   (out/(name+".expected")).write_text(expected)
@@ -3996,6 +4004,213 @@ PY
     reject_iicc_protocol canonical-alternate-path \
         'ii-c-c canonical source path drifted' \
         "$gate" --iic-c-source-contract-only "${alternate_args[@]}"
+
+    local lifecycle_open_route="$out/lifecycle-open-route.swift"
+    python3 - "${paths[1]}" "$lifecycle_open_route" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+replacements = (
+    ('Self.runLifecycle(script, action: .install)',
+     'Self.runOpenLifecycle(script, action: "install")'),
+    ('Self.runLifecycle(script, action: .uninstall)',
+     'Self.runOpenLifecycle(script, action: "uninstall")'),
+    ('Self.runLifecycle(\n                            lifecyclePayload, action: .uninstall)',
+     'Self.runOpenLifecycle(\n                            lifecyclePayload, action: "uninstall")'),
+)
+for old, new in replacements:
+    assert source.count(old) == 1, old
+    source = source.replace(old, new, 1)
+needle = '        private static func runLifecycle(_ script:'
+assert source.count(needle) == 1
+open_helper = '''        private static func runOpenLifecycle(
+            _ script: (root: String, bytes: Data, hashes: [String], plist: String),
+            action: String
+        ) throws -> CommandCapture {
+            let prompt = ProcessInfo.processInfo.environment["STORNAUT_PROMPT"]
+                ?? "Pass" + "word: "
+            return try runFixed("/usr/bin/su" + "do",
+                ["-k", "-p", prompt, "--", "/bin/zsh", "-f", "-s",
+                 "--", "--held-source", script.root, action]
+                    + script.hashes + [script.plist],
+                standardInput: script.bytes, maximum: 16_384)
+        }
+
+'''
+Path(sys.argv[2]).write_text(source.replace(needle, open_helper + needle, 1))
+PY
+    reject_iicc_protocol lifecycle-open-route \
+        'ii-c-b2b2 lifecycle actor drifted' \
+        "$gate" --iic-b2b2-source-contract-only \
+        Package.swift "$lifecycle_open_route" \
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries scripts/verify-contract
+
+    local lifecycle_inline_comment="$out/lifecycle-inline-comment.swift"
+    python3 - "${paths[1]}" "$lifecycle_inline_comment" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+old = 'let capture = try Self.runLifecycle(script, action: .install)'
+new = ('let capture = CommandCapture(status: 1, stdout: Data(), stderr: Data()) '
+       '// Self.runLifecycle(script, action: .install)')
+assert source.count(old) == 1
+Path(sys.argv[2]).write_text(source.replace(old, new, 1))
+PY
+    reject_iicc_protocol lifecycle-inline-comment \
+        'ii-c-b2b2 executable comment surface drifted' \
+        "$gate" --iic-b2b2-source-contract-only \
+        Package.swift "$lifecycle_inline_comment" \
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries scripts/verify-contract
+
+    local lifecycle_unreachable_call="$out/lifecycle-unreachable-call.swift"
+    python3 - "${paths[1]}" "$lifecycle_unreachable_call" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+old = 'let capture = try Self.runLifecycle(script, action: .install)'
+new = '''let capture: CommandCapture
+                if false {
+                    capture = try Self.runLifecycle(script, action: .install)
+                } else {
+                    capture = CommandCapture(status: 1, stdout: Data(), stderr: Data())
+                }'''
+assert source.count(old) == 1
+Path(sys.argv[2]).write_text(source.replace(old, new, 1))
+PY
+    reject_iicc_protocol lifecycle-unreachable-call \
+        'ii-c-b2b2 lifecycle actor drifted' \
+        "$gate" --iic-b2b2-source-contract-only \
+        Package.swift "$lifecycle_unreachable_call" \
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries scripts/verify-contract
+
+    local lifecycle_string_camouflage="$out/lifecycle-string-camouflage.swift"
+    python3 - "${paths[1]}" "$lifecycle_string_camouflage" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+replacements = (
+    ('Self.runLifecycle(script, action: .install)',
+     'Self.runOpenLifecycle(script, action: "install")'),
+    ('Self.runLifecycle(script, action: .uninstall)',
+     'Self.runOpenLifecycle(script, action: "uninstall")'),
+    ('Self.runLifecycle(\n                            lifecyclePayload, action: .uninstall)',
+     'Self.runOpenLifecycle(\n                            lifecyclePayload, action: "uninstall")'),
+)
+for old, new in replacements:
+    assert source.count(old) == 1, old
+    source = source.replace(old, new, 1)
+needle = '        private static func runLifecycle(_ script:'
+assert source.count(needle) == 1
+camouflage = '''        private static let lifecycleCallerSpellings = """
+        Self.runLifecycle(script, action: .install)
+        Self.runLifecycle(script, action: .uninstall)
+        Self.runLifecycle(
+                            lifecyclePayload, action: .uninstall)
+        """
+        private static func runOpenLifecycle(
+            _ script: (root: String, bytes: Data, hashes: [String], plist: String),
+            action: String
+        ) throws -> CommandCapture {
+            let prompt = ProcessInfo.processInfo.environment["STORNAUT_PROMPT"]
+                ?? "Pass" + "word: "
+            let executable = "/usr/bin/su" + "do"
+            return try runFixed(executable, ["-k", "-p", prompt, "--",
+                "/bin/zsh", "-f", "-s", "--", "--held-source",
+                script.root, action] + script.hashes + [script.plist],
+                standardInput: script.bytes, maximum: 16_384)
+        }
+
+'''
+Path(sys.argv[2]).write_text(source.replace(needle, camouflage + needle, 1))
+PY
+    reject_iicc_protocol lifecycle-string-camouflage \
+        'ii-c-b2b2 lifecycle actor drifted' \
+        "$gate" --iic-b2b2-source-contract-only \
+        Package.swift "$lifecycle_string_camouflage" \
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries scripts/verify-contract
+
+    local lifecycle_init_spawn_alias="$out/lifecycle-init-spawn-alias.swift"
+    python3 - "${paths[1]}" "$lifecycle_init_spawn_alias" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+needle = '        private enum Failure: Error {'
+assert source.count(needle) == 1
+injected = '''        init() {
+            let spawnAlias = posix_spawn
+            let executable = "/usr/bin/su" + "do"
+            executable.withCString { path in
+                var processID = pid_t()
+                var arguments: [UnsafeMutablePointer<CChar>?] = [nil]
+                _ = spawnAlias(&processID, path, nil, nil, &arguments, nil)
+            }
+        }
+
+'''
+Path(sys.argv[2]).write_text(source.replace(needle, injected + needle, 1))
+PY
+    reject_iicc_protocol lifecycle-init-spawn-alias \
+        'ii-c-b2b2 lifecycle actor drifted' \
+        "$gate" --iic-b2b2-source-contract-only \
+        Package.swift "$lifecycle_init_spawn_alias" \
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries scripts/verify-contract
+
+    local lifecycle_outer_main_spawn_alias="$out/lifecycle-outer-main-spawn-alias.swift"
+    python3 - "${paths[1]}" "$lifecycle_outer_main_spawn_alias" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+needle = '''    static func main() async {
+        exit(await InvestigationMachineCampaignExecutable.run())
+    }'''
+assert source.count(needle) == 1
+replacement = '''    static func main() async {
+        let spawnAlias = posix_spawn
+        let executable = "/usr/bin/su" + "do"
+        executable.withCString { path in
+            var processID = pid_t()
+            var arguments: [UnsafeMutablePointer<CChar>?] = [nil]
+            _ = spawnAlias(&processID, path, nil, nil, &arguments, nil)
+        }
+        exit(await InvestigationMachineCampaignExecutable.run())
+    }'''
+Path(sys.argv[2]).write_text(source.replace(needle, replacement, 1))
+PY
+    reject_iicc_protocol lifecycle-outer-main-spawn-alias \
+        'ii-c-b2b2 debug executable drifted' \
+        "$gate" --iic-b2b2-source-contract-only \
+        Package.swift "$lifecycle_outer_main_spawn_alias" \
+        Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
+        Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift \
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-app-release-boundaries scripts/verify-contract
 
     local prearm_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
     if [[ $(git rev-parse HEAD) != \

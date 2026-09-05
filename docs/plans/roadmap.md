@@ -259,8 +259,9 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    non-admitting。ii-c-a、ii-c-b 与 resolved-lineage L1/L2 已完成/non-admitting，
    L2 final review none；ii-c-c v8 随后在 `armedConsumed` 后以 transport loss
    终止，已由独立只读 verifier 固化为 non-admitting/non-retryable，未修改原
-   evidence。用户已于 2026-09-05 批准一次全新 replacement v9；当前处于
-   非提权 preflight，尚未执行。Task 39 保持 incomplete；L3c3d/L3c4 仍未证明，
+   evidence。用户已于 2026-09-05 批准一次全新 replacement v9；首次 launcher
+   已在未认证 install 提示处取消，未输入凭据、未安装、未建 evidence、未 arm，
+   零残留已验证，v9 仍未消费并处于修复后 preflight。Task 39 保持 incomplete；L3c3d/L3c4 仍未证明，
    最终 full 未运行。Task 40 仍受顺序前置条件阻塞。
 39B2c 未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
@@ -316,8 +317,10 @@ interactive-native identity binding `531f79f` / consumer seal `26e785a` 与
 fixed-gate historical replay `aa8a7f1` 已完成/non-admitting。ii-c-a、ii-c-b1、
    ii-c-b2a1、ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final
    review none；ii-c-c v8 已消费并以 transport loss 失败，failure disposition
-   已只读固化。用户已批准 replacement v9；v9 处于非提权 preflight，尚未
-   执行。L3c3d/L3c4 因仍缺少 green machine cohort 而保持 blocked/unproven。
+   已只读固化。用户已批准 replacement v9；首次 launcher 已在输入凭据、安装、
+   evidence 创建和 durable arm 前取消，零固定运行时残留已验证，v9 仍未消费并
+   处于修复后非提权 preflight。L3c3d/L3c4 因仍缺少 green machine cohort 而
+   保持 blocked/unproven。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim；由于其 green cohort 前置条件不成立，

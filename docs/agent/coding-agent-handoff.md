@@ -328,7 +328,9 @@
 > verifier 固化为 consumed transport loss / non-admitting / non-retryable，且
 > 原 evidence tree 未修改。L3c3d 与 L3c4 均依赖现有契约要求的 green machine
 > cohort；用户已于 2026-09-05 批准一次全新 replacement campaign v9。v9
-> 当前处于非提权 preflight，尚未执行；L3c3d/L3c4 继续 unproven。这些 repairs 是
+> 首次 launcher 启动已在未认证 lifecycle install 提示处取消，未输入凭据、
+> 未安装、未建 evidence、未 durable arm，且零固定运行时残留；v9 仍未消费并
+> 处于修复后 preflight。L3c3d/L3c4 继续 unproven。这些 repairs 是
 > machine-campaign prerequisite checkpoints，不是新的 Task。该
 > pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a` 完成；
 > typed failure receipt、physical compact-frame path、exact 9-path scope 与

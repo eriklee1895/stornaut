@@ -155,8 +155,10 @@
 > non-retryable, with no modification of the original evidence tree. L3c3d and
 > L3c4 remain blocked on the green machine cohort required by their existing
 > contracts. On 2026-09-05 the user explicitly authorized one fresh replacement
-> privileged campaign v9 and the corresponding plan amendment. v9 has not yet
-> executed and does not alter v8's immutable disposition.
+> privileged campaign v9 and the corresponding plan amendment. Its first
+> launcher invocation was cancelled before credential, install, evidence
+> creation or durable arm, and zero fixed-runtime residue was verified; v9
+> remains unconsumed and does not alter v8's immutable disposition.
 > The pre-arm failure diagnostic prerequisite is complete at `2ada395` / tree
 > `11e1a0a`: bounded typed failure receipt, exact exit/EOF/residue verification,
 > physical compact-frame coverage and exact nine-path mutation closure have no

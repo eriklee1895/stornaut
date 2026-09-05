@@ -7,6 +7,11 @@
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
 > Remaining order: v9 non-privileged preflight -> one replacement campaign -> L3c3d -> L3c4
+>
+> v9 launch history: the first executable launch was cancelled at the generic
+> lifecycle install prompt before credentials, install, evidence creation or
+> durable arm; exact zero fixed-runtime residue was verified, so v9 remains
+> unconsumed while the prompt contract is repaired.
 
 ## 1. Decision
 
@@ -200,6 +205,13 @@ The operator must attest that this exact prompt was observed before credentials
 were entered. Human attestation is labeled as such and is not promoted to
 machine-observed proof.
 
+The lifecycle install and uninstall sudo calls use their own exact fixed prompts:
+`Stornaut Task 39 ii-c install authorization: ` and
+`Stornaut Task 39 ii-c uninstall authorization: `. They are selected by a closed
+install/uninstall enum and never fall back to generic `Password:`. These prompts
+authorize only the sealed lifecycle transaction; the driver prompt remains the
+separate durable-arm boundary described above.
+
 ## 7. Eight-Scenario and Failure Rules
 
 The ordered scenarios remain: success, cancellation, timeout, invalid envelope,
@@ -327,13 +339,15 @@ credential after seeing the exact prompt is recorded only as a trusted-human
 attestation; machine prompt recognition is a separate fact and is not promoted
 to proof of human observation.
 
-Credential relay uses only a bounded raw buffer in the campaign executable,
+Driver credential relay uses only a bounded raw buffer in the campaign executable,
 read with Darwin `readpassphrase(..., RPP_REQUIRE_TTY)`, written directly to
 the child PTY and cleared with `memset_s` on every path. Credential bytes,
 byte counts, timing and key
 events never become `Data`, `String`, operation values, logs, stdout/stderr,
 diagnostics, tests or evidence. The tests use a non-secret sentinel through an
 injected relay and prove it is absent from every returned value and artifact.
+Lifecycle install/uninstall credentials are instead read directly by fixed
+`/usr/bin/sudo` from the controlling TTY and never enter the campaign process.
 
 ### 9.3 Full per-epoch evidence and receipt chain
 

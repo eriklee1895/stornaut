@@ -262,6 +262,19 @@ package enum InvestigationMachineCampaignExecutable {
         InvestigationMachineCampaignHarnessSystem
     {
         private enum Failure: Error { case invalid, deadline, installedStateUncertain, posix(Int32) }
+        private enum LifecycleAction: String {
+            case install
+            case uninstall
+
+            var prompt: String {
+                switch self {
+                case .install:
+                    "Stornaut Task 39 ii-c install authorization: "
+                case .uninstall:
+                    "Stornaut Task 39 ii-c uninstall authorization: "
+                }
+            }
+        }
         private struct CommandCapture { let status: Int32; let stdout, stderr: Data }
         private struct TerminalEvidence { let bundle:Data;let epochs:[InvestigationMachineCampaignVerifiedEpoch];let diagnostic:Data;let rawGateReceipt:Data;let finalReceipt:InvestigationMachineCoordinatorRawReceiptV1 };private var spawned:InvestigationMachineCampaignSpawnedProcess?;private var deadline:UInt64?;private var channelsClosed=false,bootstrapVerified=false,activationPrepared=false,preparedPublished=false,armedConsumed=false,promptObserved=false,humanActionObserved=false,attestationPublished=false
         private var preparedFrameSHA256:Data?;private var bufferedReceipt=Data();private var evidenceWriter:InvestigationMachineRawEvidenceWriter?;private var evidenceParentDescriptor:Int32 = -1;private var lastEvidenceTime:Int64=0;private var installReceipt:[String:Any]?;private var lifecyclePayload:(root:String,bytes:Data,hashes:[String],plist:String)?
@@ -273,13 +286,13 @@ package enum InvestigationMachineCampaignExecutable {
             guard !usesFixtureSibling, installReceipt == nil else { throw Failure.invalid }
             let script = try Self.lifecycleScript(); lifecyclePayload=script
             do {
-                let capture = try Self.runLifecycle(script, action: "install")
+                let capture = try Self.runLifecycle(script, action: .install)
                 guard capture.status == 0 else { throw Failure.invalid }
                 installReceipt = try Self.receipt(capture.stdout,
                     domain: "lifecycle.local.install.receipt.v1", action: "install")
             } catch {
                 do {
-                    let rollback = try Self.runLifecycle(script, action: "uninstall")
+                    let rollback = try Self.runLifecycle(script, action: .uninstall)
                     guard rollback.status == 0 else { throw Failure.invalid }
                     let receipt = try Self.receipt(rollback.stdout,
                         domain: "lifecycle.local.uninstall.receipt.v1",
@@ -357,7 +370,7 @@ package enum InvestigationMachineCampaignExecutable {
                 un = try InvestigationMachineCampaignLifecycleFinalizer.run(
                     uninstall: {
                         let value = try Self.runLifecycle(
-                            lifecyclePayload, action: "uninstall")
+                            lifecyclePayload, action: .uninstall)
                         return .init(status: value.status, output: value.stdout)
                     },
                     decode: { try Self.receipt($0, domain:
@@ -783,8 +796,8 @@ package enum InvestigationMachineCampaignExecutable {
             let executable=root.appending(path:".derivedData/xcodebuildmcp/Build/Products/Debug/StornautInvestigationDiagnostic.app/Contents/MacOS"),names=["StornautInvestigationDiagnostic","StornautLifecycleHelper","StornautInvestigationMachineDriver","StornautInvestigationMachineGate","StornautInvestigationMachineGateCoordinator"],paths=names.map{executable.appending(path:$0).path}+[root.appending(path:"StornautLifecycleHelper/com.eriklee.stornaut.lifecycle.plist").path]
             let held=try paths.map{path->Data in guard let value=stableFileBytes(path,maximum:64<<20)else{throw Failure.invalid};return value};return(root.path,bytes,held.map{InvestigationHandoffSHA256.hashing($0).lowercaseHex},held.last!.base64EncodedString())
         }
-        private static func runLifecycle(_ script:(root:String,bytes:Data,hashes:[String],plist:String),action:String)throws->CommandCapture{try runFixed("/usr/bin/sudo",
-            ["-k","--","/bin/zsh","-f","-s","--","--held-source",script.root,action]+script.hashes+[script.plist],standardInput:script.bytes,maximum:16_384)}
+        private static func runLifecycle(_ script:(root:String,bytes:Data,hashes:[String],plist:String),action:LifecycleAction)throws->CommandCapture{try runFixed("/usr/bin/sudo",
+            ["-k","-p",action.prompt,"--","/bin/zsh","-f","-s","--","--held-source",script.root,action.rawValue]+script.hashes+[script.plist],standardInput:script.bytes,maximum:16_384)}
 
         private static func receipt(_ output: Data, domain: String,
             action: String) throws -> [String: Any] {
