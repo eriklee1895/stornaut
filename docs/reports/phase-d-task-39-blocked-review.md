@@ -5,6 +5,10 @@
 > Date: 2026-09-05
 >
 > Implementation baseline before disposition: `700bb5e85cd8a4f523171d5b964412b1b8ac12b4`
+>
+> Historical status note: this audit closed the v8 result. The user later
+> authorized one fresh replacement v9; Task 39 remains incomplete and Task 40
+> remains blocked.
 
 ## Outcome
 
@@ -39,10 +43,10 @@ Accordingly:
 - L3c3d authenticated real-model success is unproven;
 - L3c4 readiness and its reserved authoritative full are not run;
 - no Ready receipt is created;
-- no v9 or replacement privileged attempt is created; and
+- no replacement privileged attempt was created by this v8 disposition; and
 - no missing v8 artifact is reconstructed or appended.
 
-This is the final v8 gate result under the current authorization. It is a
+This is the final v8 gate result under the authorization at that time. It is a
 completed negative evaluation, not Task 39 completion or successful runtime
 admission.
 

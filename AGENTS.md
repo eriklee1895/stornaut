@@ -430,9 +430,12 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   final no-unresolved-P0–P2 review 完成；L2 implementation `474f634`、
   cross-UID correction `b664299`、PID-reuse fix `b4c632e` 与 verifier
   mutation-oracle fix 也已完成/non-admitting，final verifier review none；
-  ii-c-c v8 已作为唯一 real machine campaign 消费并失败；当前不存在可执行的
-  machine frontier。Task 39 保持 blocked/incomplete，只有用户明确批准新的
-  privileged campaign/plan amendment 后才可继续。
+  ii-c-c v8 已作为原唯一 real machine campaign 消费并失败；其只读 disposition
+  已在 `4147e45` 收口。用户于 2026-09-05 明确批准 plan amendment 与一次新的
+  replacement privileged campaign v9；当前 machine frontier 为 v9 非提权
+  preflight → 用户本人 Terminal 授权 → 单次 campaign。v9 不是 v8 重试，必须
+  使用全新 UUID/evidence root；durable arm 后失败即停止且不得自动创建 v10。
+  Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
   quarantine。
@@ -492,8 +495,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b 与 resolved-lineage
   L1/L2 已完成/non-admitting，L2 final verifier review none；
   ii-c-c v8 随后在 `armedConsumed` 后以 transport loss 终止，并已由独立
-  self-sealed 只读 verifier 固化为 non-admitting/non-retryable；Task 39 保持
-  blocked/incomplete，L3c3d/L3c4 未证明。这些 repairs 是 machine-campaign
+  self-sealed 只读 verifier 固化为 non-admitting/non-retryable；随后用户已授权
+  replacement v9，Task 39 当前 active/incomplete，L3c3d/L3c4 未证明。这些
+  repairs 是 machine-campaign
   prerequisite checkpoints，不是递归命名的新 Task；后续
   review finding 与局部修复也不得再产生新的命名 Task。
   该 ii-b5b-ii-c checkpoint 以 8 个
@@ -652,6 +656,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c resolved root-driver lineage L2 review / completion audit | [docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md](docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md) |
 | Phase D Task 39B2c ii-c pre-arm failure diagnostic review | [docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md](docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md) |
 | Phase D Task 39B2c ii-c-c v8 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v9 replacement campaign authorization | [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) |
 | Phase D Task 39 blocked/no-go gate audit | [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
@@ -911,8 +916,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   exact 9-path scope、physical compact-frame path、nine negative mutations 与
   final no-unresolved-P0–P2 review 均已关闭。唯一 privileged v8 attempt 后续
   已消费并以 transport loss 终止，现已只读固化为 non-admitting/non-retryable；
-  Task 39 保持 blocked/incomplete，L3c3d/L3c4 在没有新授权 machine cohort 的
-  条件下保持未证明；
+  Task 39 已从纯外部阻塞恢复到 authorized/preflight 状态；replacement v9 尚未
+  执行，L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

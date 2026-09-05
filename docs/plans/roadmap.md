@@ -259,8 +259,9 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    non-admitting。ii-c-a、ii-c-b 与 resolved-lineage L1/L2 已完成/non-admitting，
    L2 final review none；ii-c-c v8 随后在 `armedConsumed` 后以 transport loss
    终止，已由独立只读 verifier 固化为 non-admitting/non-retryable，未修改原
-   evidence 或创建 replacement attempt。Task 39 保持 blocked/incomplete；L3c3d/
-   L3c4 保持未证明，最终 full 未运行。Task 40 仍受顺序前置条件阻塞。
+   evidence。用户已于 2026-09-05 批准一次全新 replacement v9；当前处于
+   非提权 preflight，尚未执行。Task 39 保持 incomplete；L3c3d/L3c4 仍未证明，
+   最终 full 未运行。Task 40 仍受顺序前置条件阻塞。
 39B2c 未作 machine readiness claim。
 [ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
 冻结 v1-preserving enclosing projected-cohort binary contract、exact 8-path /
@@ -315,8 +316,8 @@ interactive-native identity binding `531f79f` / consumer seal `26e785a` 与
 fixed-gate historical replay `aa8a7f1` 已完成/non-admitting。ii-c-a、ii-c-b1、
    ii-c-b2a1、ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final
    review none；ii-c-c v8 已消费并以 transport loss 失败，failure disposition
-   已只读固化。L3c3d/L3c4 因缺少 green machine cohort 而保持 blocked/unproven；
-   replacement privileged attempt 未获授权。
+   已只读固化。用户已批准 replacement v9；v9 处于非提权 preflight，尚未
+   执行。L3c3d/L3c4 因仍缺少 green machine cohort 而保持 blocked/unproven。
 L3c2b preflight 的 real-plan matrix contradiction 已由 3-path plan-freshness
 prerequisite 关闭，affected/Investigation/structural/review gates 通过；
 只有 L3c4 可作 readiness claim；由于其 green cohort 前置条件不成立，
@@ -535,8 +536,9 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    replay `aa8a7f1` 已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
    ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review
    none；ii-c-c v8 已消费并以 transport loss 失败，独立只读 disposition
-   verifier 已证明 non-admitting/non-retryable 与当前零 runtime 残留。Task 39
-   保持 blocked/incomplete；L3c3d/L3c4 未证明，L3c4 的 final admission/full
+   verifier 已证明 non-admitting/non-retryable 与当前零 runtime 残留。用户随后
+   授权 replacement v9；Task 39 当前 active/incomplete，L3c3d/L3c4 未证明，
+   L3c4 的 final admission/full
    不运行。Task 40 仍受批准计划的 Task 39 前置条件阻塞。
 - Epic 0 Foundation Upstream Study：已完成，选择 checked-in Xcode App/Test host + local Swift packages。
 - Epic 0 Task 1：SwiftPM Core/Codex、smoke tests、`scripts/verify`、manual-only CI 与 ThirdPartyNotices 骨架已完成。

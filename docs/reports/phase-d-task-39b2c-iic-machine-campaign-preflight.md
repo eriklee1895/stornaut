@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / ii-c-a and ii-c-b complete/non-admitting / ii-c-c v8 consumed failure disposed; no retry authorized
+> Status: frozen / v8 consumed failure disposed / replacement v9 explicitly authorized; preflight pending
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: v8 failure disposition -> L3c3d/L3c4 blocked pending an authorized green machine cohort
+> Remaining order: v9 non-privileged preflight -> one replacement campaign -> L3c3d -> L3c4
 
 ## 1. Decision
 
@@ -158,7 +158,8 @@ Live disposition (2026-09-05): v8 reached
 `prepared -> armedConsumed -> spawnUncertain` and is therefore consumed. It
 contains no manifest, external seal, uninstall artifact or global post-teardown
 artifact and cannot admit ii-c. The suspended-sudo root cause is repaired, but
-v8 was not retried and no replacement privileged attempt is authorized. The
+v8 was not retried. On 2026-09-05 the user authorized one fresh replacement
+privileged campaign v9 under the separately recorded one-shot amendment. The
 [v8 failure disposition](phase-d-task-39b2c-iic-v8-failure-disposition.md)
 binds the preserved evidence and current zero-runtime observation without
 modifying the original evidence tree. L3c3d and L3c4 remain blocked on the

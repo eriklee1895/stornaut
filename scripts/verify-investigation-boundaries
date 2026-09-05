@@ -12731,17 +12731,18 @@ for marker in (
 ):
     if marker not in report_source:
         raise SystemExit("ii-c-c failure disposition report drifted: " + marker)
-active_status_sha256 = {
-    Path("AGENTS.md"): "4ab074744544f6af12fe409f67c5e7db862f74dae3e193ba7d9476af267db04b",
-    Path("README.md"): "97f0933a6b830de6946ada0b4cbd140a80e1692d443acd70a18222374113dc83",
-    Path("docs/README.md"): "03fc686ea88ab244a2506b8ce55217d74b587adac5400202ce3689c2a6937249",
-    Path("docs/agent/coding-agent-handoff.md"): "809ba290f3552d9c763ab14582db413797a9dd6c9740c4af3c0ba7529f791955",
-    Path("docs/plans/active/README.md"): "f72cb8d2d708752ebfd55133c6adba4d70907c8a6d569ec7f3af927114bfca4b",
-    Path("docs/plans/active/phase-d-conditional-deep-dive.md"): "494721e057c2e41ecd5de1f8cf9a5559a1773ebce88b8149b9c41c9c97ec56e3",
-    Path("docs/plans/active/task-39-implementation-brief.md"): "e20bf97729bad999f839165b606e16a6227c3f04dddded0e8c69d7571ff38732",
-    Path("docs/plans/active/task-40-implementation-brief.md"): "73a01d3997def484f9f68e0bb6906f8bec00c8d18a397ca9a168d247e0a197de",
-    Path("docs/plans/roadmap.md"): "25823d112e6354a59dca80b7ad9bd36eb145a61e444dd9c27a2db30e2a33060a",
-}
+active_status_entries = (
+    (Path("AGENTS.md"), "4c908d496c3df9655fdf228c42136e7de0519c842e9909425c0509b798953d43"),
+    (Path("README.md"), "ed942fa2df27e5a44a2e20affd38a6ae06a8dade2558e45a55c48cd3e81574b8"),
+    (Path("docs/README.md"), "e71772aba0823f04d60130b429e9df6c4fb32ee20593f81f37a04905b6966f96"),
+    (Path("docs/agent/coding-agent-handoff.md"), "41a04c5504903fb4f022e8a2c7840c0c4b4c54aee568403c3e25c62128ff7574"),
+    (Path("docs/plans/active/README.md"), "af2b8be6792bbb020955b2d1601c5fb2653d1618c092f2ed014bcf6753b8b624"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "a9ec4e81cd331ba7ba8f25cd1728a6e851025746f1bec1c9aa87e82d90e52e46"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "5ca68b73555196f4508e173432a785062b4a564966e096e9306f209896fbccba"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "198559a2e202083b765993563418f5df98a46e077f5768c4b565bcc6841b26db"),
+    (Path("docs/plans/roadmap.md"), "a548c9f3d036e0393361774615b5276687d30974fa66b998e5682c3298b1a96a"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "bc5cc1fa381b1221404da539536b7d94837e9828a88207b1353f88fcbb76edfe"),
+)
 active_status_expected_paths = {
     Path("AGENTS.md"),
     Path("README.md"),
@@ -12752,10 +12753,14 @@ active_status_expected_paths = {
     Path("docs/plans/active/task-39-implementation-brief.md"),
     Path("docs/plans/active/task-40-implementation-brief.md"),
     Path("docs/plans/roadmap.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"),
 }
-if set(active_status_sha256) != active_status_expected_paths:
+active_status_paths = [path for path, _ in active_status_entries]
+if (len(active_status_entries) != 10
+        or len(set(active_status_paths)) != len(active_status_paths)
+        or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
-for active_path, expected_digest in active_status_sha256.items():
+for active_path, expected_digest in active_status_entries:
     if (not active_path.is_file() or active_path.is_symlink()
             or hashlib.sha256(active_path.read_bytes()).hexdigest()
                 != expected_digest):

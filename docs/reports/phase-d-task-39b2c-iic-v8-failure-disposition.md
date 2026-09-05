@@ -7,6 +7,9 @@
 > Frozen campaign: `64473a10-abfd-4a03-872b-eac1e1262242`
 >
 > Frozen attempt: `68c1b0e0-c609-4ff1-b468-b0b443753fa9`
+>
+> Historical status note: the user later authorized one fresh replacement v9;
+> this does not change any v8 fact or permit v8 reuse.
 
 ## Result
 
@@ -94,8 +97,8 @@ tree before and after verification to prove the verifier did not modify it.
 
 L3c3d's authenticated real-model success and L3c4's sealed readiness both
 depend on a green installed three-plane machine cohort. v8 cannot supply that
-cohort, and no replacement privileged attempt is currently authorized. Therefore
-those readiness conditions remain unproven under the current authorization.
+cohort. The later v9 authorization does not change that result. Until v9 is
+green, those readiness conditions remain unproven.
 No local implementation work may reinterpret this disposition as success.
 
 The v8 gate is closed as `blocked/no-go`, but Task 39 itself remains incomplete.

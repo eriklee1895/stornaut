@@ -4,8 +4,10 @@ The approved executable plan is
 [Phase D — Conditional Deep Dive](phase-d-conditional-deep-dive.md).
 Tasks 36–38 are complete. Task 38's closed fake-runtime coordinator,
 independent review, 811-test serialized regression and 23/23-stage
-authoritative full verifier passed. Task 39 is blocked/incomplete after a conclusive no-go
-machine-gate result: checkpoints 39A,
+authoritative full verifier passed. Task 39 is incomplete but active again after
+the user authorized one replacement privileged campaign v9 on 2026-09-05. v8
+remains an immutable consumed/no-go record; v9 is in non-privileged preflight
+and has not executed. Checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
 39B1b-i closed the package-scoped transport/non-product composition seam.
@@ -456,7 +458,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | blocked/incomplete: v8 is consumed transport loss, independently dispositioned non-admitting/non-retryable; no replacement privileged attempt authorized; L3c3d/L3c4 readiness evidence unavailable; final full intentionally not run; ADR 0018 remains Proposed |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | authorized/preflight: v8 remains consumed/non-retryable; one fresh replacement v9 is authorized but not executed; L3c3d/L3c4 remain unproven; final full not run; ADR 0018 Proposed |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

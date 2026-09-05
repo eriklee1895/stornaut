@@ -33,7 +33,7 @@
 | Agent、双模式与治理设计 | [Agent Disk Governance](design/agent-disk-governance.md) |
 | UI、品牌、状态与交互 | [UI/UX](design/ui-ux.md) |
 | 宏观交付顺序与阶段 Gate | [Delivery Roadmap](plans/roadmap.md) |
-| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；Task 39 blocked/incomplete：v8 consumed transport loss 已只读固化且禁止重试；L3c3d/L3c4 未证明，ADR 0018 Proposed；Task 40 仍受顺序前置条件阻塞 |
+| 当前计划状态 | [Active Plans](plans/active/README.md) — Phase D approved；v8 consumed failure 已只读固化且不可重试；replacement v9 已获一次性授权并处于非提权 preflight；Task 39 incomplete，L3c3d/L3c4 未证明，ADR 0018 Proposed；Task 40 仍阻塞 |
 | Capability-first Codex Runtime Gate | [Runtime Evidence Gate](plans/completed/capability-first-codex-runtime-gate.md) — complete / archived |
 | R2 tests-first brief | [R2 Implementation Brief](plans/completed/task-r2-implementation-brief.md) — complete |
 | R3 lifecycle hard-gate brief | [R3 Implementation Brief](plans/completed/task-r3-implementation-brief.md) — behaviorReady candidate |
@@ -64,9 +64,10 @@
 | Phase D Task 37 Review | [Code Review and Completion Audit](reports/phase-d-task-37-review.md) |
 | Phase D Task 38 | [Implementation Brief](plans/active/task-38-implementation-brief.md) — complete |
 | Phase D Task 38 Review | [Code Review and Completion Audit](reports/phase-d-task-38-review.md) |
-| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — blocked/incomplete；v8 consumed transport loss 已只读固化且不可重试；L3c3d/L3c4 未证明，final full 未运行；production Deep Dive unavailable |
+| Phase D Task 39 | [Implementation Brief](plans/active/task-39-implementation-brief.md) — authorized/preflight；v8 immutable，replacement v9 尚未执行；L3c3d/L3c4 未证明，final full 未运行；production Deep Dive unavailable |
 | Phase D Task 39B2c v8 Failure Disposition | [Read-only Failure Audit](reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) — consumed / non-admitting / non-retryable；原 evidence 未修改；当前 fixed runtime absent |
-| Phase D Task 39 Gate Result | [Blocked/No-Go Audit](reports/phase-d-task-39-blocked-review.md) — implementation/non-privileged verification complete；Task 39 remains incomplete；L3c3d/L3c4 unproven |
+| Phase D Task 39B2c v9 Authorization | [Replacement Campaign Amendment](reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) — one fresh campaign；operator-only credential entry；failure stops without automatic retry |
+| Phase D Task 39 v8 Gate Result | [Historical Blocked/No-Go Audit](reports/phase-d-task-39-blocked-review.md) — v8 negative gate complete；replacement v9 later authorized；Task 39 remains incomplete |
 | Phase D Task 39A Review | [Code Review and Completion Audit](reports/phase-d-task-39a-review.md) |
 | Phase D Task 39B1a Review | [Code Review and Completion Audit](reports/phase-d-task-39b1a-review.md) |
 | Phase D Task 39B1b-i Review | [Code Review and Completion Audit](reports/phase-d-task-39b1b-i-review.md) |
@@ -169,7 +170,7 @@
 | Phase D Task 39B2c Interactive-Native Identity Binding Review | [Completion Audit](reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md) — exact 14 paths / 2,389 lines、1,756-test serial、Debug/Release 与 boundary gates；complete/non-admitting |
 | Phase D Task 39B2c Fixed-Gate Historical Replay Preflight | [Frozen Verifier Scope](reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md) — one-path successor replay and alternate-index closure |
 | Phase D Task 39B2c Fixed-Gate Historical Replay Review | [Completion Audit](reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md) — implementation `aa8a7f1` / tree `8176e92a`、bare Investigation/App Release gates；complete/non-admitting |
-| Phase D Task 39B2c ii-c Machine Campaign Preflight | [Frozen Campaign Split](reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) — ii-c-b and resolved-lineage L1/L2 implementation complete/non-admitting；ii-c-c v8 consumed failure/non-retryable；Task 39 blocked |
+| Phase D Task 39B2c ii-c Machine Campaign Preflight | [Frozen Campaign Split](reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) — ii-c-b and resolved-lineage L1/L2 complete/non-admitting；v8 historical consumed/no-go；replacement v9 authorized/preflight |
 | Phase D Task 39B2c ii-c-a Static Installed Topology Review | [Completion Audit](reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) — implementation `81f185c` / tree `7cf4db75`、11 paths / 2,669 lines、856/856 affected serial；complete/non-admitting |
 | Phase D Task 39B2c ii-c-b1 Root-Owned Gate Review | [Completion Audit](reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md) — implementation `77cde61` / tree `9c59f241`、7 paths / 1,900 lines、860/860 serial；complete/non-admitting |
 | Phase D Task 39B2c ii-c-b2 Split Preflight | [Frozen Scope](reports/phase-d-task-39b2c-iic-b2-split-preflight.md) — b2a1 producer → b2a2 verifier → b2b PTY/FD3 transport |
