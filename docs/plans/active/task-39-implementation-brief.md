@@ -1,8 +1,8 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
 > **Status:** Active/incomplete; privileged campaigns v8 and v9 are consumed,
-> non-admitting and non-retryable. The v9 AMFI root-cause repair is in
-> non-privileged validation; no fresh campaign is authorized. 39A contract/facade foundation, 39B1a exact
+> non-admitting and non-retryable. The v9 AMFI root-cause repair passed
+> non-privileged validation and one fresh v10 campaign is authorized/unconsumed. 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
 > independently verified. The 39B2 preflight found that the accepted R5 helper
@@ -163,7 +163,8 @@
 > non-admitting and non-retryable. AMFI code `-423` bound the failure to the
 > ad-hoc MachineDriver's restricted application-identifier entitlement. A
 > tests-first local repair now produces fixed-identifier, zero-entitlement
-> Debug/Release driver artifacts, but no new campaign is authorized.
+> Debug/Release driver artifacts. One fresh v10 campaign is now authorized from
+> pushed repair baseline `05fd0cd`; it remains unconsumed and in preflight.
 > A later serial validation exposed that the historical fixed-gate physical
 > fixture invoked production stale-recovery and removed the preserved v9 Gate
 > capsule. No exact byte copy was recoverable. The original v2 receipt is
@@ -191,8 +192,9 @@
 >
 > **Current Task 39 disposition (2026-09-07):** v8 and v9 are conclusive
 > machine-gate `no-go` attempts. Both are consumed, non-admitting and
-> non-retryable; no fresh replacement campaign is authorized. The v9 AMFI
-> root-cause repair is undergoing non-privileged validation. Task 39 is
+> non-retryable. One fresh v10 replacement campaign is authorized, unconsumed
+> and in preflight. The v9 AMFI root-cause repair passed non-privileged
+> validation and independent review. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential

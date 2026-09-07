@@ -34,8 +34,8 @@ Trash, Registered Actions or a second Policy/Executor path.
 
 Task 40 starts after Tasks 36–39 are independently committed and pushed. The
 Task 39 blocked/no-go disposition does not satisfy that sequential prerequisite;
-the consumed/non-admitting replacement v9 also does not satisfy it. A separately
-authorized fresh campaign must first let Task 39 produce and push a Ready
+the consumed/non-admitting replacement v9 also does not satisfy it. The
+authorized but still unconsumed v10 campaign must first let Task 39 produce and push a Ready
 baseline.
 Inputs are:
 

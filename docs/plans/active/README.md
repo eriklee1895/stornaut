@@ -14,8 +14,8 @@ serial validation exposed that the historical physical fixture could invoke
 production stale-recovery and remove the preserved v9 Gate capsule. The exact
 bytes were not recoverable; the original v2 receipt and current v3 mutation
 receipt are both retained, and the fixture is now explicit opt-in with
-discovery/entry guards. No new
-privileged campaign is authorized. Checkpoints 39A,
+discovery/entry guards. One fresh v10 privileged campaign is authorized from
+pushed repair baseline `05fd0cd`; it is unconsumed and in preflight. Checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
 39B1b-i closed the package-scoped transport/non-product composition seam.
@@ -466,7 +466,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | blocked: v8/v9 consumed and non-admitting; v9 AMFI root-cause repaired locally; new campaign not authorized; L3c3d/L3c4 unproven |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8/v9 consumed and non-admitting; v10 authorized/unconsumed and in preflight; L3c3d/L3c4 unproven |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

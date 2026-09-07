@@ -5,6 +5,9 @@
 > Date: 2026-09-05
 >
 > Frozen parent baseline: `4147e455d326a87cda1a3b048ce5ce85e08b5309`
+>
+> Historical status note: this v9 authorization remains consumed and does not
+> authorize reuse. The user later granted one independent v10 authorization.
 
 ## Authorization
 

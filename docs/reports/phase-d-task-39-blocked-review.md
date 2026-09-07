@@ -7,8 +7,9 @@
 > Implementation baseline before disposition: `700bb5e85cd8a4f523171d5b964412b1b8ac12b4`
 >
 > Historical status note: this audit closed the v8 result. The user later
-> authorized one fresh replacement v9; Task 39 remains incomplete and Task 40
-> remains blocked.
+> authorized one fresh replacement v9 and, after v9's consumed no-go, one
+> independent v10 campaign. Task 39 remains incomplete and Task 40 remains
+> blocked.
 
 ## Outcome
 

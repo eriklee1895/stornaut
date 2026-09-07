@@ -437,9 +437,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   receipt 均保留，不能把 owner-lock-only 解释为成功清理。fixture 已改为显式
   opt-in 并在 discovery/entry 双重拒绝历史 attempt。唯一 1,932-test/99-suite
   serial 记录 1 个 missing-attempt issue 且未重跑；v3/fixture exact cases 随后
-  通过。v9 的 AMFI `-423` root cause
-  已 tests-first 修复，但新 privileged campaign 尚未授权；当前 machine frontier 为 reviewed
-  repair → 单独授权 fresh campaign → L3c3d → L3c4。
+  通过。v9 的 AMFI `-423` root cause 已 tests-first 修复并以 `05fd0cd`
+  推送；用户已授权一次 fresh v10 privileged campaign，当前 machine frontier
+  为 v10 clean pushed preflight → one-shot campaign → L3c3d → L3c4。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -502,7 +502,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   ii-c-c v8 随后在 `armedConsumed` 后以 transport loss 终止，并已由独立
   self-sealed 只读 verifier 固化为 non-admitting/non-retryable；replacement v9
   后续也在 `armedConsumed` 后因 AMFI `-423` 终止并只读固化，修复已通过
-  非提权 gates，但新的 privileged campaign 尚未授权。Task 39 当前
+  非提权 gates；fresh v10 privileged campaign 已授权且尚未消费。Task 39 当前
   active/incomplete，L3c3d/L3c4 未证明。这些
   repairs 是 machine-campaign
   prerequisite checkpoints，不是递归命名的新 Task；后续

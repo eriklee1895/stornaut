@@ -1026,8 +1026,8 @@ Checkpoint status:
   L1/L2 are complete/non-admitting; L2 final verifier closure is `849e454` /
   tree `f6c36d2`, and final review returned no finding. The historical pre-v8
   order was `ii-c-c -> L3c3d -> L3c4`; v8 and v9 are consumed, failed and
-  non-retryable. The current frontier is the reviewed AMFI root-cause repair
-  followed by a separately authorized fresh campaign.
+  non-retryable. The reviewed AMFI root-cause repair is pushed at `05fd0cd`;
+  one fresh v10 campaign is authorized, unconsumed and in preflight.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

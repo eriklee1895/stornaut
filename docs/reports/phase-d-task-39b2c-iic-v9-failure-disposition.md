@@ -7,6 +7,9 @@
 > Frozen campaign: `fd4bac12-d40d-4470-b6d2-7dcd0f1661d0`
 >
 > Frozen attempt: `b856e976-e74a-4f6d-9079-0d6859fab67d`
+>
+> Historical status note: the user later authorized one independent v10
+> campaign; this does not alter or permit reuse of any v9 evidence.
 
 ## Result
 
@@ -129,8 +132,8 @@ read-only review reported no actionable regressions. The frozen v9-v2 receipt
 remains byte-identical at SHA-256
 `9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252`.
 
-This source repair is non-admitting. A new replacement privileged campaign
-requires separate user authorization, a fresh campaign/attempt UUID and a fresh
-evidence root. Until it succeeds, L3c3d/L3c4 remain unproven, the authoritative
+This source repair is non-admitting. The separately authorized v10 campaign must
+use a fresh campaign/attempt UUID and a fresh evidence root. Until it succeeds,
+L3c3d/L3c4 remain unproven, the authoritative
 full verifier remains reserved, Task 39 remains incomplete, Task 40 stays
 blocked and production Deep Dive remains unavailable.
