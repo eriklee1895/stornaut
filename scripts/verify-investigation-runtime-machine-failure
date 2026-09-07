@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_failure_self_sha=8b0e9eecbf0846e663a86c3781e077880df7294cdf6a934572f266e82135bfc0 # iicc-failure-self-seal
+typeset -r iicc_failure_self_sha=f496b8a3b027c751c6ed49cd0d657154f10f5ce957127f1c616f512bba55394c # iicc-failure-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -533,7 +533,7 @@ def validate_json_artifacts(contents, report):
                                "stagingIdentitySHA256",
                                "installedIdentitySHA256", "plistSHA256"}:
         digest_text(install[name], name)
-    if report["schemaVersion"] in (2, 3):
+    if report["schemaVersion"] in (2, 3, 5):
         require(report["rootCauseObservation"]["driverExecutableSHA256"]
                 == install["machineDriverExecutableSHA256"],
                 "AMFI driver artifact binding")
@@ -598,14 +598,19 @@ def validate_report(data):
         "requiredMissingArtifacts", "rootIdentity",
         "parentIdentity", "systemObservation", "nonClaims"}
     profile = exact_int(value.get("schemaVersion"), "disposition schema")
-    require(profile in (1, 2, 3), "disposition schema version")
+    require(profile in (1, 2, 3, 4, 5), "disposition schema version")
     profile_keys = (set() if profile == 1 else {"rootCauseObservation"})
     if profile == 3:
         profile_keys |= {"priorGateResidueObservation",
                          "postDispositionMutation"}
+    elif profile == 5:
+        profile_keys |= {"priorGateResidueObservation",
+                         "postDispositionMutation",
+                         "subsequentCampaignObservation"}
     exact_object(value, common_keys | profile_keys, "disposition")
     expected_domain = f"stornaut.task39.iic.failure-disposition.v{profile}"
     expected_classification = ("consumedTransportLoss" if profile == 1
+        else "consumedCampaignDeadlineExhaustion" if profile == 4
         else "consumedDriverExecutionPolicyDenial")
     expected_events = (["prepared", "armedConsumed", "spawnUncertain"]
         if profile == 1 else
@@ -634,10 +639,10 @@ def validate_report(data):
                     for key in identity_keys), name + " values")
     system_keys = {"fixedPathsAbsent", "fixedServiceAbsent",
         "fixedProcessCount", "gateBaseState"}
-    if profile == 2:
+    if profile in (2, 4):
         system_keys |= {"gateAttemptName", "gateCapsuleName",
             "gateCapsuleSHA256", "gateCapsuleByteCount"}
-    elif profile == 3:
+    elif profile in (3, 5):
         system_keys |= {"gateBaseChangeTimeNanoseconds",
             "gateBaseDevice", "gateBaseInode",
             "gateBaseGeneration", "ownerLockDevice", "ownerLockInode",
@@ -649,10 +654,12 @@ def validate_report(data):
             and value["systemObservation"]["fixedProcessCount"] == 0
             and value["systemObservation"]["gateBaseState"]
                 in (("ownAttemptAbsent",) if profile == 1
-                    else ("ownConsumedAttemptPresent",) if profile == 2
-                    else ("ownConsumedAttemptRemovedByTestFixture",)),
+                    else ("ownConsumedAttemptPresent",) if profile in (2, 4)
+                    else ("ownConsumedAttemptRemovedByTestFixture",)
+                    if profile == 3 else
+                    ("ownConsumedAttemptRemovedWithSubsequentAttemptPresent",)),
             "system observation values")
-    if profile == 2:
+    if profile in (2, 4):
         observation = value["systemObservation"]
         require(observation["gateAttemptName"] == "attempt-" + value["attemptUUID"]
                 and re.fullmatch(r"projected-cohort-[0-9a-f]{64}\.bin",
@@ -661,7 +668,7 @@ def validate_report(data):
                 and exact_int(observation["gateCapsuleByteCount"],
                               "gate capsule bytes", 1) <= 1_069_056,
                 "consumed Gate residue observation")
-    if profile in (2, 3):
+    if profile in (2, 3, 5):
         root_cause = value["rootCauseObservation"]
         exact_object(root_cause, {"source", "process", "observedAtUTC",
             "errorDomain", "errorCode", "reason",
@@ -683,7 +690,39 @@ def validate_report(data):
                 and root_cause["driverEntitlementKeys"]
                     == ["com.apple.application-identifier"],
                 "AMFI root-cause observation")
-    if profile == 3:
+    elif profile == 4:
+        root_cause = value["rootCauseObservation"]
+        exact_object(root_cause, {"source", "reason",
+            "configuredCampaignDeadlineNanoseconds", "epochCount",
+            "maximumEpochWallClockSeconds", "maximumEpochBudgetSeconds",
+            "campaignOrchestrationAndCleanupReserveSeconds",
+            "armedConsumedObservedAtUTCMicroseconds",
+            "spawnUncertainObservedAtUTCMicroseconds",
+            "elapsedAfterArmMicroseconds", "driverEpochArtifactCount"},
+            "root cause")
+        require(root_cause["source"] == "durableAttemptEventTimeline"
+                and root_cause["reason"]
+                    == "sharedCampaignDeadlineExhaustedBeforeCoordinatorReceipt"
+                and root_cause["configuredCampaignDeadlineNanoseconds"]
+                    == "1200000000000"
+                and exact_int(root_cause["epochCount"], "epoch count") == 8
+                and exact_int(root_cause["maximumEpochWallClockSeconds"],
+                              "epoch wall clock") == 140
+                and exact_int(root_cause["maximumEpochBudgetSeconds"],
+                              "epoch budget") == 1_120
+                and exact_int(root_cause[
+                    "campaignOrchestrationAndCleanupReserveSeconds"],
+                    "campaign reserve") == 80
+                and root_cause["armedConsumedObservedAtUTCMicroseconds"]
+                    == "1788786289593855"
+                and root_cause["spawnUncertainObservedAtUTCMicroseconds"]
+                    == "1788787484650045"
+                and root_cause["elapsedAfterArmMicroseconds"]
+                    == "1195056190"
+                and exact_int(root_cause["driverEpochArtifactCount"],
+                              "driver epoch artifact count") == 0,
+                "campaign deadline root-cause observation")
+    if profile in (3, 5):
         prior = value["priorGateResidueObservation"]
         exact_object(prior, {"gateAttemptName", "gateCapsuleName",
             "gateCapsuleSHA256", "gateCapsuleByteCount"},
@@ -727,6 +766,28 @@ def validate_report(data):
                     "post-mutation node identity")
         digest_text(value["systemObservation"]["ownerLockSHA256"],
                     "owner lock")
+    if profile == 5:
+        subsequent = value["subsequentCampaignObservation"]
+        exact_object(subsequent, {"campaignUUID", "attemptUUID",
+            "classification", "priorDispositionSHA256",
+            "gateCapsuleName", "gateCapsuleSHA256", "gateCapsuleByteCount"},
+            "subsequent campaign")
+        require(exact_uuid(subsequent["campaignUUID"], "subsequent campaign")
+                    == "b6ee7781-5298-4732-a312-26eb7e0c37d1"
+                and exact_uuid(subsequent["attemptUUID"], "subsequent attempt")
+                    == "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd"
+                and subsequent["attemptUUID"] != value["attemptUUID"]
+                and subsequent["classification"]
+                    == "consumedCampaignDeadlineExhaustion"
+                and subsequent["priorDispositionSHA256"]
+                    == "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac"
+                and subsequent["gateCapsuleName"]
+                    == "projected-cohort-544d12b656dccc35bc0e5aeedea4a06992c71efa6646fecde622d7604b728d6a.bin"
+                and subsequent["gateCapsuleSHA256"]
+                    == "80aa1200fdb6801b8c8ac50383f6231a21a0c1ef4033371561fcfd9c6e6b4f73"
+                and exact_int(subsequent["gateCapsuleByteCount"],
+                              "subsequent Gate capsule bytes", 1) == 28_997,
+                "subsequent campaign observation")
     expected_nonclaims = [
         "no manifest or external seal",
         "no uninstall or global post-teardown artifact",
@@ -734,10 +795,14 @@ def validate_report(data):
         "no L3c3d authenticated model success",
         "no Task 39 readiness",
     ]
-    if profile == 3:
+    if profile in (3, 5):
         expected_nonclaims += [
             "no verified recovery of removed Gate capsule",
             "owner-lock-only state is not successful campaign cleanup",
+        ]
+    if profile == 5:
+        expected_nonclaims += [
+            "subsequent campaign residue is not prior campaign success",
         ]
     require(value["nonClaims"] == expected_nonclaims, "non-claims")
     value["_files"] = files
@@ -841,6 +906,14 @@ def observe_system(expected, report):
                     == "ownConsumedAttemptRemovedByTestFixture":
                 require(gate_inventory == [".owner-lock-v1"],
                         "post-mutation Gate base inventory")
+            elif expected["gateBaseState"] \
+                    == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent":
+                subsequent = report["subsequentCampaignObservation"]
+                subsequent_attempt = "attempt-" + subsequent["attemptUUID"]
+                require("attempt-" + report["attemptUUID"] not in gate_inventory
+                        and gate_inventory
+                            == [".owner-lock-v1", subsequent_attempt],
+                        "post-mutation subsequent Gate inventory")
             else:
                 require("attempt-" + report["attemptUUID"]
                         not in gate_inventory,
@@ -849,8 +922,9 @@ def observe_system(expected, report):
                 gate_fd, ".owner-lock-v1", 1, held_files, 0o600,
                 allow_empty=True)
             require(lock == b"", "owner lock content")
-            if expected["gateBaseState"] \
-                    == "ownConsumedAttemptRemovedByTestFixture":
+            if expected["gateBaseState"] in (
+                    "ownConsumedAttemptRemovedByTestFixture",
+                    "ownConsumedAttemptRemovedWithSubsequentAttemptPresent"):
                 lock_identity = os.fstat(held_files[-1][2])
                 require(str(gate_before.st_ctime_ns)
                             == expected["gateBaseChangeTimeNanoseconds"]
@@ -893,6 +967,31 @@ def observe_system(expected, report):
                             attempt_name, dir_fd=gate_fd, follow_symlinks=False))
                         and inventory(attempt_fd) == [capsule_name],
                         "Gate attempt changed during verification")
+            elif expected["gateBaseState"] \
+                    == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent":
+                subsequent = report["subsequentCampaignObservation"]
+                attempt_name = "attempt-" + subsequent["attemptUUID"]
+                named_attempt = os.stat(
+                    attempt_name, dir_fd=gate_fd, follow_symlinks=False)
+                attempt_fd = os.open(attempt_name, DIRECTORY_FLAGS, dir_fd=gate_fd)
+                watch(attempt_fd, True)
+                attempt_held = validate_descriptor(
+                    attempt_fd, named_attempt, 0o700, False)
+                capsule_name = subsequent["gateCapsuleName"]
+                require(inventory(attempt_fd) == [capsule_name],
+                        "subsequent Gate attempt inventory")
+                capsule, _ = read_child(
+                    attempt_fd, capsule_name, 1_069_056, held_files, 0o600)
+                require(len(capsule) == subsequent["gateCapsuleByteCount"]
+                        and hashlib.sha256(capsule).hexdigest()
+                            == subsequent["gateCapsuleSHA256"],
+                        "subsequent Gate capsule binding")
+                require(node_identity(os.fstat(attempt_fd))
+                        == node_identity(attempt_held)
+                        == node_identity(os.stat(
+                            attempt_name, dir_fd=gate_fd, follow_symlinks=False))
+                        and inventory(attempt_fd) == [capsule_name],
+                        "subsequent Gate attempt changed during verification")
             for record in held_files:
                 if stat.S_ISREG(os.fstat(record[2]).st_mode):
                     revalidate_file(record)
@@ -936,8 +1035,16 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
             "disposition read")
     report_digest = hashlib.sha256(report_bytes).digest()
     report = validate_report(report_bytes)
-    require(report["verifierExecutableSHA256"]
-            == hashlib.sha256(verifier_bytes).hexdigest(),
+    verifier_digest = hashlib.sha256(verifier_bytes).hexdigest()
+    historical_verifier_digest = (
+        "848955e1ea62e194990163558f8217c47ad28b85bd4a8a6d1de0660b35ef40e1")
+    expected_verifier_digests = (
+        {verifier_digest, historical_verifier_digest}
+        if report["schemaVersion"] == 1 else
+        {historical_verifier_digest}
+        if report["schemaVersion"] in (2, 3) else
+        {verifier_digest})
+    require(report["verifierExecutableSHA256"] in expected_verifier_digests,
             "verifier executable binding")
     require(os.path.basename(root_path)
             == "stornaut-task39-iic-" + report["campaignUUID"],
@@ -1005,6 +1112,15 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
                     == report["_expectedEventKinds"]
                 and all(event["attempt"] == report["attemptUUID"]
                         for event in events), "consumed transport-loss event chain")
+        if report["schemaVersion"] == 4:
+            root_cause = report["rootCauseObservation"]
+            require(str(events[1]["observed"])
+                        == root_cause["armedConsumedObservedAtUTCMicroseconds"]
+                    and str(events[2]["observed"])
+                        == root_cause["spawnUncertainObservedAtUTCMicroseconds"]
+                    and str(events[2]["observed"] - events[1]["observed"])
+                        == root_cause["elapsedAfterArmMicroseconds"],
+                    "campaign deadline event timing binding")
         for index, event in enumerate(events):
             previous = bytes(32) if index == 0 else hashlib.sha256(
                 events[index - 1]["bytes"]).digest()

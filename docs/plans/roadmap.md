@@ -262,11 +262,12 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    evidence。用户批准的 replacement v9 首次 launcher 在 install 提示处取消且
    未消费；修复后 invocation 已到达 `armedConsumed`，随后因 AMFI `-423` 拒绝
    携带受限 entitlement 的 ad-hoc MachineDriver 而失败。v9 已消费、不可重试；
-   tests-first root-cause 修复已通过非提权 gates；fresh v10 campaign 已授权且
-   尚未消费。Task 39
+   tests-first root-cause 修复已通过非提权 gates；fresh v10 campaign 随后在
+   durable arm 后耗尽 1,200 秒 outer deadline，已消费且不可重试；1,400 秒
+   deadline-budget repair 已完成/non-admitting。Task 39
    后续 serial validation 暴露历史 physical fixture 会触发 production
    stale-recovery 并误删 v9 Gate capsule；精确副本不可恢复，原 v2 receipt 与
-   当前 v3 mutation receipt 已保留，fixture 已改为显式 opt-in + 双重保护。
+   v3 predecessor 与当前 v5 receipt 已保留，fixture 已改为显式 opt-in + 双重保护。
    保持 incomplete；L3c3d/L3c4 仍未证明，
    最终 full 未运行。Task 40 仍受顺序前置条件阻塞。
 39B2c 未作 machine readiness claim。
@@ -547,7 +548,8 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    none；ii-c-c v8 已消费并以 transport loss 失败，独立只读 disposition
    verifier 已证明 non-admitting/non-retryable 与当前零 runtime 残留。replacement
    v9 后续也在 durable arm 后以 AMFI `-423` 失败且不可重试；root-cause 修复已
-   通过非提权 gates；fresh v10 privileged campaign 已授权且尚未消费。Task 39 当前
+   通过非提权 gates；v10 又因 outer deadline exhaustion 消费失败且不可重试，
+   1,400 秒 deadline-budget repair 已完成/non-admitting。Task 39 当前
    active/incomplete，L3c3d/L3c4 未证明，
    L3c4 的 final admission/full
    不运行。Task 40 仍受批准计划的 Task 39 前置条件阻塞。

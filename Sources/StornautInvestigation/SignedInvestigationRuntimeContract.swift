@@ -321,8 +321,14 @@ public struct SignedInvestigationRuntimeDiagnosticConfiguration:
     Equatable
 {
     public static let schemaVersion = 3
-    package static let maximumMachineCohortValiditySeconds: TimeInterval = 1_200
     package static let maximumMachineEpochWallClockSeconds = 140
+    package static let machineCampaignOrchestrationAndCleanupReserveSeconds:
+        TimeInterval = 280
+    package static let maximumMachineCohortValiditySeconds: TimeInterval =
+        TimeInterval(
+            SignedInvestigationRuntimeDiagnosticScenario.allCases.count
+                * maximumMachineEpochWallClockSeconds
+        ) + machineCampaignOrchestrationAndCleanupReserveSeconds
     public static let requiredOptIn =
         "I authorize one bounded disposable read-only Stornaut Investigation diagnostic."
 

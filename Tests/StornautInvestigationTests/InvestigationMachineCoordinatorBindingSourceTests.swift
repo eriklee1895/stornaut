@@ -582,7 +582,7 @@ struct InvestigationMachineCoordinatorBindingSourceTests {
     )
     let scenarios = SignedInvestigationRuntimeDiagnosticScenario.allCases
     let rows = result.rows
-    let expectedCohortDeadline = fixture.now.addingTimeInterval(1_200)
+    let expectedCohortDeadline = fixture.now.addingTimeInterval(1_400)
     #expect(rows.count == 8)
     #expect(result.configurations.count == 8)
     #expect(result.canonicalConfigurationData.count == 8)

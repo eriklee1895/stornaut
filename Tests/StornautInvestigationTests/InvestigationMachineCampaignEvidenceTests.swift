@@ -1603,15 +1603,21 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(before == after)
         let disposition = try #require(JSONSerialization.jsonObject(
             with: Data(contentsOf: report)) as? [String: Any])
-        #expect(disposition["schemaVersion"] as? Int == 3)
+        #expect(disposition["schemaVersion"] as? Int == 5)
         let observation = try #require(
             disposition["systemObservation"] as? [String: Any])
         #expect(observation["gateBaseState"] as? String
-            == "ownConsumedAttemptRemovedByTestFixture")
+            == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent")
         let mutation = try #require(
             disposition["postDispositionMutation"] as? [String: Any])
         #expect(mutation["recoverySearchResult"] as? String
             == "exactCapsuleBytesUnavailable")
+        let subsequent = try #require(
+            disposition["subsequentCampaignObservation"] as? [String: Any])
+        #expect(subsequent["attemptUUID"] as? String
+            == "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd")
+        #expect(subsequent["classification"] as? String
+            == "consumedCampaignDeadlineExhaustion")
 
         let reportParent = try Self.makeFailureReportParent()
         defer { try? FileManager.default.removeItem(at: reportParent) }
@@ -1641,6 +1647,35 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(priorRejected.status != 0)
         #expect(priorRejected.stderr.contains(
             "post-disposition mutation observation"))
+    }
+
+    @Test
+    func checkedV10FailureDispositionBindsFrozenExternalEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v10-failure-disposition.json")
+        guard let root = ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V10_EVIDENCE_ROOT"] else { return }
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+        let disposition = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: report)) as? [String: Any])
+        #expect(disposition["schemaVersion"] as? Int == 4)
+        #expect(disposition["classification"] as? String
+            == "consumedCampaignDeadlineExhaustion")
+        let cause = try #require(
+            disposition["rootCauseObservation"] as? [String: Any])
+        #expect(cause["configuredCampaignDeadlineNanoseconds"] as? String
+            == "1200000000000")
+        #expect(cause["elapsedAfterArmMicroseconds"] as? String
+            == "1195056190")
+        #expect(cause["driverEpochArtifactCount"] as? Int == 0)
     }
 
     @Test
@@ -3906,7 +3941,9 @@ private final class CampaignEvidenceDiskFixture {
             initialStopStatus: 0x7f, outerAttemptUUID: attemptUUID,
             wholeInputSHA256: projected.wholeInputSHA256, capsule: node,
             terminal: tty(outerPID), absoluteDeadlineNanoseconds:
-                gateStarted + 1_200_000_000_000).encoded()
+                gateStarted
+                    + InvestigationCohortCapsule
+                        .maximumCampaignWallClockNanoseconds).encoded()
         let raw = try InvestigationMachineGateTransportReceipt(
             launcherExecutableSHA256: digest(0x74), outerAttemptUUID: attemptUUID, wholeInputSHA256: projected.wholeInputSHA256, preparedFrameSHA256: rawGateMutation == .preparedFrameDigest ? digest(0x75) : .hashing(gatePrepared),
             capsule: node, gateProcessID: 4_001, coordinatorProcessID: outerPID, sessionID: outerPID, recoveryProcessGroupID: 4_001, savedForegroundProcessGroupID: outerPID,

@@ -19,7 +19,8 @@ package enum InvestigationMachineFixedGateContract {
     package static let environment: [String] = []
     package static let requiredUserID: uid_t = 501
     package static let requiredGroupID: gid_t = 20
-    package static let deadlineNanoseconds: UInt64 = 1_200_000_000_000
+    package static let deadlineNanoseconds =
+        InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds
     package static let maximumCapturedOutputByteCount =
         4 + ResolvedRootDriverClaimV1.encodedByteCount + 180
     package static let maximumReadOutputByteCount =

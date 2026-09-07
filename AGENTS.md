@@ -433,13 +433,15 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   ii-c-c v8 与 replacement v9 均已作为 real machine campaign 消费并失败；
   两者只读 disposition 均完成。后续 serial validation 暴露历史 physical
   fixture 错误触发 production stale-recovery，v9 Gate capsule 实体已被移除且
-  无精确副本可恢复；原 v2 receipt、九份 campaign evidence 与当前 v3 mutation
-  receipt 均保留，不能把 owner-lock-only 解释为成功清理。fixture 已改为显式
+  无精确副本可恢复；原 v2 receipt、九份 campaign evidence、v3 predecessor 与
+  当前 v5 receipt 均保留，不能把后续 v10 residue 解释为 v9 成功清理。fixture 已改为显式
   opt-in 并在 discovery/entry 双重拒绝历史 attempt。唯一 1,932-test/99-suite
   serial 记录 1 个 missing-attempt issue 且未重跑；v3/fixture exact cases 随后
   通过。v9 的 AMFI `-423` root cause 已 tests-first 修复并以 `05fd0cd`
-  推送；用户已授权一次 fresh v10 privileged campaign，当前 machine frontier
-  为 v10 clean pushed preflight → one-shot campaign → L3c3d → L3c4。
+  推送；fresh v10 privileged campaign 随后在 durable arm 后耗尽 1,200 秒
+  outer deadline，已消费、non-admitting 且不可重试。其只读 disposition 与
+  1,400 秒 bounded deadline repair 已完成非提权验收并保持 non-admitting；当前
+  machine frontier 为 fresh authorization → replacement campaign → L3c3d → L3c4。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -502,7 +504,8 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   ii-c-c v8 随后在 `armedConsumed` 后以 transport loss 终止，并已由独立
   self-sealed 只读 verifier 固化为 non-admitting/non-retryable；replacement v9
   后续也在 `armedConsumed` 后因 AMFI `-423` 终止并只读固化，修复已通过
-  非提权 gates；fresh v10 privileged campaign 已授权且尚未消费。Task 39 当前
+  非提权 gates；v10 又因 outer deadline exhaustion 消费失败且不可重试，
+  1,400 秒 deadline-budget repair 已完成/non-admitting。Task 39 当前
   active/incomplete，L3c3d/L3c4 未证明。这些
   repairs 是 machine-campaign
   prerequisite checkpoints，不是递归命名的新 Task；后续
@@ -645,6 +648,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-i review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-ii review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) |
 | Phase D Task 39B2c L3c3c-ii-c0b-iv-b2 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md) |
+| Phase D Task 39B2c ii-c-c deadline-budget repair review / completion audit | [docs/reports/phase-d-task-39b2c-iic-deadline-budget-repair-review.md](docs/reports/phase-d-task-39b2c-iic-deadline-budget-repair-review.md) |
 | Phase D Task 39B2c shared-deadline repair preflight | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md) |
 | Phase D Task 39B2c shared-deadline repair review / completion audit | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md) |
 | Phase D Task 39B2c fixed-gate deadline cleanup repair preflight | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md) |
@@ -665,6 +669,7 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c ii-c-c v8 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) |
 | Phase D Task 39B2c ii-c-c v9 replacement campaign authorization | [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) |
 | Phase D Task 39B2c ii-c-c v9 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v10 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md) |
 | Phase D Task 39 blocked/no-go gate audit | [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
@@ -929,11 +934,12 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   `prepared → armedConsumed → spawnUncertain → terminal`，因此 v9 已消费、
   non-admitting 且不可重试。固定 App/plist/service 已卸载；Gate attempt/capsule
   原先已由 v2 receipt 验真，后被历史 physical test 的 stale-recovery 误删，现由
-  v3 post-mutation receipt 如实固化。macOS `amfid` 明确以 code `-423` 拒绝
+  v3 predecessor 与 v5 current receipt 如实固化。macOS `amfid` 明确以 code `-423` 拒绝
   携带受限 application-identifier entitlement 的 ad-hoc MachineDriver；本地
   tests-first 修复现仅对 MachineDriver 禁止 entitlement 生成并通过 focused、
-  structural、真实 Debug build 与 Debug/Release component gate。新的 privileged
-  campaign 尚未获授权，L3c3d/L3c4 仍未证明；
+  structural、真实 Debug build 与 Debug/Release component gate。后续 v10
+  已消费并因 1,200 秒 outer deadline exhaustion 失败；1,400 秒 deadline-budget
+  repair 正在收口，新的 privileged campaign 仍需明确授权，L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

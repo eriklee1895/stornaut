@@ -10,6 +10,8 @@
 >
 > Historical status note: the user later authorized one independent v10
 > campaign; this does not alter or permit reuse of any v9 evidence.
+> The current v5 receipt preserves the byte-identical v3 receipt and binds the
+> later v10 Gate residue without treating it as v9 success evidence.
 
 ## Result
 
@@ -86,12 +88,21 @@ preserved byte-for-byte as
 [`task-39-iic-v9-failure-disposition-before-test-mutation.json`](evidence/task-39-iic-v9-failure-disposition-before-test-mutation.json)
 with SHA-256
 `9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252`.
-The current v3 receipt binds the remaining nine campaign artifacts, the original
-Gate residue name/size/hash, the v2 receipt hash and the current owner-lock-only
-physical state. It does not claim capsule recovery or successful campaign
-cleanup. The incident does not change v9's consumed/non-admitting/non-retryable
-classification, but it invalidates any claim that the original Gate residue
-still exists.
+The historical v3 receipt binds the remaining nine campaign artifacts, the
+original Gate residue name/size/hash, the v2 receipt hash and the then-current
+owner-lock-only physical state. It does not claim capsule recovery or successful
+campaign cleanup. The incident does not change v9's
+consumed/non-admitting/non-retryable classification, but it invalidates any
+claim that the original Gate residue still exists.
+
+After the independently authorized v10 attempt, the Gate base is no longer
+owner-lock-only: it contains only the owner lock and v10's preserved consumed
+attempt. The byte-identical v3 receipt is retained as
+`task-39-iic-v9-failure-disposition-before-v10.json` at SHA-256
+`f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac`.
+The current v5 receipt binds that predecessor and v10's current attempt/capsule;
+the repository boundary gate separately pins v10's checked disposition. v10
+residue is explicitly not evidence of v9 cleanup or success.
 
 The physical fixture is now opt-in only and performs a discovery-time check
 plus a second check immediately before `fixture.run(.success)` that the fixed
@@ -119,21 +130,14 @@ identifier and ad-hoc CodeDirectory while exposing zero entitlement bytes.
 Independent review then found one P2 in the failure verifier: on an account
 where the fixed Gate base did not exist, the v1 observation produced `absent`
 instead of the closed receipt state `ownAttemptAbsent`. The verifier now
-normalizes a missing Gate base only for v1 and rejects the same condition for
-v2/v3. A test executes the extracted production `observe_system()` against a
-nonexistent path for all three profiles and confirms that it creates no node.
-The final read-only verifier self-seal is
-`8b0e9eecbf0846e663a86c3781e077880df7294cdf6a934572f266e82135bfc0`;
-its executable SHA-256 is
-`848955e1ea62e194990163558f8217c47ad28b85bd4a8a6d1de0660b35ef40e1`.
-Both current v8 and v9-v3 evidence checks, the failure-disposition structural
-gate and 145 focused tests across four suites passed. A fresh independent
-read-only review reported no actionable regressions. The frozen v9-v2 receipt
-remains byte-identical at SHA-256
+normalizes a missing Gate base only for v1 and rejects that condition for
+residue-bearing profiles. The current v5 receipt preserves the v2/v3 chain and
+binds the later v10 attempt without treating v10 residue as v9 evidence. The
+frozen v9-v2 receipt remains byte-identical at SHA-256
 `9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252`.
 
-This source repair is non-admitting. The separately authorized v10 campaign must
-use a fresh campaign/attempt UUID and a fresh evidence root. Until it succeeds,
-L3c3d/L3c4 remain unproven, the authoritative
+This source repair is non-admitting. The separately authorized v10 campaign is
+also consumed/non-admitting/non-retryable after deadline exhaustion. Until a
+newly authorized replacement succeeds, L3c3d/L3c4 remain unproven, the authoritative
 full verifier remains reserved, Task 39 remains incomplete, Task 40 stays
 blocked and production Deep Dive remains unavailable.

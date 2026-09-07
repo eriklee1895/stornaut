@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_self_sha=2ac09ab50f34f9936b8046e911e7ac17c88da55abfb7e62ab439016b769793f1 # iicc-self-seal
+typeset -r iicc_self_sha=31fe83a5f53c1cef7e3439a5ee6bfd4cf8549d4680e41fb4ab099a9d57292bda # iicc-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -739,7 +739,7 @@ def parse_gate_receipt(data, manifest, prearm):
     wait, forwarded = take(5), u32(take(4))
     started, completed, progression = u64(take(8)),u64(take(8)),take(1)[0]
     group_empty, child_reaped, restored, borrowed = boolean(take(1)),boolean(take(1)),boolean(take(1)),take(5)
-    prepared_deadline = started + 1_200_000_000_000
+    prepared_deadline = started + 1_400_000_000_000
     require(prepared_deadline <= (1 << 64) - 1, "raw Gate prepared deadline")
     prepared_payload = b"".join(struct.pack(">I",value) for value in
         (gate,coordinator,session,child[0],recovery,saved,child[1],child[3])) \
@@ -768,7 +768,7 @@ def parse_gate_receipt(data, manifest, prearm):
             and not expired and wait == b"\x01\x00\x00\x00\x00"
             and forwarded == 0, "raw Gate output")
     require(started > 0 and started <= completed
-            and completed-started <= 1_200_000_000_000 and progression == 1
+            and completed-started <= 1_400_000_000_000 and progression == 1
             and group_empty and child_reaped and restored
             and borrowed == b"\x01\x00\x00\x00\x00", "raw Gate terminal state")
     return {"gate":launcher,"attempt":attempt,"whole":whole,"prepared":prepared,"capsule":capsule,

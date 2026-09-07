@@ -1,0 +1,91 @@
+{
+  "admission" : "rejected",
+  "artifactSHA256" : {
+    "01-preflight/source-build.json" : "05e411282a7f92bd846393375632865cf46541c0adf55aeb3951c49ab5466c25",
+    "02-install/installed.json" : "ba8bbfdc872a54248a6f0bae2c7d67aac4c946517daa59edc550ea72f90beab1",
+    "03-authorization/attempt-event-0001.bin" : "afedec5a5e2f9ddd9ce937cc7edc5b064a5f8dc6801101d6d90d87e8809b0379",
+    "03-authorization/attempt-event-0002.bin" : "8a0f3b7866669459a5b1f343c680e912b791123cdbc99808b0efb0ca8138a924",
+    "03-authorization/attempt-event-0003.bin" : "7b4e7687f0dfb0dc494408a25b59fc52b181cbc0e24b6429dc863e92ae6800ba",
+    "03-authorization/attempt-event-0004.bin" : "737b2655e189f6c2471d023cdbc81c2309c9022d5ca2932fa4c31e2442fee022",
+    "03-authorization/capability-counts.json" : "a367e91dbb50cc28d5fe6f3c5cd656f30477c98936282e3841077592ed833498",
+    "03-authorization/human-attestation.json" : "c9ed401e4e0d87f7a46db894e0ef3e9d29213ba4ac48395ff83eb635e91d32fb",
+    "03-authorization/policy-probe.json" : "572b24cdcaf91bb741b44e2d2f940e58bf0dcaff7f082eeab86668fe54cc2fc3"
+  },
+  "attemptUUID" : "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+  "campaignUUID" : "b6ee7781-5298-4732-a312-26eb7e0c37d1",
+  "classification" : "consumedCampaignDeadlineExhaustion",
+  "domain" : "stornaut.task39.iic.failure-disposition.v4",
+  "eventChain" : [
+    "prepared",
+    "armedConsumed",
+    "spawnUncertain",
+    "terminal"
+  ],
+  "evidenceSetSHA256" : "d514a5df5866d0a843295a8962cc752f92dc2ebf56107088fac93dc5d31c385f",
+  "nonClaims" : [
+    "no manifest or external seal",
+    "no uninstall or global post-teardown artifact",
+    "no machine admission",
+    "no L3c3d authenticated model success",
+    "no Task 39 readiness"
+  ],
+  "parentIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "516755944",
+    "size" : "96"
+  },
+  "requiredMissingArtifacts" : [
+    "manifest.bin",
+    "../seal.json",
+    "04-driver-epochs/coordinator-receipt.bin",
+    "04-driver-epochs/diagnostic-output.bin",
+    "05-uninstall/uninstall.json",
+    "06-verifier/global-post-teardown.json",
+    "06-verifier/verification-input.json"
+  ],
+  "retry" : "forbidden",
+  "rootCauseObservation" : {
+    "armedConsumedObservedAtUTCMicroseconds" : "1788786289593855",
+    "campaignOrchestrationAndCleanupReserveSeconds" : 80,
+    "configuredCampaignDeadlineNanoseconds" : "1200000000000",
+    "driverEpochArtifactCount" : 0,
+    "elapsedAfterArmMicroseconds" : "1195056190",
+    "epochCount" : 8,
+    "maximumEpochBudgetSeconds" : 1120,
+    "maximumEpochWallClockSeconds" : 140,
+    "reason" : "sharedCampaignDeadlineExhaustedBeforeCoordinatorReceipt",
+    "source" : "durableAttemptEventTimeline",
+    "spawnUncertainObservedAtUTCMicroseconds" : "1788787484650045"
+  },
+  "rootIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "516755945",
+    "size" : "256"
+  },
+  "schemaVersion" : 4,
+  "sourceBinding" : {
+    "attemptUUID" : "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+    "buildProvenanceSHA256" : "a1ff757bccfa44699369e4d0c2259e2554b151dd45419b2012bee3ae920d7690",
+    "campaignUUID" : "b6ee7781-5298-4732-a312-26eb7e0c37d1",
+    "canonicalSourceManifestSHA256" : "992b6ed5945ea123a34f9ba8e5e1619a19fd06bf2f3b82f001d6a42bf77fd4ae",
+    "preArmFrameSHA256" : "d514a5df5866d0a843295a8962cc752f92dc2ebf56107088fac93dc5d31c385f",
+    "repositoryHEAD" : "b9ade5e49131619c05f8b57e35cc310276b3a6f7",
+    "repositoryTree" : "3542a6d0ae3ca59310fd33230e861e17610a24d3",
+    "role" : "sourceBuildIdentity",
+    "schemaVersion" : 1,
+    "signedRuntimeBindingSHA256" : "a55c10feedf9a3efc3e06b78239b0f745d7bc2bb267514be9762b8c040add1e6"
+  },
+  "systemObservation" : {
+    "fixedPathsAbsent" : true,
+    "fixedProcessCount" : 0,
+    "fixedServiceAbsent" : true,
+    "gateAttemptName" : "attempt-9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+    "gateBaseState" : "ownConsumedAttemptPresent",
+    "gateCapsuleByteCount" : 28997,
+    "gateCapsuleName" : "projected-cohort-544d12b656dccc35bc0e5aeedea4a06992c71efa6646fecde622d7604b728d6a.bin",
+    "gateCapsuleSHA256" : "80aa1200fdb6801b8c8ac50383f6231a21a0c1ef4033371561fcfd9c6e6b4f73"
+  },
+  "verifierExecutableSHA256" : "512e6005b0cbe0fcbd4b8a42da31ccfcd245868bc62e31fead257222a86c025b"
+}

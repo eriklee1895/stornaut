@@ -14,7 +14,7 @@
   "attemptUUID" : "b856e976-e74a-4f6d-9079-0d6859fab67d",
   "campaignUUID" : "fd4bac12-d40d-4470-b6d2-7dcd0f1661d0",
   "classification" : "consumedDriverExecutionPolicyDenial",
-  "domain" : "stornaut.task39.iic.failure-disposition.v5",
+  "domain" : "stornaut.task39.iic.failure-disposition.v3",
   "eventChain" : [
     "prepared",
     "armedConsumed",
@@ -29,8 +29,7 @@
     "no L3c3d authenticated model success",
     "no Task 39 readiness",
     "no verified recovery of removed Gate capsule",
-    "owner-lock-only state is not successful campaign cleanup",
-    "subsequent campaign residue is not prior campaign success"
+    "owner-lock-only state is not successful campaign cleanup"
   ],
   "parentIdentity" : {
     "device" : "16777229",
@@ -85,7 +84,7 @@
     "inode" : "515639988",
     "size" : "256"
   },
-  "schemaVersion" : 5,
+  "schemaVersion" : 3,
   "sourceBinding" : {
     "attemptUUID" : "b856e976-e74a-4f6d-9079-0d6859fab67d",
     "buildProvenanceSHA256" : "b70accb75a5fe676cd848ca416cebda6dfd8ac2fffc23e347b83c65e31d7fec9",
@@ -98,29 +97,20 @@
     "schemaVersion" : 1,
     "signedRuntimeBindingSHA256" : "9d7844cac8223dfa328c63b7778ac1c66da0ac9867e76a35104b3f522f6fea69"
   },
-  "subsequentCampaignObservation" : {
-    "attemptUUID" : "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
-    "campaignUUID" : "b6ee7781-5298-4732-a312-26eb7e0c37d1",
-    "classification" : "consumedCampaignDeadlineExhaustion",
-    "gateCapsuleByteCount" : 28997,
-    "gateCapsuleName" : "projected-cohort-544d12b656dccc35bc0e5aeedea4a06992c71efa6646fecde622d7604b728d6a.bin",
-    "gateCapsuleSHA256" : "80aa1200fdb6801b8c8ac50383f6231a21a0c1ef4033371561fcfd9c6e6b4f73",
-    "priorDispositionSHA256" : "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac"
-  },
   "systemObservation" : {
     "fixedPathsAbsent" : true,
     "fixedProcessCount" : 0,
     "fixedServiceAbsent" : true,
-    "gateBaseChangeTimeNanoseconds" : "1788786289606239018",
+    "gateBaseChangeTimeNanoseconds" : "1788779295142023470",
     "gateBaseDevice" : "16777229",
     "gateBaseGeneration" : "0",
     "gateBaseInode" : "499810932",
-    "gateBaseState" : "ownConsumedAttemptRemovedWithSubsequentAttemptPresent",
+    "gateBaseState" : "ownConsumedAttemptRemovedByTestFixture",
     "ownerLockChangeTimeNanoseconds" : "1787992800592752249",
     "ownerLockDevice" : "16777229",
     "ownerLockGeneration" : "0",
     "ownerLockInode" : "499810933",
     "ownerLockSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
-  "verifierExecutableSHA256" : "512e6005b0cbe0fcbd4b8a42da31ccfcd245868bc62e31fead257222a86c025b"
+  "verifierExecutableSHA256" : "848955e1ea62e194990163558f8217c47ad28b85bd4a8a6d1de0660b35ef40e1"
 }

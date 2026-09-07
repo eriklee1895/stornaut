@@ -362,7 +362,7 @@ struct SignedRuntimeContractTests {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
         let configuration = try fixture.configuration(
-            machineCohortWindow: 1_200
+            machineCohortWindow: 1_400
         )
         let data = try configuration.canonicalJSONData()
 
@@ -372,7 +372,7 @@ struct SignedRuntimeContractTests {
                 .decodeValidated(from: data, now: fixture.now)
         }
         let configurations = try fixture.machineConfigurations(
-            machineCohortWindow: 1_200
+            machineCohortWindow: 1_400
         )
         let binding = fixture.binding()
         let installed = try InvestigationProjectedCohortInstalledBinding(
@@ -418,7 +418,7 @@ struct SignedRuntimeContractTests {
         )
         #expect(throws: SignedInvestigationRuntimeContractError
             .invalidConfiguration) {
-            _ = try fixture.configuration(machineCohortWindow: 1_200.001)
+            _ = try fixture.configuration(machineCohortWindow: 1_400.001)
         }
         #expect(throws: SignedInvestigationRuntimeContractError
             .invalidConfiguration) {
@@ -429,7 +429,7 @@ struct SignedRuntimeContractTests {
         var overlong = try #require(
             JSONSerialization.jsonObject(with: data) as? [String: Any]
         )
-        overlong["validBefore"] = fixture.now.addingTimeInterval(1_200.001)
+        overlong["validBefore"] = fixture.now.addingTimeInterval(1_400.001)
             .timeIntervalSinceReferenceDate
         let overlongData = try JSONSerialization.data(
             withJSONObject: overlong,
@@ -496,7 +496,7 @@ struct SignedRuntimeContractTests {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
         let configuration = try fixture.configuration(
-            machineCohortWindow: 1_200
+            machineCohortWindow: 1_400
         )
 
         #expect(throws: Never.self) {
@@ -1665,7 +1665,7 @@ struct SignedRuntimeContractTests {
         let fixture = try SignedRuntimeContractFixture()
         defer { fixture.remove() }
         let configurations = try fixture.machineConfigurations(
-            machineCohortWindow: 1_200
+            machineCohortWindow: 1_400
         )
         fixture.materializeOutputs()
         let artifacts = try configurations.map {

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=5def77cac52d78edc692c4cbfd00351d6c4b82f8aa79f3e8b2e409981dd75397
+# ib2_self_sha=925565928ccaa7b1fc6283d52d221a33070b7c6c31ce962452438c5c96747989
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3801,6 +3801,7 @@ function verify_iicc_contract() {
     "$gate" --iic-root-driver-lineage-l2-source-contract-only >"$out/current-lineage-l2.log"
     "$gate" --root-driver-lineage-cross-uid-source-contract-only >"$out/current-cross-uid.log"
     "$gate" --iic-c-source-contract-only "${paths[@]}" >"$out/source.log"
+    "$gate" --iic-c-deadline-budget-contract-only >"$out/deadline-budget.log"
     "$gate" --iic-c-suspended-sudo-contract-only \
         Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift \
         Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift \

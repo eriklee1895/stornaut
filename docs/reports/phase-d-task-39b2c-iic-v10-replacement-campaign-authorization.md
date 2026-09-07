@@ -1,10 +1,12 @@
 # Phase D Task 39B2c ii-c-c v10 replacement campaign authorization
 
-> Status: authorized / unconsumed / preflight pending
+> Status: authorized / consumed / non-admitting / non-retryable
 >
 > Date: 2026-09-07
 >
-> Frozen parent repair baseline: `05fd0cded87714170105744c5c42945a0017c6c1`
+> Executed source baseline: `b9ade5e49131619c05f8b57e35cc310276b3a6f7`
+>
+> Executed tree: `3542a6d0ae3ca59310fd33230e861e17610a24d3`
 
 ## Authorization
 
@@ -72,3 +74,11 @@ only `.owner-lock-v1`, and the existing
 structural, focused, component/final-Mach-O and independent-review gates required
 by the frozen ii-c plan must be green. The campaign is then launched exactly once
 from an interactive Terminal.
+
+## Consumed outcome
+
+The single authorized launch reached durable `armedConsumed`, accepted the
+operator-entered credential, and later recorded `spawnUncertain → terminal`
+after 1,195.056190 seconds. It is consumed and cannot be retried. The checked
+non-admitting disposition is recorded in
+[the v10 failure report](phase-d-task-39b2c-iic-v10-failure-disposition.md).

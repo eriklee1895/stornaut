@@ -356,6 +356,7 @@ iicc_scope_baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
 iicc_suspended_sudo_contract_only=false
 iicc_suspended_sudo_sources=()
 iicc_failure_disposition_contract_only=false
+iicc_deadline_budget_contract_only=false
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -986,6 +987,9 @@ if (( $# > 0 )); then
     elif (( $# == 1 )) \
         && [[ $1 == --iic-c-failure-disposition-contract-only ]]; then
         iicc_failure_disposition_contract_only=true
+    elif (( $# == 1 )) \
+        && [[ $1 == --iic-c-deadline-budget-contract-only ]]; then
+        iicc_deadline_budget_contract_only=true
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -9887,7 +9891,7 @@ fixed_markers = (
     'package static let environment: [String] = []',
     'package static let requiredUserID: uid_t = 501',
     'package static let requiredGroupID: gid_t = 20',
-    'package static let deadlineNanoseconds: UInt64 = 1_200_000_000_000',
+    'InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds',
     'package static let maximumCapturedOutputByteCount = 512',
     'package static let maximumReadOutputByteCount = 513',
     'SIGHUP, SIGINT, SIGQUIT, SIGTERM',
@@ -12634,7 +12638,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '3e4fc893ac38a0066a3019174bc48165b1b60882b2f8ee0c42f2deec060abbff':
+            '1b78490bc9617c954c5d8eaa77eb5911e1ca892c2f6db1db199923d33b91b34c':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -12697,7 +12701,7 @@ transport, darwin, fixture, tests = (
     Path(value).read_text(encoding="utf-8") for value in sys.argv[1:]
 )
 expected_sha256 = (
-    "30c1abadb746c70b89c846058da0558368d76285bf5cbfc348b86ed13b41a2a4",
+    "7c52fc0d80edc6170b9e376aa54143b5c4fd1734f5bd465d76762b74d8980e83",
     "7835888badd696951da85d82e3cb79f5736ea6fe4028a0b433a6ed8605d0a406",
     "d0bc9bc33f24f3eaa30440fafa4cda530568de9d754478c279014f41ec9b43fd",
     "b9128269b2298733ce156241376051da6fdf05ee4e66bd4a7f37fc619a6e79f5",
@@ -12810,17 +12814,116 @@ for marker in (
 PY
 }
 
+function verify_iicc_deadline_budget_contract() {
+    local package=Package.swift
+    local handoff=Sources/StornautInvestigationHandoffContract/InvestigationCohortCapsuleContract.swift
+    local runtime=Sources/StornautInvestigation/SignedInvestigationRuntimeContract.swift
+    local campaign=Sources/StornautInvestigationMachineCampaign/main.swift
+    local evidence=Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+    local gate=Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+    local verifier=scripts/verify-investigation-runtime-machine-report
+    local tests=Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+    local path
+    for path in $package $handoff $runtime $campaign $evidence $gate $verifier $tests; do
+        [[ -f $path && ! -L $path ]] || {
+            print -u2 "ii-c-c deadline budget source unavailable: $path"
+            return 1
+        }
+    done
+    /bin/zsh -n $verifier || return $?
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+        $handoff $runtime $campaign $evidence $gate $tests || return $?
+    /usr/bin/python3 -I - $package $handoff $runtime $campaign $evidence \
+        $gate $verifier $tests <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+package, handoff, runtime, campaign, evidence, gate, verifier, tests = (
+    Path(value).read_text(encoding="utf-8") for value in sys.argv[1:]
+)
+def one(source, marker, label):
+    if source.count(marker) != 1:
+        raise SystemExit("ii-c-c deadline budget drifted: " + label)
+
+for marker, label in (
+    ("package static let epochCount = 8", "epoch count"),
+    ("package static let maximumEpochWallClockSeconds: UInt64 = 140",
+     "epoch ceiling"),
+    ("package static let campaignOrchestrationAndCleanupReserveSeconds: UInt64 = 280",
+     "campaign reserve"),
+    ("UInt64(epochCount) * maximumEpochWallClockSeconds",
+     "campaign epoch derivation"),
+    ("+ campaignOrchestrationAndCleanupReserveSeconds",
+     "campaign reserve derivation"),
+    ("maximumCampaignWallClockSeconds * 1_000_000_000",
+     "campaign nanosecond derivation"),
+):
+    one(handoff, marker, label)
+for marker, label in (
+    ("SignedInvestigationRuntimeDiagnosticScenario.allCases.count",
+     "runtime scenario count"),
+    ("* maximumMachineEpochWallClockSeconds",
+     "runtime epoch horizon"),
+    ("+ machineCampaignOrchestrationAndCleanupReserveSeconds",
+     "runtime campaign reserve"),
+):
+    one(runtime, marker, label)
+target = re.search(
+    r'(?ms)\.target\(\s*name: "StornautInvestigation",(.*?)^\s*\),',
+    package)
+if target is None or "StornautInvestigationHandoffContract" in target.group(1):
+    raise SystemExit("ii-c-c deadline budget package dependency drifted")
+one(campaign,
+    "InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds",
+    "campaign executable horizon")
+if evidence.count(
+        "InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds") != 2:
+    raise SystemExit("ii-c-c deadline budget evidence horizon drifted")
+one(gate,
+    "InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds",
+    "fixed Gate horizon")
+if verifier.count("1_400_000_000_000") != 2:
+    raise SystemExit("ii-c-c deadline budget independent verifier drifted")
+self_match = re.search(
+    r"(?m)^typeset -r iicc_self_sha=([0-9a-f]{64}) # iicc-self-seal$",
+    verifier)
+normalized = re.sub(
+    r"(?m)^typeset -r iicc_self_sha=[0-9a-f]{64} # iicc-self-seal$",
+    "typeset -r iicc_self_sha=SELF # iicc-self-seal", verifier)
+if self_match is None or hashlib.sha256(normalized.encode()).hexdigest() \
+        != self_match.group(1):
+    raise SystemExit("ii-c-c deadline budget verifier self-seal drifted")
+for marker in (
+    "machineCampaignDeadlineCoversEpochBudgetAndFixedReserve",
+    "requiredGateSeconds == 1_400",
+    "maximumMachineCohortValiditySeconds",
+    "productionDeadlineNanoseconds",
+):
+    one(tests, marker, "focused coverage " + marker)
+if tests.count("InvestigationMachineFixedGateContract.deadlineNanoseconds") < 3:
+    raise SystemExit("ii-c-c deadline budget drifted: focused Gate coverage")
+if "1_200_000_000_000" in campaign + evidence + gate + verifier:
+    raise SystemExit("ii-c-c deadline budget retained old outer horizon")
+PY
+}
+
 function verify_iicc_failure_disposition_contract() {
     local verifier=scripts/verify-investigation-runtime-machine-failure
     local evidence=docs/reports/evidence/task-39-iic-v8-failure-disposition.json
     local v9_evidence=docs/reports/evidence/task-39-iic-v9-failure-disposition.json
     local v9_prior=docs/reports/evidence/task-39-iic-v9-failure-disposition-before-test-mutation.json
+    local v9_before_v10=docs/reports/evidence/task-39-iic-v9-failure-disposition-before-v10.json
+    local v10_evidence=docs/reports/evidence/task-39-iic-v10-failure-disposition.json
     local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
     local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
     local v9_report=docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md
+    local v10_report=docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md
     local path
-    for path in $verifier $evidence $v9_evidence $v9_prior $tests $boundary $report $v9_report; do
+    for path in $verifier $evidence $v9_evidence $v9_prior $v9_before_v10 \
+        $v10_evidence $tests $boundary $report $v9_report $v10_report; do
         [[ -f $path && ! -L $path ]] || {
             print -u2 "ii-c-c failure disposition source unavailable: $path"
             return 1
@@ -12831,20 +12934,24 @@ function verify_iicc_failure_disposition_contract() {
         return 1
     }
     /bin/zsh -n $verifier || return $?
-    /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior $tests $boundary $report $v9_report <<'PY'
+    /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior \
+        $v9_before_v10 $v10_evidence $tests $boundary $report $v9_report \
+        $v10_report <<'PY'
 from pathlib import Path
 import hashlib
 import json
 import re
 import sys
 
-verifier, evidence, v9_evidence, v9_prior, tests, boundary, report, v9_report = (
+verifier, evidence, v9_evidence, v9_prior, v9_before_v10, v10_evidence, \
+tests, boundary, report, v9_report, v10_report = (
     Path(value) for value in sys.argv[1:])
 source = verifier.read_text(encoding="utf-8")
 test_source = tests.read_text(encoding="utf-8")
 boundary_source = boundary.read_text(encoding="utf-8")
 report_source = report.read_text(encoding="utf-8")
 v9_report_source = v9_report.read_text(encoding="utf-8")
+v10_report_source = v10_report.read_text(encoding="utf-8")
 match = re.fullmatch(
     r"([0-9a-f]{64})",
     re.search(
@@ -12870,6 +12977,10 @@ required = (
     "pwd.getpwuid(user_id)", "record.pw_dir",
     "admission\"] == \"rejected", "retry\"] == \"forbidden",
     "consumedDriverExecutionPolicyDenial", "ownConsumedAttemptPresent",
+    "consumedCampaignDeadlineExhaustion",
+    "ownConsumedAttemptRemovedWithSubsequentAttemptPresent",
+    "campaign deadline event timing binding",
+    "subsequent Gate capsule binding",
     "ownConsumedAttemptRemovedByTestFixture",
     "testFixtureStaleRecoveryRemovedConsumedGateResidue",
     "exactCapsuleBytesUnavailable",
@@ -12891,10 +13002,13 @@ checked = (
      ["prepared", "armedConsumed", "spawnUncertain"]),
     (v9_evidence, "consumedDriverExecutionPolicyDenial",
      ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
+    (v10_evidence, "consumedCampaignDeadlineExhaustion",
+     ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
 )
 checked_digests = {
     evidence: "7351c8312315b5673c7610a3421a20eb14fdb53fb6bdd181abfde4732d16b072",
-    v9_evidence: "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac",
+    v9_evidence: "5cb77d0962d2de217cba1560e68c230ffc16b88778d3e42281213522fe79aedc",
+    v10_evidence: "877d538feca64846a2bafa167dff48c951a47849661efd2dae83011dd67d673e",
 }
 for checked_path, classification, events in checked:
     if hashlib.sha256(checked_path.read_bytes()).hexdigest() \
@@ -12910,16 +13024,23 @@ if hashlib.sha256(v9_prior.read_bytes()).hexdigest() \
         != "9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252":
     raise SystemExit("ii-c-c prior v9 disposition digest drifted")
 prior = json.loads(v9_prior.read_bytes())
+before_v10 = json.loads(v9_before_v10.read_bytes())
 current = json.loads(v9_evidence.read_bytes())
 if (prior.get("schemaVersion") != 2
         or prior.get("systemObservation", {}).get("gateBaseState")
             != "ownConsumedAttemptPresent"
-        or current.get("schemaVersion") != 3
+        or hashlib.sha256(v9_before_v10.read_bytes()).hexdigest()
+            != "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac"
+        or before_v10.get("schemaVersion") != 3
+        or current.get("schemaVersion") != 5
         or current.get("systemObservation", {}).get("gateBaseState")
-            != "ownConsumedAttemptRemovedByTestFixture"
+            != "ownConsumedAttemptRemovedWithSubsequentAttemptPresent"
         or current.get("postDispositionMutation", {}).get(
             "priorDispositionSHA256")
-            != hashlib.sha256(v9_prior.read_bytes()).hexdigest()):
+            != hashlib.sha256(v9_prior.read_bytes()).hexdigest()
+        or current.get("subsequentCampaignObservation", {}).get(
+            "priorDispositionSHA256")
+            != hashlib.sha256(v9_before_v10.read_bytes()).hexdigest()):
     raise SystemExit("ii-c-c v9 mutation chain drifted")
 for marker in (
     "failureDispositionVerifierAcceptsOnlyConsumedTransportLoss",
@@ -12930,6 +13051,7 @@ for marker in (
     "failureDispositionVerifierIgnoresUnrelatedAncestorDirectoryChurn",
     "checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
     "checkedV9FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
+    "checkedV10FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
 ):
     if marker not in test_source:
         raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
@@ -12972,18 +13094,25 @@ for marker in (
 ):
     if marker not in v9_report_source:
         raise SystemExit("ii-c-c v9 failure disposition report drifted: " + marker)
+for marker in (
+    "consumedCampaignDeadlineExhaustion", "1,195,056,190",
+    "1,200-second campaign deadline", "8 * 140 = 1,120",
+    "1,400 seconds", "non-admitting", "non-retryable",
+):
+    if marker not in v10_report_source:
+        raise SystemExit("ii-c-c v10 failure disposition report drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "59e09f67a5a7b5373fa5219756674cd76b3293a6cfb9becd472bc031ccec3927"),
-    (Path("README.md"), "b426120ada73bd89750c34e4553f571ade5d369e9fa5ad85c90e569449a48874"),
-    (Path("docs/README.md"), "5f15a4b7b9b805989883a56715632ee272801cf7f603de38120af4a0ab316133"),
-    (Path("docs/agent/coding-agent-handoff.md"), "b00b846ba0d8d7bc8be023d8e7df13c7cb06555d83a1071a353a5c83a0c93542"),
-    (Path("docs/plans/active/README.md"), "99cf080c93a523b8adfc4795f368e95ef7a26b1d7666407cb2dfd46f75de0137"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "f93800d85643da90fc2955c0b0416562300211448fcc9bfdc93517accd33ccbc"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "7fdcd6e9ba1434fd325782fcf76d2d0bbe64d8cea9b3a7a25dd4e59510da6163"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "dd6d9ac1185cb55fe16121cc26688898db6becaac477c24228115092c29b7a42"),
-    (Path("docs/plans/roadmap.md"), "a48b7b2f2574729521d87ff08417259746c6452aa5f0cb694716775db92ca7ef"),
+    (Path("AGENTS.md"), "88faa4e93662c411598a6508a29d652a8c6d474a148e10fbb22b57fe8d6c4fb8"),
+    (Path("README.md"), "4b82bb722bc2e713e43c1f3fc22cbf3cd798e8c1d9c95e4465506954eb2918d4"),
+    (Path("docs/README.md"), "66656f4b91a2504070d9c5971addcdcb389714d02f4223975c5f5b81ced27057"),
+    (Path("docs/agent/coding-agent-handoff.md"), "6e8c7350c15c4e11713fdef7b6d65edfad27aee3d9c5acb866517f6edd7aaee9"),
+    (Path("docs/plans/active/README.md"), "fd88977fe645a3dc1bffbe92de837233ed2e4b55c39f15064c392b9eacfc3e23"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "e11e499abb99271fe12321159c99b106709e85fd27cfc551081df1439e722886"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "4898e4feb205ab1002cd28b2728996f283afb9976e05cd048f6ed57810a63bc8"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "8dfc19e53d3ec14ee8fbf92e00cf57f7466f2747f23eae21d86adc8d012d8d47"),
+    (Path("docs/plans/roadmap.md"), "2fa880935a7fc307de13bdc2bc42a2de2a930b14e291d3b36eec5b93d7bc7235"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "cbda3a326440cab1be46d94a78c3aaeb49c6b1abaa8417f9b82134f1070a039b"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13324,18 +13453,18 @@ slot_names = ("contract","author","composition","runner","machine","configuratio
 raw_sources = tuple(Path(x).read_text() for x in sys.argv[4:])
 import hashlib
 expected = (
-    "119b1884498eccb8b29aff86f1e6c05698ee517638c2f01fbf99730781468141",
+    "cd984378e63a0d3d09177e417bf7b45228f0e66ce0303987e391bb0c3a1c0d10",
     "d650ce1a72623415020b8874360f44c2de03e1e9cc604a8b13f0d13dbf7b5dbc",
-    "93e6e4f03d7f9cfec3ebe37b2232c030deddfb135cc0d94a14439dfa550d381a",
+    "1f1f40793ea4cbfbd9a4ae875b2dca6604eb2c06f7355948f297b5825b5287e7",
     "1f088b8987d521f9700cfe8e01e9c205394fa9b9a188a879c661329cde4f7140",
     "c5fdd0bf621018bf88c0c68be4d95ca1a8883fc69fcf1c3cdfa31886eaefb977",
-    "f1a760d3ca6042c5c090a9542b05fa235b3fce21265b3cd253ee1c359c14067e",
-    "746fc4b1900103fde66786ad699e4f868e46b1eefc712c0c3135cbef239f37bf",
-    "3018ac3bbdee76138dda2ba046ee7ab6b52a6f07b3b377a98871643ce56f933b",
+    "012dab98b928791aade5c6d326e791a624e023feb29dbb08a3478587d3b54617",
+    "27a48fc373ab862ae31320a85308f6444aefaead370673e759524e0a89d251a1",
+    "8f3a84b6f18726618c2ad3dab2ea36a1763ad0465c580b58651f588b0368ac6a",
     "4bb10d821727719cf74e38d14539a30485c86c0d769d4005f7df0d8a499561d3",
     "688848926de2cdbc276ea1e1c662da7cddaee9a8ba7e28108031b04490cb5e54",
-    "7afaf9dd177c8c3508a029839bdd1eeab4689a1debe7f298d993ca54305f6493",
-    "dcdb198be26abff6965cfd45d73ba60b85454314f6dddae796409a8413567e45",
+    "00ed1287d427af617a4078b0c5971a54ed56ca725cad2cdcc20c2c314e5ed589",
+    "ddb9f3c9566bf5c75186f72f88ca7fce834c7e20f0e1d1a3860ebbb91b91bdb3",
 )
 if mutation_mode == "true":
     if mutation_slot not in slot_names:
@@ -13408,7 +13537,9 @@ def body(source, name):
 def test(source, name, *markers):
     value = body(source, name)
     for marker in markers: exact(value, marker, 1, "shared-deadline focused tests became vacuous")
-exact(c, "package static let maximumMachineCohortValiditySeconds: TimeInterval = 1_200", 1, "shared-deadline 1200 constant drifted")
+exact(c, "package static let machineCampaignOrchestrationAndCleanupReserveSeconds: TimeInterval = 280", 1, "shared-deadline orchestration reserve drifted")
+exact(c, "SignedInvestigationRuntimeDiagnosticScenario.allCases.count * maximumMachineEpochWallClockSeconds", 1, "shared-deadline epoch budget derivation drifted")
+exact(c, "+ machineCampaignOrchestrationAndCleanupReserveSeconds", 1, "shared-deadline total budget derivation drifted")
 exact(c, "package static let maximumMachineEpochWallClockSeconds = 140", 1, "shared-deadline 140 constant drifted")
 exact(c, "validBefore.timeIntervalSince(now) <= 900", 1, "generic 900-second validity drifted")
 for marker in ("maximumWallClockSeconds == Self.maximumMachineEpochWallClockSeconds", "maximumTurns == 3", "maximumProbeCalls == 16", "maximumContextBytes == 1_048_576"):
@@ -13453,9 +13584,9 @@ test(ct, "diagnosticCompositionPreparesOpaqueProductionChain", "composition.life
 test(ct, "diagnosticCompositionUsesLiveRuntimeClock", "anchor + 141_000_000_000", "continuousNow: { try continuous.next() }")
 test(ct, "diagnosticCompositionUsesEarlierConfigurationDeadline", "validBefore: fixture.now.addingTimeInterval(100)", "composition.lifecycleValidBefore == configuration.validBefore")
 test(ct, "strictConfigurationRoundTripsAndRejectsUnknownFields", "addingTimeInterval(901)", "decodeValidated(from: overbroadData, now: fixture.now)")
-test(ct, "machineCohortValidityIsExactAndDoesNotWidenGeneralDecoding", "machineCohortWindow: 1_200.001", "fixture.materializeOutputs()", "outputs: .ownerRegularFile", 'overlong["maximumWallClockSeconds"] = 139')
+test(ct, "machineCohortValidityIsExactAndDoesNotWidenGeneralDecoding", "machineCohortWindow: 1_400.001", "fixture.materializeOutputs()", "outputs: .ownerRegularFile", 'overlong["maximumWallClockSeconds"] = 139')
 test(ct, "fixedRunnerAcceptsThePresealedMachineCohortWindow", 'object["maximumTurns"] = 2', "InvestigationFixedScenarioRunnerError.invalidInput")
-test(ct, "machineAssemblerAcceptsPresealedCohortValidity", "machineCohortWindow: 1_200", "evidenceContractValidatedMachineAdmissionPending")
+test(ct, "machineAssemblerAcceptsPresealedCohortValidity", "machineCohortWindow: 1_400", "evidenceContractValidatedMachineAdmissionPending")
 test(ct, "machineAssemblerRejectsExpiredOrFutureCaseEvidence", "completedAt: fixture.now.addingTimeInterval(141)", "artifacts: overlongArtifacts")
 test(ct, "machineAssemblerRejectsMixedBuildOrPlanEvidence", "validBefore: fixture.now.addingTimeInterval(299)", "artifacts: mixedDeadlineArtifacts")
 test(ct, "machineLifecycleObservationCannotBeDecodedAsTrustedEvidence", "encodedConfigurations[0]", "from: JSONSerialization.data(withJSONObject: wrongProfile)")
@@ -13464,7 +13595,7 @@ test(dt, "noAuthRetirementClampsTheSessionToTheEpochWallClockWindow", "[(1_200.0
 test(dt, "appLeafHandshakeCannotExtendTheCapturedEpochDeadline", "validBefore: fixture.now.addingTimeInterval(-80)", "continuousAnchor + 41_000_000_000", "deadline == fixture.now.addingTimeInterval(40)")
 test(dt, "appLeafMonotonicFailureOrRegressionExpiresTheEpoch", "throwsOnRead ? nil : anchor - 1", "operations.acknowledgeConfiguration", "operations.preDropClaim")
 for marker in (".machineCohort(", "validBefore: now.addingTimeInterval(1_200)", "maximumWallClockSeconds: 140", "maximumTurns: 3", "maximumProbeCalls: 16", "maximumContextBytes: 1_048_576"): exact(lt, marker, 1, "machine topology fixture profile drifted")
-test(st, "configurationSetEagerlyBuildsEightRowsWithSharedCohortDeadline", "expectedCohortDeadline = fixture.now.addingTimeInterval(1_200)", "row.plan.expiresAt == fixture.now.addingTimeInterval(600)", "Set(rows.map { $0.configuration.validBefore }).count == 1")
+test(st, "configurationSetEagerlyBuildsEightRowsWithSharedCohortDeadline", "expectedCohortDeadline = fixture.now.addingTimeInterval(1_400)", "row.plan.expiresAt == fixture.now.addingTimeInterval(600)", "Set(rows.map { $0.configuration.validBefore }).count == 1")
 test(gt, "productionSourceRequiresCompleteCampaignWindowBeforeHandoff", "minimumHandoffRemainingSeconds == 1_125", "cohort, now: Date(timeIntervalSince1970: 10_000.0000006)", "late.handoffCallCount == 0", "configurationValidBeforeRawValues")
 PY
 }
@@ -16312,7 +16443,7 @@ def digest(path):
 expected_frozen = {
     scheme_root / "Stornaut.xcscheme": "5d0d87082e3c0efed4165566e13f4fa560906137785c61a55b25d63a8ab2d987",
     handoff_root / "HandoffBinaryTranscript.swift": "dd286134478b715f51f190ec4cdbc3cf10449b330ddb60b11cc06777a4a5a7c9",
-    handoff_root / "InvestigationCohortCapsuleContract.swift": "d08046025cbebe320161732883d89dbaf710f1073d0a41ca3254e4eea828e437",
+    handoff_root / "InvestigationCohortCapsuleContract.swift": "005cfbaff8d9c041eecc28d19d412a7d2414343866a9240ebae29e35b74aea78",
     handoff_root / "InvestigationHandoffEpochBootstrapContract.swift": "c295fdefeea11ffc767fc45865a87b5b399cf2ca51b877c5425ed30ed86100fd",
     handoff_root / "InvestigationHandoffFrameContract.swift": "33bf13d57d4acfc621cf7a5baf7ca3deaa8819d1c723573039ae91f07a21b4d9",
     handoff_root / "InvestigationMachineClaimContract.swift": "1b01315aaf822ac126d7d4a7391d7af3c93efcf444892d73ac0f88642dc4f352",
@@ -17878,6 +18009,11 @@ if $iicc_failure_disposition_contract_only; then
     print "ii-c-c failure disposition contract verification passed."
     exit 0
 fi
+if $iicc_deadline_budget_contract_only; then
+    verify_iicc_deadline_budget_contract
+    print "ii-c-c deadline budget contract verification passed."
+    exit 0
+fi
 if $iicc_scope_contract_only; then
     verify_iicc_staged_scope "$iicc_scope_baseline"
     print "ii-c-c staged scope verification passed."
@@ -18136,6 +18272,7 @@ verify_iicb1_root_owned_gate_source_contract
 verify_iic_evidence_verification_source_contract
 verify_iicb2b2_source_contract
 verify_iicc_source_contract
+verify_iicc_deadline_budget_contract
 verify_iicc_suspended_sudo_contract
 verify_iicc_failure_disposition_contract
 verify_iib5biib_app_identity_contract \

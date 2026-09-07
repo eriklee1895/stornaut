@@ -4,18 +4,21 @@ The approved executable plan is
 [Phase D — Conditional Deep Dive](phase-d-conditional-deep-dive.md).
 Tasks 36–38 are complete. Task 38's closed fake-runtime coordinator,
 independent review, 811-test serialized regression and 23/23-stage
-authoritative full verifier passed. Task 39 remains incomplete. v8 and v9 are
-consumed/no-go records. The first v9 launcher invocation was cancelled
+authoritative full verifier passed. Task 39 remains incomplete. v8, v9 and v10
+are consumed/no-go records. The first v9 launcher invocation was cancelled
 before arm; the repaired invocation reached `armedConsumed` and then failed
 `spawnUncertain → terminal` because AMFI rejected the ad-hoc MachineDriver's
 restricted application-identifier entitlement. The root-cause repair has passed
 non-privileged focused, structural and Debug/Release binary gates. A later
 serial validation exposed that the historical physical fixture could invoke
 production stale-recovery and remove the preserved v9 Gate capsule. The exact
-bytes were not recoverable; the original v2 receipt and current v3 mutation
-receipt are both retained, and the fixture is now explicit opt-in with
-discovery/entry guards. One fresh v10 privileged campaign is authorized from
-pushed repair baseline `05fd0cd`; it is unconsumed and in preflight. Checkpoints 39A,
+bytes were not recoverable; the original v2 receipt, v3 predecessor and current
+v5 receipt are retained, and the fixture is now explicit opt-in with
+discovery/entry guards. v10 later ran from source `b9ade5e`, reached durable
+arm, and exhausted the 1,200-second outer deadline before a coordinator receipt.
+Its failure disposition is checked, and the machine-only 1,400-second
+deadline-budget repair is complete and non-admitting. A further privileged
+campaign requires fresh explicit authorization. Checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
 39B1b-i closed the package-scoped transport/non-product composition seam.
@@ -466,7 +469,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8/v9 consumed and non-admitting; v10 authorized/unconsumed and in preflight; L3c3d/L3c4 unproven |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8/v9/v10 consumed and non-admitting; deadline-budget repair complete/non-admitting; a new privileged campaign needs explicit authorization; L3c3d/L3c4 unproven |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

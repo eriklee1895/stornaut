@@ -127,8 +127,8 @@
 > tests-first repair is green, but a new campaign has not been authorized. Task
 > A later serial validation exposed a historical physical fixture that invoked
 > production stale-recovery and removed the preserved v9 Gate capsule. Its exact
-> bytes were not recoverable; the original v2 receipt and current v3 mutation
-> receipt preserve the truthful audit chain, and the fixture now requires
+> bytes were not recoverable; the original v2 receipt, v3 predecessor and current
+> v5 receipt preserve the truthful audit chain, and the fixture now requires
 > explicit opt-in plus discovery/entry guards.
 > 40 remains blocked under the
 > approved sequential plan; Task 44 remains blocked
@@ -1025,9 +1025,11 @@ Checkpoint status:
   replay `aa8a7f1`, all non-admitting. ii-c-a, ii-c-b and resolved-lineage
   L1/L2 are complete/non-admitting; L2 final verifier closure is `849e454` /
   tree `f6c36d2`, and final review returned no finding. The historical pre-v8
-  order was `ii-c-c -> L3c3d -> L3c4`; v8 and v9 are consumed, failed and
-  non-retryable. The reviewed AMFI root-cause repair is pushed at `05fd0cd`;
-  one fresh v10 campaign is authorized, unconsumed and in preflight.
+  order was `ii-c-c -> L3c3d -> L3c4`; v8, v9 and v10 are consumed, failed
+  and non-retryable. v10 passed the repaired AMFI boundary but exhausted the
+  1,200-second outer deadline after 1,195.056190 seconds from durable arm. Its
+  checked disposition and the 1,400-second deadline-budget repair are complete
+  and non-admitting. Any replacement campaign requires fresh authorization.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

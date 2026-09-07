@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8 and v9 consumed failures disposed / replacement v10 authorized and unconsumed
+> Status: frozen / v8, v9 and v10 consumed failures disposed / deadline repair complete and non-admitting
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: v10 non-privileged preflight -> one campaign -> L3c3d -> L3c4
+> Remaining order: fresh authorization -> replacement campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -16,8 +16,12 @@
 > rejected the ad-hoc MachineDriver carrying a restricted application-identifier
 > entitlement. v9 is consumed, non-admitting and non-retryable.
 > On 2026-09-07 the user authorized one fresh v10 campaign from pushed repair
-> baseline `05fd0cded87714170105744c5c42945a0017c6c1`; it is unconsumed and
-> remains subject to the existing one-shot and failure-stop rules.
+> baseline `05fd0cded87714170105744c5c42945a0017c6c1`. It later ran from
+> `b9ade5e49131619c05f8b57e35cc310276b3a6f7`, reached durable arm and
+> exhausted the 1,200-second outer deadline before a coordinator receipt. v10
+> is consumed, non-admitting and non-retryable. Its checked disposition and the
+> 1,400-second bounded deadline repair is complete and non-admitting. Any
+> replacement campaign requires fresh explicit authorization.
 
 ## 1. Decision
 

@@ -2024,7 +2024,7 @@ package enum InvestigationMachineCampaignRawGateReceiptValidator {
         let groupEmpty = try cursor.boolean(), childReaped = try cursor.boolean()
         let restored = try cursor.boolean(), borrowed = try cursor.read(5)
         let preparedDeadline = started.addingReportingOverflow(
-            1_200_000_000_000)
+            InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds)
         guard !preparedDeadline.overflow else {
             throw campaignEvidenceInvalid()
         }
@@ -2075,7 +2075,9 @@ package enum InvestigationMachineCampaignRawGateReceiptValidator {
             wait == Data([1,0,0,0,0]), forwarded == 0, started > 0,
             finalReceipt.monotonicStartedNanoseconds < started,
             completed < finalReceipt.monotonicCompletedNanoseconds,
-            completed >= started, completed - started <= 1_200_000_000_000,
+            completed >= started,
+            completed - started
+                <= InvestigationCohortCapsule.maximumCampaignWallClockNanoseconds,
             progression == 1, groupEmpty, childReaped, restored,
             borrowed == Data([1,0,0,0,0])
         else { throw campaignEvidenceInvalid() }

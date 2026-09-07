@@ -2,11 +2,49 @@ import Darwin
 import Foundation
 import Testing
 
+@testable import StornautInvestigation
 @testable import StornautInvestigationHandoffContract
+@testable import StornautInvestigationMachineCampaign
 @testable import StornautInvestigationMachineGateSupport
 
 @Suite("Investigation sudo-shaped driver launcher", .serialized)
 struct InvestigationSudoShapedDriverLauncherTests {
+    @Test
+    func machineCampaignDeadlineCoversEpochBudgetAndFixedReserve() {
+        let epochBudgetSeconds = TimeInterval(
+            InvestigationCohortCapsule.epochCount
+                * SignedInvestigationRuntimeDiagnosticConfiguration
+                    .maximumMachineEpochWallClockSeconds
+        )
+        let campaignOrchestrationAndCleanupReserveSeconds =
+            SignedInvestigationRuntimeDiagnosticConfiguration
+                .machineCampaignOrchestrationAndCleanupReserveSeconds
+        let requiredGateSeconds =
+            epochBudgetSeconds + campaignOrchestrationAndCleanupReserveSeconds
+
+        #expect(
+            SignedInvestigationRuntimeDiagnosticConfiguration
+                .maximumMachineCohortValiditySeconds
+                == requiredGateSeconds
+        )
+        #expect(campaignOrchestrationAndCleanupReserveSeconds == 280)
+        #expect(requiredGateSeconds == 1_400)
+        #expect(
+            InvestigationCohortCapsule.maximumCampaignWallClockSeconds
+                == UInt64(requiredGateSeconds)
+        )
+        #expect(
+            InvestigationMachineFixedGateContract.deadlineNanoseconds
+                == InvestigationCohortCapsule
+                    .maximumCampaignWallClockNanoseconds
+        )
+        #expect(
+            InvestigationMachineCampaignExecutable
+                .productionDeadlineNanoseconds
+                == InvestigationMachineFixedGateContract.deadlineNanoseconds
+        )
+    }
+
     @Test
     func fixedContractHasNoCallerSelectedProcessAuthority() {
         #expect(
@@ -32,7 +70,8 @@ struct InvestigationSudoShapedDriverLauncherTests {
         #expect(InvestigationMachineFixedGateContract.requiredGroupID == 20)
         #expect(
             InvestigationMachineFixedGateContract.deadlineNanoseconds
-                == 1_200_000_000_000
+                == InvestigationCohortCapsule
+                    .maximumCampaignWallClockNanoseconds
         )
         #expect(
             InvestigationMachineFixedGateContract.maximumCapturedOutputByteCount
@@ -98,7 +137,8 @@ struct InvestigationSudoShapedDriverLauncherTests {
                 device: 7, inode: 8, generation: 9, size: 1_024
             )
             , terminal: tty(foreground: 40)
-            , absoluteDeadlineNanoseconds: 1_200_000_000_100
+            , absoluteDeadlineNanoseconds:
+                InvestigationMachineFixedGateContract.deadlineNanoseconds + 100
         )
         let encoded = try frame.encoded()
         #expect(encoded.count <= Int(PIPE_BUF))
@@ -620,8 +660,10 @@ struct InvestigationSudoShapedDriverLauncherTests {
     func initialStopDeadlineReservesFiveSecondCleanupWindow() throws {
         #expect(
             try InvestigationMachineGateDeadlinePolicy.operationDeadline(
-                absoluteDeadlineNanoseconds: 1_200_000_000_100
-            ) == 1_195_000_000_100
+                absoluteDeadlineNanoseconds:
+                    InvestigationMachineFixedGateContract.deadlineNanoseconds + 100
+            ) == InvestigationMachineFixedGateContract.deadlineNanoseconds
+                - 5_000_000_000 + 100
         )
         #expect(throws: InvestigationMachineGateError.containmentUncertain) {
             _ = try InvestigationMachineGateDeadlinePolicy.operationDeadline(
@@ -1167,7 +1209,8 @@ private func preparedBytes() throws -> Data {
             device: 7, inode: 8, generation: 9, size: 1_024
         )
         , terminal: tty(foreground: 40)
-        , absoluteDeadlineNanoseconds: 1_200_000_000_100
+        , absoluteDeadlineNanoseconds:
+            InvestigationMachineFixedGateContract.deadlineNanoseconds + 100
     ).encoded()
 }
 

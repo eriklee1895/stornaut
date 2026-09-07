@@ -520,10 +520,13 @@ struct InvestigationMachineTargetBoundaryTests {
         let v9Evidence = try String(contentsOf: root.appending(
             path: "docs/reports/evidence/task-39-iic-v9-failure-disposition.json"),
             encoding: .utf8)
+        let v10Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v10-failure-disposition.json"),
+            encoding: .utf8)
 
         for marker in [
             "iicc_failure_self_sha=", "/usr/bin/python3 -I",
-            "profile in (1, 2, 3)",
+            "profile in (1, 2, 3, 4, 5)",
             "f\"stornaut.task39.iic.failure-disposition.v{profile}\"",
             "consumedTransportLoss", "admission\"] == \"rejected",
             "retry\"] == \"forbidden",
@@ -537,6 +540,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "required Gate base absent",
             "pwd.getpwuid(user_id)", "record.pw_dir",
             "consumedDriverExecutionPolicyDenial",
+            "consumedCampaignDeadlineExhaustion",
             "ownConsumedAttemptPresent",
             "ownConsumedAttemptRemovedByTestFixture",
             "testFixtureStaleRecoveryRemovedConsumedGateResidue",
@@ -597,17 +601,17 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"59e09f67a5a7b5373fa5219756674cd76b3293a6cfb9becd472bc031ccec3927\")",
-            "(Path(\"README.md\"), \"b426120ada73bd89750c34e4553f571ade5d369e9fa5ad85c90e569449a48874\")",
-            "(Path(\"docs/README.md\"), \"5f15a4b7b9b805989883a56715632ee272801cf7f603de38120af4a0ab316133\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"b00b846ba0d8d7bc8be023d8e7df13c7cb06555d83a1071a353a5c83a0c93542\")",
-            "(Path(\"docs/plans/active/README.md\"), \"99cf080c93a523b8adfc4795f368e95ef7a26b1d7666407cb2dfd46f75de0137\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"f93800d85643da90fc2955c0b0416562300211448fcc9bfdc93517accd33ccbc\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"7fdcd6e9ba1434fd325782fcf76d2d0bbe64d8cea9b3a7a25dd4e59510da6163\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"dd6d9ac1185cb55fe16121cc26688898db6becaac477c24228115092c29b7a42\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"a48b7b2f2574729521d87ff08417259746c6452aa5f0cb694716775db92ca7ef\")",
+            "(Path(\"AGENTS.md\"), \"88faa4e93662c411598a6508a29d652a8c6d474a148e10fbb22b57fe8d6c4fb8\")",
+            "(Path(\"README.md\"), \"4b82bb722bc2e713e43c1f3fc22cbf3cd798e8c1d9c95e4465506954eb2918d4\")",
+            "(Path(\"docs/README.md\"), \"66656f4b91a2504070d9c5971addcdcb389714d02f4223975c5f5b81ced27057\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"6e8c7350c15c4e11713fdef7b6d65edfad27aee3d9c5acb866517f6edd7aaee9\")",
+            "(Path(\"docs/plans/active/README.md\"), \"fd88977fe645a3dc1bffbe92de837233ed2e4b55c39f15064c392b9eacfc3e23\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"e11e499abb99271fe12321159c99b106709e85fd27cfc551081df1439e722886\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"4898e4feb205ab1002cd28b2728996f283afb9976e05cd048f6ed57810a63bc8\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"8dfc19e53d3ec14ee8fbf92e00cf57f7466f2747f23eae21d86adc8d012d8d47\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"2fa880935a7fc307de13bdc2bc42a2de2a930b14e291d3b36eec5b93d7bc7235\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"cbda3a326440cab1be46d94a78c3aaeb49c6b1abaa8417f9b82134f1070a039b\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "len(active_status_entries) != 11",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
@@ -625,12 +629,25 @@ struct InvestigationMachineTargetBoundaryTests {
             == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
         #expect(v9Object["admission"] as? String == "rejected")
         #expect(v9Object["retry"] as? String == "forbidden")
-        #expect(v9Object["schemaVersion"] as? Int == 3)
+        #expect(v9Object["schemaVersion"] as? Int == 5)
         let currentObservation = try #require(
             v9Object["systemObservation"] as? [String: Any])
         #expect(currentObservation["gateBaseState"] as? String
-            == "ownConsumedAttemptRemovedByTestFixture")
+            == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent")
+        let subsequentObservation = try #require(
+            v9Object["subsequentCampaignObservation"] as? [String: Any])
+        #expect(subsequentObservation["classification"] as? String
+            == "consumedCampaignDeadlineExhaustion")
         #expect(!v9Evidence.contains("signedInvestigationRuntimeReady"))
+        let v10Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v10Evidence.utf8)) as? [String: Any])
+        #expect(v10Object["classification"] as? String
+            == "consumedCampaignDeadlineExhaustion")
+        #expect(v10Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v10Object["admission"] as? String == "rejected")
+        #expect(v10Object["retry"] as? String == "forbidden")
+        #expect(!v10Evidence.contains("signedInvestigationRuntimeReady"))
     }
 
     private func boundarySource(_ root: URL) -> String {
