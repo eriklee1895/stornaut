@@ -120,6 +120,18 @@ struct InvestigationClosedMachineArtifactInstallerTests {
         #expect(project.components(
             separatedBy: "settings = {ATTRIBUTES = (CodeSignOnCopy, ); };"
         ).count >= 3)
+        for configuration in [
+            (id: "A00000000000000000000170", comment: "Debug"),
+            (id: "A00000000000000000000171", comment: "Release"),
+        ] {
+            let driver = try projectBlock(
+                id: configuration.id,
+                comment: configuration.comment,
+                in: project
+            )
+            #expect(driver.contains("ENTITLEMENTS_ALLOWED = NO;"))
+            #expect(driver.contains("ENTITLEMENTS_REQUIRED = NO;"))
+        }
         let coordinatorSchemeEntry = try schemeBuildEntry(
             blueprintID: "A0000000000000000000000A",
             in: scheme

@@ -119,11 +119,18 @@
 > repairs are machine-campaign prerequisite checkpoints, not new Tasks. The authoritative
 > real-model run and readiness verdict remain unimplemented.
 > Production Deep Dive remains unavailable until Task 44 admission.
-> Task 39 remains incomplete, but the user authorized one fresh replacement
-> privileged campaign v9 on 2026-09-05. Its first launcher invocation was
-> cancelled at the unauthenticated lifecycle-install prompt before credential,
-> install, evidence creation or durable arm, with zero residue verified; v9
-> remains unconsumed in post-repair preflight. Task 40 remains blocked under the
+> Task 39 remains incomplete. The authorized v9 first-launch cancellation did
+> not consume the attempt, but the reviewed invocation later reached durable
+> arm and failed `spawnUncertain → terminal`; v9 is consumed/non-admitting/
+> non-retryable. AMFI code `-423` identified the ad-hoc MachineDriver's restricted
+> application-identifier entitlement as the root cause. Its non-privileged
+> tests-first repair is green, but a new campaign has not been authorized. Task
+> A later serial validation exposed a historical physical fixture that invoked
+> production stale-recovery and removed the preserved v9 Gate capsule. Its exact
+> bytes were not recoverable; the original v2 receipt and current v3 mutation
+> receipt preserve the truthful audit chain, and the fixture now requires
+> explicit opt-in plus discovery/entry guards.
+> 40 remains blocked under the
 > approved sequential plan; Task 44 remains blocked
 > from `go` until a fresh successful machine cohort is separately authorized and
 > admitted. Local findings remain within their owning
@@ -1018,9 +1025,9 @@ Checkpoint status:
   replay `aa8a7f1`, all non-admitting. ii-c-a, ii-c-b and resolved-lineage
   L1/L2 are complete/non-admitting; L2 final verifier closure is `849e454` /
   tree `f6c36d2`, and final review returned no finding. The historical pre-v8
-  order was `ii-c-c -> L3c3d -> L3c4`; v8 is consumed, failed and
-  non-retryable. The current frontier is the authorized v9 non-privileged
-  preflight followed by its one-shot operator-authorized campaign.
+  order was `ii-c-c -> L3c3d -> L3c4`; v8 and v9 are consumed, failed and
+  non-retryable. The current frontier is the reviewed AMFI root-cause repair
+  followed by a separately authorized fresh campaign.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

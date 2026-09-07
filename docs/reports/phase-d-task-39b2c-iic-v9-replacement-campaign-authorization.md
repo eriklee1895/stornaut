@@ -1,7 +1,6 @@
 # Phase D Task 39B2c ii-c-c v9 replacement campaign authorization
 
-> Status: authorized / first launch cancelled before credential and arm /
-> zero residue verified / replacement attempt remains unconsumed
+> Status: consumed / failed after durable arm / non-admitting / non-retryable
 >
 > Date: 2026-09-05
 >
@@ -27,7 +26,11 @@ service, runtime and lease paths remained absent, and the Gate base still
 contained only `.owner-lock-v1`. This pre-arm cancellation did not consume v9.
 The prompt defect is now repaired: install and uninstall use closed fixed prompts,
 and non-privileged contract, mutation, component, build and regression gates are
-green. A second launcher invocation awaits this repair's reviewed pushed baseline.
+green. A second launcher invocation ran from reviewed pushed baseline `55c574d`,
+reached `armedConsumed`, then ended `spawnUncertain -> terminal`. The checked
+disposition and AMFI root cause are recorded in
+[the v9 failure audit](phase-d-task-39b2c-iic-v9-failure-disposition.md). This
+authorization is consumed and does not permit another invocation or v10.
 
 ## Exact authority boundary
 

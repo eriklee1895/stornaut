@@ -10794,9 +10794,9 @@ if len(mutations) != 51:
 expected = (
     "7d86510b67b92f8dd1e2773faca3f1faeccaeb113a1292fb91a17db5f4386613",
     "2ae5f50fd8d60135caf007096d171315d3fed228da10f6fbfff3bde1187a3dd5",
-    "bd00ae59aa33ca772c4694872abeba255ec1d8b6bb12bd69ebd683183c0e71c2",
-    "bcd7590ed10c61a370670d75928adfe8f0661df0d75bce8f5d949752ffa066e8",
-    "58fb1aec6e6a888b7c92064a142a57e777dc90185d5012947e5bc49be3838504",
+    "4cb27c939e8846ae7c05e63258127a19fc40fb934781df41afa29f287131b9f8",
+    "30c1abadb746c70b89c846058da0558368d76285bf5cbfc348b86ed13b41a2a4",
+    "0de2813f9416833b1fd80c6d0a3ee78d0cb365fc3dfd961d031008dcbc7a412b",
 )
 if mutation_mode == "true":
     if mutation_name not in mutations:
@@ -11018,6 +11018,19 @@ if physical_signature not in lexical_physical:
 physical_test = re.sub(
     r"\s+", "", function_body(lexical_physical, physical_signature)
 )
+compact_physical_source = re.sub(r"\s+", "", lexical_physical)
+for marker in (
+    ".enabled(if:physicalFixedGateFixtureOptIn&&physicalGateFixtureCanRun(at:physicalFixedMachineGateRoot)",
+    "funcphysicalFixtureEnablementRejectsHistoricalAttempts()throws",
+    "#expect(!physicalGateFixtureCanRun(at:root))",
+):
+    if marker not in compact_physical_source:
+        raise SystemExit("ii-c-b1 physical fixed-base discovery guard drifted")
+compact_raw_physical = re.sub(r"\s+", "", physical)
+if (physical.count("STORNAUT_RUN_FIXED_GATE_HANDOFF_PHYSICAL") != 1
+        or "entries.allSatisfy({$0==\".owner-lock-v1\"})"
+            not in compact_raw_physical):
+    raise SystemExit("ii-c-b1 physical fixed-base opt-in drifted")
 for marker in (
     "try#require(geteuid()==501)",
     "try#require(getegid()==20)",
@@ -11044,6 +11057,10 @@ for marker in (
 ):
     if physical_test.count(marker) != 1:
         raise SystemExit("ii-c-b1 physical rejection test became vacuous")
+if (physical_test.index(
+        "try#require(physicalGateFixtureCanRun(at:physicalFixedMachineGateRoot))")
+        > physical_test.index("letevidence=tryfixture.run(.success)")):
+    raise SystemExit("ii-c-b1 physical entry guard moved after spawn")
 if "return" in physical_test or "requireSuccessfulPhysicalHandoff" in physical_test \
         or "cleanupTimeout" in physical_test or "for(" in physical_test:
     raise SystemExit("ii-c-b1 physical rejection test became vacuous")
@@ -12796,11 +12813,14 @@ PY
 function verify_iicc_failure_disposition_contract() {
     local verifier=scripts/verify-investigation-runtime-machine-failure
     local evidence=docs/reports/evidence/task-39-iic-v8-failure-disposition.json
+    local v9_evidence=docs/reports/evidence/task-39-iic-v9-failure-disposition.json
+    local v9_prior=docs/reports/evidence/task-39-iic-v9-failure-disposition-before-test-mutation.json
     local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
     local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
+    local v9_report=docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md
     local path
-    for path in $verifier $evidence $tests $boundary $report; do
+    for path in $verifier $evidence $v9_evidence $v9_prior $tests $boundary $report $v9_report; do
         [[ -f $path && ! -L $path ]] || {
             print -u2 "ii-c-c failure disposition source unavailable: $path"
             return 1
@@ -12811,19 +12831,20 @@ function verify_iicc_failure_disposition_contract() {
         return 1
     }
     /bin/zsh -n $verifier || return $?
-    /usr/bin/python3 -I - $verifier $evidence $tests $boundary $report <<'PY'
+    /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior $tests $boundary $report $v9_report <<'PY'
 from pathlib import Path
 import hashlib
 import json
 import re
 import sys
 
-verifier, evidence, tests, boundary, report = (
+verifier, evidence, v9_evidence, v9_prior, tests, boundary, report, v9_report = (
     Path(value) for value in sys.argv[1:])
 source = verifier.read_text(encoding="utf-8")
 test_source = tests.read_text(encoding="utf-8")
 boundary_source = boundary.read_text(encoding="utf-8")
 report_source = report.read_text(encoding="utf-8")
+v9_report_source = v9_report.read_text(encoding="utf-8")
 match = re.fullmatch(
     r"([0-9a-f]{64})",
     re.search(
@@ -12842,9 +12863,17 @@ required = (
     "requiredMissingArtifacts", "completion artifact unexpectedly present",
     "fixed Stornaut path present",
     "fixed Stornaut service state unavailable or registered",
-    "fixed Stornaut process present", "gate base has attempt residue",
+    "fixed Stornaut process present", "gate base residue inventory",
+    "historical attempt residue unexpectedly present",
+    "consumed Gate attempt absent",
+    "required Gate base absent",
     "pwd.getpwuid(user_id)", "record.pw_dir",
     "admission\"] == \"rejected", "retry\"] == \"forbidden",
+    "consumedDriverExecutionPolicyDenial", "ownConsumedAttemptPresent",
+    "ownConsumedAttemptRemovedByTestFixture",
+    "testFixtureStaleRecoveryRemovedConsumedGateResidue",
+    "exactCapsuleBytesUnavailable",
+    "AMFI root-cause observation", "Gate capsule binding",
 )
 for marker in required:
     if marker not in source:
@@ -12857,24 +12886,50 @@ for forbidden in (
 ):
     if forbidden in source:
         raise SystemExit("ii-c-c failure verifier gained authority: " + forbidden)
-evidence_bytes = evidence.read_bytes()
-checked_receipt_sha256 = "d911ffc9904340e0f963b56b87ae3e23b0f6495f9b2867982671f2450cab8f41"
-if hashlib.sha256(evidence_bytes).hexdigest() != checked_receipt_sha256:
-    raise SystemExit("ii-c-c checked failure disposition digest drifted")
-value = json.loads(evidence_bytes)
-if (value.get("classification") != "consumedTransportLoss"
-        or value.get("admission") != "rejected"
-        or value.get("retry") != "forbidden"
-        or value.get("eventChain")
-            != ["prepared", "armedConsumed", "spawnUncertain"]):
-    raise SystemExit("ii-c-c checked failure disposition drifted")
+checked = (
+    (evidence, "consumedTransportLoss",
+     ["prepared", "armedConsumed", "spawnUncertain"]),
+    (v9_evidence, "consumedDriverExecutionPolicyDenial",
+     ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
+)
+checked_digests = {
+    evidence: "7351c8312315b5673c7610a3421a20eb14fdb53fb6bdd181abfde4732d16b072",
+    v9_evidence: "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac",
+}
+for checked_path, classification, events in checked:
+    if hashlib.sha256(checked_path.read_bytes()).hexdigest() \
+            != checked_digests[checked_path]:
+        raise SystemExit("ii-c-c checked failure disposition digest drifted")
+    value = json.loads(checked_path.read_bytes())
+    if (value.get("classification") != classification
+            or value.get("admission") != "rejected"
+            or value.get("retry") != "forbidden"
+            or value.get("eventChain") != events):
+        raise SystemExit("ii-c-c checked failure disposition drifted")
+if hashlib.sha256(v9_prior.read_bytes()).hexdigest() \
+        != "9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252":
+    raise SystemExit("ii-c-c prior v9 disposition digest drifted")
+prior = json.loads(v9_prior.read_bytes())
+current = json.loads(v9_evidence.read_bytes())
+if (prior.get("schemaVersion") != 2
+        or prior.get("systemObservation", {}).get("gateBaseState")
+            != "ownConsumedAttemptPresent"
+        or current.get("schemaVersion") != 3
+        or current.get("systemObservation", {}).get("gateBaseState")
+            != "ownConsumedAttemptRemovedByTestFixture"
+        or current.get("postDispositionMutation", {}).get(
+            "priorDispositionSHA256")
+            != hashlib.sha256(v9_prior.read_bytes()).hexdigest()):
+    raise SystemExit("ii-c-c v9 mutation chain drifted")
 for marker in (
     "failureDispositionVerifierAcceptsOnlyConsumedTransportLoss",
+    "failureDispositionVerifierNormalizesMissingGateBaseOnlyForV1",
     "failureDispositionVerifierRejectsCompletionArtifactsAndAdmission",
     "failureDispositionVerifierRejectsReportAndTreeAliases",
     "failureDispositionVerifierIgnoresCallerControlledHome",
     "failureDispositionVerifierIgnoresUnrelatedAncestorDirectoryChurn",
     "checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
+    "checkedV9FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
 ):
     if marker not in test_source:
         raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
@@ -12908,17 +12963,26 @@ for marker in (
 ):
     if marker not in report_source:
         raise SystemExit("ii-c-c failure disposition report drifted: " + marker)
+for marker in (
+    "consumedDriverExecutionPolicyDenial", "macOS unified log",
+    "amfid", "AppleMobileFileIntegrityError", "-423",
+    "non-admitting", "non-retryable", "owner-private Gate residue",
+    "attempt-b856e976-e74a-4f6d-9079-0d6859fab67d",
+    "74be60f6fab16aba9e73fc090bbcf6c38def74726473b8ddc61ca5d7b84459f8",
+):
+    if marker not in v9_report_source:
+        raise SystemExit("ii-c-c v9 failure disposition report drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "7978b9bf4266bb1bbc1220fef2ce9cdbd87a9b7028882c01b654e1ee3c29a4db"),
-    (Path("README.md"), "7ac2fe61c7dcc155ea40194b6206a18a8bc75506c1ec9dc39869ed78a832c195"),
-    (Path("docs/README.md"), "38dc526526703bacae3524dc9437d3c66ab3729944782d0e2222679ec761bcd7"),
-    (Path("docs/agent/coding-agent-handoff.md"), "0d094ac8f305b77fc3492b562901f786c19703dc7ec7aaf9c8130639e76330ab"),
-    (Path("docs/plans/active/README.md"), "d8b4388eebb32c9181ff2cc38fb6abf82d6c50c3f32879fdb3cfa7284a047b7d"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "dbce2f21fa932b41456423b38ed640c4927e50ed5fbf4d0bd1b2b887eb4c198a"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "2f52947ace84f272d55a6ef7efcec83da3bf1dfc81bd037ecc052c5cd563a307"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "198559a2e202083b765993563418f5df98a46e077f5768c4b565bcc6841b26db"),
-    (Path("docs/plans/roadmap.md"), "98b1801e65a180b8e1d74f7452cc16a3618dc994c1d39b6830bf363c0d775108"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "8cffd0c92ecffedd8fb7e4aa5ba7447ac65dbed2d5984ca8c0db12ce37f4f4da"),
+    (Path("AGENTS.md"), "352bc6cb360676f258aab9d85713a0beeb87effb24e14384828de6f78a8ea23f"),
+    (Path("README.md"), "3e4d1da941cb2fbece0a516c1f485175d6bf1ce039b3c12e70acc8342457080d"),
+    (Path("docs/README.md"), "28c2a6d3988d2dda519315f592c63e6e0609d3a60c4051d382295820edc3e443"),
+    (Path("docs/agent/coding-agent-handoff.md"), "292fd25cb6b02dd12a2ead75c19390427df2c8c0b49b9c1797d5e21ce1fff7ac"),
+    (Path("docs/plans/active/README.md"), "aac8836da17d430d3609564cc933d16cf42fb767bf399551133ad637eb4a1584"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "c795089bd07a6c7ae4c3bcd4416300d282c3c070accae5bbe6fe582cdadfeec1"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "fe992575e337ed230443326e503d32478289d1f8ca3e5262c10b837431028ab8"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "902d85e34914e722b11fbf40b934685108c551b6db5c49d8862cc71bf337cf40"),
+    (Path("docs/plans/roadmap.md"), "ad40743bc2d20e0eb5cb2450bc60c765c52c3a3522a236ad229c92b8400b887d"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "b5e01a495b35d9ba63b293d74742667877be7a0a33d77d6fd892c0a163329195"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -18591,6 +18655,22 @@ for tool_name, product_name, support_name, main_path, signing_identifier in tool
                 raise SystemExit(
                     f"Machine tool {configuration_name} setting drifted: {tool_name}: {marker}"
                 )
+        if tool_name == "StornautInvestigationMachineDriverNative":
+            for marker in (
+                'ENTITLEMENTS_ALLOWED = NO',
+                'ENTITLEMENTS_REQUIRED = NO',
+            ):
+                if configuration.count(marker) != 1:
+                    raise SystemExit(
+                        f"Machine driver {configuration_name} entitlement suppression drifted: {marker}"
+                    )
+        elif (
+            'ENTITLEMENTS_ALLOWED' in configuration
+            or 'ENTITLEMENTS_REQUIRED' in configuration
+        ):
+            raise SystemExit(
+                f"Non-driver Machine tool gained entitlement suppression: {tool_name}"
+            )
         if 'CODE_SIGN_ENTITLEMENTS' in configuration:
             raise SystemExit(f"Machine tool gained entitlements: {tool_name}")
         coordinator_only_settings = (

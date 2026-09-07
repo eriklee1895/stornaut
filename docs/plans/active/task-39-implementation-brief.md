@@ -1,7 +1,8 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** Active/incomplete; replacement privileged campaign v9 explicitly
-> authorized and in non-privileged preflight after the immutable v8 no-go; 39A contract/facade foundation, 39B1a exact
+> **Status:** Active/incomplete; privileged campaigns v8 and v9 are consumed,
+> non-admitting and non-retryable. The v9 AMFI root-cause repair is in
+> non-privileged validation; no fresh campaign is authorized. 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
 > independently verified. The 39B2 preflight found that the accepted R5 helper
@@ -157,16 +158,27 @@
 > contracts. On 2026-09-05 the user explicitly authorized one fresh replacement
 > privileged campaign v9 and the corresponding plan amendment. Its first
 > launcher invocation was cancelled before credential, install, evidence
-> creation or durable arm, and zero fixed-runtime residue was verified; v9
-> remains unconsumed and does not alter v8's immutable disposition.
+> creation or durable arm. The reviewed invocation later reached
+> `prepared → armedConsumed → spawnUncertain → terminal`; v9 is consumed,
+> non-admitting and non-retryable. AMFI code `-423` bound the failure to the
+> ad-hoc MachineDriver's restricted application-identifier entitlement. A
+> tests-first local repair now produces fixed-identifier, zero-entitlement
+> Debug/Release driver artifacts, but no new campaign is authorized.
+> A later serial validation exposed that the historical fixed-gate physical
+> fixture invoked production stale-recovery and removed the preserved v9 Gate
+> capsule. No exact byte copy was recoverable. The original v2 receipt is
+> retained, a v3 post-mutation receipt binds the remaining nine artifacts and
+> current owner-lock-only state, and the fixture now requires explicit opt-in
+> plus discovery/entry rejection of any historical attempt. The checkpoint's
+> sole 1,932-test/99-suite serial recorded one missing-attempt issue and was not
+> repeated; the exact v8/v3 and fixture cases passed after the repair.
 > The pre-arm failure diagnostic prerequisite is complete at `2ada395` / tree
 > `11e1a0a`: bounded typed failure receipt, exact exit/EOF/residue verification,
 > physical compact-frame coverage and exact nine-path mutation closure have no
 > unresolved P0-P2. The unique privileged attempt v8 is consumed and may not be
 > retried. The v8 read-only failure closure is complete at `4147e45`; the current
-> frontier is v9 non-privileged preflight followed by one operator-authorized
-> campaign. v9 must use fresh UUIDs/evidence and stops permanently if consumed
-> without a green result.
+> frontier is the reviewed AMFI root-cause repair followed by a separately
+> authorized fresh campaign. v8 and v9 are both consumed and cannot be reused.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.
@@ -177,10 +189,11 @@
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
 >
-> **Current Task 39 disposition (2026-09-05):** v8 remains a conclusive
-> machine-gate `no-go`, but the user has authorized one fresh replacement v9.
-> Task 39 is active/incomplete and not Ready. v8 is the consumed, non-retryable
-> `transportLoss` attempt; L3c3d
+> **Current Task 39 disposition (2026-09-07):** v8 and v9 are conclusive
+> machine-gate `no-go` attempts. Both are consumed, non-admitting and
+> non-retryable; no fresh replacement campaign is authorized. The v9 AMFI
+> root-cause repair is undergoing non-privileged validation. Task 39 is
+> active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential
 > Task 40 start condition remains blocked until Task 39 produces a pushed Ready
@@ -1517,8 +1530,9 @@ non-admitting. ii-c-a, ii-c-b1, ii-c-b2a1 and ii-c-b2a2 are
 complete/non-admitting; ii-c-b2b and resolved-lineage L1/L2 implementation are
 complete/non-admitting; L2 final verifier review returned no finding. The
 historical pre-v8 order was ii-c-c → L3c3d → L3c4. v8 is consumed, failed and
-non-retryable. The current frontier is the authorized v9 non-privileged preflight
-followed by its one-shot operator-authorized campaign. These repairs are
+non-retryable. v9 is also consumed/non-retryable; the current frontier is the
+reviewed AMFI root-cause repair followed by a separately authorized fresh
+campaign. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the
 [shared-deadline audit](../../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)

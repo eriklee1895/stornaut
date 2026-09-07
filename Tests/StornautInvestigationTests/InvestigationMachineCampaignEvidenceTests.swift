@@ -1299,7 +1299,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             fixture.evidenceRoot, report)
         #expect(accepted.status == 0, Comment(rawValue: accepted.stderr))
         #expect(accepted.stdout.contains(
-            "consumed transport-loss disposition verified"))
+            "consumed failure disposition verified"))
 
         let event = fixture.evidenceRoot.appending(
             path: "03-authorization/attempt-event-0003.bin")
@@ -1309,6 +1309,87 @@ struct InvestigationMachineCampaignEvidenceTests {
         let rejected = try Self.runFailureVerifier(
             fixture.evidenceRoot, report)
         #expect(rejected.status != 0)
+    }
+
+    @Test
+    func failureDispositionVerifierNormalizesMissingGateBaseOnlyForV1() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure")
+        let harness = """
+        import ast
+        import errno
+        import os
+        import subprocess
+        import sys
+
+        source = open(sys.argv[1], "r", encoding="utf-8").read()
+        python_source = source.split("<<'PY'\\n", 1)[1].rsplit("\\nPY\\n", 1)[0]
+        tree = ast.parse(python_source)
+        function = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "observe_system")
+        namespace = {
+            "os": os, "errno": errno, "subprocess": subprocess,
+            "FIXED_PATHS": (), "FIXED_EXECUTABLES": (),
+            "SERVICE": "system/com.eriklee.stornaut.lifecycle",
+            "process_paths": lambda: [],
+            "account_gate_base": lambda: sys.argv[2],
+        }
+        def require(condition, message):
+            if not condition:
+                raise RuntimeError(message)
+        namespace["require"] = require
+        class ServiceResult:
+            returncode = 113
+            stdout = b""
+            stderr = (b'Could not find service \"com.eriklee.stornaut.lifecycle\"'
+                      b" in domain for system")
+        namespace["subprocess"].run = lambda *args, **kwargs: ServiceResult()
+        exec(compile(ast.Module(body=[function], type_ignores=[]),
+                     "<observe-system>", "exec"), namespace)
+        expected_state = sys.argv[3]
+        should_accept = sys.argv[4] == "accept"
+        expected = {
+            "fixedPathsAbsent": True, "fixedServiceAbsent": True,
+            "fixedProcessCount": 0, "gateBaseState": expected_state,
+        }
+        try:
+            namespace["observe_system"](expected, {"attemptUUID": "unused"})
+        except RuntimeError as error:
+            if should_accept or str(error) != "required Gate base absent":
+                raise
+        else:
+            if not should_accept:
+                raise RuntimeError("missing Gate base was accepted for " + expected_state)
+        """
+        let missingGateBase = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-missing-gate-base-" + UUID().uuidString)
+        #expect(!FileManager.default.fileExists(atPath: missingGateBase.path))
+
+        for (state, outcome) in [
+            ("ownAttemptAbsent", "accept"),
+            ("ownConsumedAttemptPresent", "reject"),
+            ("ownConsumedAttemptRemovedByTestFixture", "reject"),
+        ] {
+            let process = Process(), output = Pipe(), errors = Pipe()
+            process.executableURL = URL(filePath: "/usr/bin/python3")
+            process.arguments = [
+                "-I", "-c", harness, verifier.path, missingGateBase.path,
+                state, outcome,
+            ]
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = output
+            process.standardError = errors
+            try process.run()
+            process.waitUntilExit()
+            let stderr = String(decoding: errors.fileHandleForReading
+                .readDataToEndOfFile(), as: UTF8.self)
+            #expect(process.terminationStatus == 0,
+                Comment(rawValue: "\(state): \(stderr)"))
+        }
+        #expect(!FileManager.default.fileExists(atPath: missingGateBase.path))
     }
 
     @Test
@@ -1424,7 +1505,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         let rejected = try Self.runFailureVerifier(
             fixture.evidenceRoot, report, environment: ["HOME": fakeHome.path])
         #expect(rejected.status != 0)
-        #expect(rejected.stderr.contains("system observation drift"))
+        #expect(rejected.stderr.contains("system observation values"))
     }
 
     @Test
@@ -1503,6 +1584,63 @@ struct InvestigationMachineCampaignEvidenceTests {
         let after = try Self.treeSnapshot(URL(filePath: root))
         #expect(result.status == 0, Comment(rawValue: result.stderr))
         #expect(before == after)
+    }
+
+    @Test
+    func checkedV9FailureDispositionBindsFrozenExternalEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v9-failure-disposition.json")
+        guard let root = ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V9_EVIDENCE_ROOT"] else { return }
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+        let disposition = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: report)) as? [String: Any])
+        #expect(disposition["schemaVersion"] as? Int == 3)
+        let observation = try #require(
+            disposition["systemObservation"] as? [String: Any])
+        #expect(observation["gateBaseState"] as? String
+            == "ownConsumedAttemptRemovedByTestFixture")
+        let mutation = try #require(
+            disposition["postDispositionMutation"] as? [String: Any])
+        #expect(mutation["recoverySearchResult"] as? String
+            == "exactCapsuleBytesUnavailable")
+
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        var forgedRootCause = disposition
+        var rootCause = try #require(
+            forgedRootCause["rootCauseObservation"] as? [String: Any])
+        rootCause["driverExecutableSHA256"] = String(repeating: "a", count: 64)
+        forgedRootCause["rootCauseObservation"] = rootCause
+        let rootCauseReport = reportParent.appending(path: "root-cause.json")
+        try Self.writeCanonicalReport(forgedRootCause, to: rootCauseReport)
+        let rootCauseRejected = try Self.runFailureVerifier(
+            URL(filePath: root), rootCauseReport)
+        #expect(rootCauseRejected.status != 0)
+        #expect(rootCauseRejected.stderr.contains(
+            "AMFI driver artifact binding"))
+
+        var forgedPrior = disposition
+        var postMutation = try #require(
+            forgedPrior["postDispositionMutation"] as? [String: Any])
+        postMutation["priorDispositionSHA256"] = String(
+            repeating: "b", count: 64)
+        forgedPrior["postDispositionMutation"] = postMutation
+        let priorReport = reportParent.appending(path: "prior-receipt.json")
+        try Self.writeCanonicalReport(forgedPrior, to: priorReport)
+        let priorRejected = try Self.runFailureVerifier(
+            URL(filePath: root), priorReport)
+        #expect(priorRejected.status != 0)
+        #expect(priorRejected.stderr.contains(
+            "post-disposition mutation observation"))
     }
 
     @Test
@@ -3573,8 +3711,8 @@ private final class CampaignEvidenceDiskFixture {
         let gateBase = FileManager.default.homeDirectoryForCurrentUser
             .appending(path:
                 "Library/Caches/com.eriklee.stornaut.task39-machine-gate")
-        let gateBaseState = FileManager.default.fileExists(atPath: gateBase.path)
-            ? "ownerLockOnly" : "absent"
+        _ = gateBase
+        let gateBaseState = "ownAttemptAbsent"
         let repository = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let verifier = repository.appending(

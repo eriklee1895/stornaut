@@ -1,17 +1,20 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8 consumed failure disposed / replacement v9 explicitly authorized; preflight pending
+> Status: frozen / v8 and v9 consumed failures disposed / new campaign not authorized
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: v9 non-privileged preflight -> one replacement campaign -> L3c3d -> L3c4
+> Remaining order: reviewed root-cause repair -> explicit new campaign authorization -> green campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
-> durable arm; exact zero fixed-runtime residue was verified, so v9 remains
-> unconsumed while the prompt contract is repaired.
+> durable arm; exact zero fixed-runtime residue was verified, so v9 was still
+> unconsumed while the prompt contract was repaired.
+> The repaired invocation later reached durable arm and failed when macOS AMFI
+> rejected the ad-hoc MachineDriver carrying a restricted application-identifier
+> entitlement. v9 is consumed, non-admitting and non-retryable.
 
 ## 1. Decision
 

@@ -6296,7 +6296,16 @@ for machine_driver in "$machine_driver_product" "$diagnostic_machine_driver"; do
     (( machine_driver_bytes > 0 && machine_driver_bytes <= machine_driver_max_bytes ))
     test "$(/usr/bin/lipo -archs "$machine_driver")" = arm64
     /usr/bin/codesign --verify --strict "$machine_driver"
+    machine_driver_entitlements=$(
+        /usr/bin/codesign -d --entitlements :- "$machine_driver" 2>/dev/null
+    )
+    test -z "$machine_driver_entitlements"
 done
+/usr/bin/codesign --verify --strict "$release_machine_driver"
+release_machine_driver_entitlements=$(
+    /usr/bin/codesign -d --entitlements :- "$release_machine_driver" 2>/dev/null
+)
+test -z "$release_machine_driver_entitlements"
 /usr/bin/codesign --verify --deep --strict "$diagnostic_debug_app"
 
 machine_driver_product_identifier=$(

@@ -66,7 +66,7 @@
     "fixedPathsAbsent" : true,
     "fixedProcessCount" : 0,
     "fixedServiceAbsent" : true,
-    "gateBaseState" : "ownerLockOnly"
+    "gateBaseState" : "ownAttemptAbsent"
   },
-  "verifierExecutableSHA256" : "254a6e4dec35458106e243f4a0b6217be3eb05d7e5d1a7f993b8010a47d04d5a"
+  "verifierExecutableSHA256" : "848955e1ea62e194990163558f8217c47ad28b85bd4a8a6d1de0660b35ef40e1"
 }

@@ -112,8 +112,14 @@ implementation、cross-UID/PID-reuse corrections 与 mutation-oracle fix 也已
 `armedConsumed` 后以 transport loss 失败；独立只读
 failure-disposition verifier 已固定其 non-admitting/non-retryable 结论与当前
 零 Stornaut runtime 残留。用户已于 2026-09-05 批准一次全新 replacement
-campaign v9；首次 launcher 启动已在未认证 install 提示处取消，未安装、未建
-evidence、未 arm 且零残留，v9 仍未消费；当前处于修复后 preflight，L3c3d/L3c4
+campaign v9；首次 launcher 启动在未认证 install 提示处取消且未消费，修复后
+invocation 已到达 `armedConsumed`，随后因 AMFI `-423` 拒绝携带受限 entitlement
+的 ad-hoc MachineDriver 而 `spawnUncertain → terminal`。v9 已消费且不可重试；
+root-cause 修复已通过非提权 focused/structural/binary gates，但新 campaign 尚未
+授权。后续 serial validation 暴露历史 physical fixture 会触发 production
+stale-recovery 并移除 v9 Gate capsule；精确副本不可恢复，原 v2 receipt 与当前
+v3 post-mutation receipt 已分别保留，fixture 已改为显式 opt-in + 双重拒绝历史
+attempt。L3c3d/L3c4
 仍未证明，最终 authoritative full 未运行；Task 40 仍受批准计划的顺序前置
 条件阻塞，production Deep Dive 仍 unavailable。
 见文档：
@@ -130,7 +136,7 @@ evidence、未 arm 且零残留，v9 仍未消费；当前处于修复后 prefli
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete；Task 39 authorized/preflight for replacement v9 after immutable v8 no-go；Task 40 remains blocked；machine admission unavailable |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete；Task 39 blocked after consumed v8/v9 no-go；v9 post-mutation audit and AMFI repair green；new campaign not authorized；Task 40 remains blocked；machine admission unavailable |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) | c0b-i semantic producer completion audit；exact 7 paths / 1,900 lines、95 tests / 5 suites；complete/non-admitting |
@@ -141,10 +147,11 @@ evidence、未 arm 且零残留，v9 仍未消费；当前处于修复后 prefli
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) | iv-b1b-i injected Darwin lifecycle；implementation `41d34f26` / tree `8ab58932`、3 paths / 1,173 production lines、806/806 affected、Release target 与两组终审；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) | iv-b1b-ii dedicated physical/verifier closure；implementation `373431d4` / tree `b08342e5`、5 paths / 2,193 lines、七场景 physical、808/808 serial、三项 gates 与无 unresolved P0–P2 review；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md) | iv-b2 zero-argument coordinator/verifier closure；implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree `e02a515283225b0b19443a47fad0b90fe3d0ddfd`；complete/non-admitting |
-| [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) | ii-c-b and resolved-lineage L1/L2 complete/non-admitting；v8 consumed/no-go；replacement v9 authorized/preflight |
+| [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) | ii-c-b complete/non-admitting；v8/v9 consumed/no-go；root-cause repair green；new campaign not authorized |
 | [docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) | v8 read-only failure disposition；consumed/non-admitting/non-retryable；current fixed runtime absent |
-| [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) | 用户批准的 v9 replacement campaign 单次权限边界、preflight 与 stop rules |
-| [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) | Historical v8 blocked/no-go gate audit；v9 later authorized，Task 40 remains blocked |
+| [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) | 用户批准的 v9 replacement campaign 单次权限边界、preflight 与 stop rules；授权已消费，禁止重试/v10 |
+| [docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md) | v9 consumed failure、AMFI `-423` root cause、原 Gate residue v2 receipt 与后续 test-mutation v3 disposition |
+| [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) | Historical v8 blocked/no-go gate audit；v9 later consumed/no-go；Task 39 incomplete，Task 40 remains blocked |
 | [docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md](docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) | ii-c-a implementation `81f185c` / tree `7cf4db75`、11 paths / 2,669 lines、856/856 affected serial；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md](docs/reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md) | ii-c-b1 implementation `77cde61` / tree `9c59f241`、7 paths / 1,900 lines、860/860 serial；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-iic-b2-split-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2-split-preflight.md) | ii-c-b2 mandatory split：b2a1 producer → b2a2 independent verifier → b2b PTY/FD3 transport |

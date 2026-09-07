@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_failure_self_sha=b61e11f402e6005afc552e65172acdba903aeaf3366c3078ca3e61570f539a55 # iicc-failure-self-seal
+typeset -r iicc_failure_self_sha=8b0e9eecbf0846e663a86c3781e077880df7294cdf6a934572f266e82135bfc0 # iicc-failure-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -47,7 +47,7 @@ ROOT_FLAGS = (os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NONBLOCK
               | O_NOFOLLOW_ANY | O_UNIQUE)
 PHASES = ("01-preflight", "02-install", "03-authorization",
           "04-driver-epochs", "05-uninstall", "06-verifier")
-FILES = (
+V1_FILES = (
     "01-preflight/source-build.json",
     "02-install/installed.json",
     "03-authorization/attempt-event-0001.bin",
@@ -57,6 +57,9 @@ FILES = (
     "03-authorization/human-attestation.json",
     "03-authorization/policy-probe.json",
 )
+V2_FILES = V1_FILES[:5] + (
+    "03-authorization/attempt-event-0004.bin",
+) + V1_FILES[5:]
 MISSING = (
     "manifest.bin",
     "../seal.json",
@@ -466,9 +469,11 @@ def parse_event(data):
     attempt = str(uuid.UUID(bytes=fields[1]))
     kind = take_u32(fields[2])
     observed = take_i64(fields[4])
-    require(sequence > 0 and kind in (1, 3, 5) and observed > 0, "event values")
+    require(sequence > 0 and kind in (1, 3, 5, 6) and observed > 0,
+            "event values")
     payload = canonical_json(fields[5])
-    names = {1: "prepared", 3: "armedConsumed", 5: "spawnUncertain"}
+    names = {1: "prepared", 3: "armedConsumed", 5: "spawnUncertain",
+             6: "terminal"}
     common = {"schemaVersion", "kind", "attemptUUID", "evidenceSetSHA256"}
     exact_object(payload, common | ({"reason"} if kind == 5 else set()),
                  "event payload")
@@ -528,6 +533,10 @@ def validate_json_artifacts(contents, report):
                                "stagingIdentitySHA256",
                                "installedIdentitySHA256", "plistSHA256"}:
         digest_text(install[name], name)
+    if report["schemaVersion"] in (2, 3):
+        require(report["rootCauseObservation"]["driverExecutableSHA256"]
+                == install["machineDriverExecutableSHA256"],
+                "AMFI driver artifact binding")
 
     policy = canonical_json(contents["03-authorization/policy-probe.json"])
     exact_object(policy, common | {"command", "exitStatus",
@@ -547,16 +556,21 @@ def validate_json_artifacts(contents, report):
     exact_object(attestation, common | {"prompt", "machinePromptObserved",
         "attestationKind", "humanActionObserved",
         "credentialRetainedByteCount"}, "attestation")
+    attestation_expected = (
+        (False, False, "operatorCancellationBeforeCredential")
+        if report["schemaVersion"] == 1 else
+        (True, True, "trustedOperatorInteractiveAction")
+    )
     require(attestation["schemaVersion"] == 1
             and attestation["role"] == "humanPromptAttestation"
             and attestation["campaignUUID"] == campaign
             and attestation["attemptUUID"] == attempt
             and attestation["prompt"]
                 == "Stornaut Task 39 ii-c administrator authorization: "
-            and attestation["machinePromptObserved"] is False
-            and attestation["humanActionObserved"] is False
-            and attestation["attestationKind"]
-                == "operatorCancellationBeforeCredential"
+            and attestation["machinePromptObserved"]
+                is attestation_expected[0]
+            and attestation["humanActionObserved"] is attestation_expected[1]
+            and attestation["attestationKind"] == attestation_expected[2]
             and exact_int(attestation["credentialRetainedByteCount"],
                           "credential bytes") == 0, "attestation semantics")
 
@@ -577,28 +591,39 @@ def validate_json_artifacts(contents, report):
 
 def validate_report(data):
     value = canonical_report_json(data)
-    exact_object(value, {"schemaVersion", "domain", "campaignUUID",
+    common_keys = {"schemaVersion", "domain", "campaignUUID",
         "attemptUUID", "classification", "admission", "retry",
         "eventChain", "evidenceSetSHA256", "sourceBinding",
         "artifactSHA256", "verifierExecutableSHA256",
         "requiredMissingArtifacts", "rootIdentity",
-        "parentIdentity", "systemObservation", "nonClaims"},
-        "disposition")
-    require(value["schemaVersion"] == 1
-            and value["domain"] == "stornaut.task39.iic.failure-disposition.v1"
+        "parentIdentity", "systemObservation", "nonClaims"}
+    profile = exact_int(value.get("schemaVersion"), "disposition schema")
+    require(profile in (1, 2, 3), "disposition schema version")
+    profile_keys = (set() if profile == 1 else {"rootCauseObservation"})
+    if profile == 3:
+        profile_keys |= {"priorGateResidueObservation",
+                         "postDispositionMutation"}
+    exact_object(value, common_keys | profile_keys, "disposition")
+    expected_domain = f"stornaut.task39.iic.failure-disposition.v{profile}"
+    expected_classification = ("consumedTransportLoss" if profile == 1
+        else "consumedDriverExecutionPolicyDenial")
+    expected_events = (["prepared", "armedConsumed", "spawnUncertain"]
+        if profile == 1 else
+        ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+    files = V1_FILES if profile == 1 else V2_FILES
+    require(value["domain"] == expected_domain
             and exact_uuid(value["campaignUUID"], "campaign")
             and exact_uuid(value["attemptUUID"], "attempt")
             and value["campaignUUID"] != value["attemptUUID"]
-            and value["classification"] == "consumedTransportLoss"
+            and value["classification"] == expected_classification
             and value["admission"] == "rejected"
             and value["retry"] == "forbidden"
-            and value["eventChain"]
-                == ["prepared", "armedConsumed", "spawnUncertain"]
+            and value["eventChain"] == expected_events
             and valid_hex(value["evidenceSetSHA256"]),
             "disposition semantics")
     digest_text(value["verifierExecutableSHA256"], "verifier executable")
-    exact_object(value["artifactSHA256"], FILES, "artifact hashes")
-    for path in FILES:
+    exact_object(value["artifactSHA256"], files, "artifact hashes")
+    for path in files:
         digest_text(value["artifactSHA256"][path], path)
     require(value["requiredMissingArtifacts"] == list(MISSING),
             "missing-artifact contract")
@@ -607,21 +632,117 @@ def validate_report(data):
         exact_object(value[name], identity_keys, name)
         require(all(isinstance(value[name][key], str) and value[name][key].isdecimal()
                     for key in identity_keys), name + " values")
-    exact_object(value["systemObservation"], {"fixedPathsAbsent",
-        "fixedServiceAbsent", "fixedProcessCount", "gateBaseState"},
-        "system observation")
+    system_keys = {"fixedPathsAbsent", "fixedServiceAbsent",
+        "fixedProcessCount", "gateBaseState"}
+    if profile == 2:
+        system_keys |= {"gateAttemptName", "gateCapsuleName",
+            "gateCapsuleSHA256", "gateCapsuleByteCount"}
+    elif profile == 3:
+        system_keys |= {"gateBaseChangeTimeNanoseconds",
+            "gateBaseDevice", "gateBaseInode",
+            "gateBaseGeneration", "ownerLockDevice", "ownerLockInode",
+            "ownerLockGeneration", "ownerLockChangeTimeNanoseconds",
+            "ownerLockSHA256"}
+    exact_object(value["systemObservation"], system_keys, "system observation")
     require(value["systemObservation"]["fixedPathsAbsent"] is True
             and value["systemObservation"]["fixedServiceAbsent"] is True
             and value["systemObservation"]["fixedProcessCount"] == 0
             and value["systemObservation"]["gateBaseState"]
-                in ("absent", "ownerLockOnly"), "system observation values")
-    require(value["nonClaims"] == [
+                in (("ownAttemptAbsent",) if profile == 1
+                    else ("ownConsumedAttemptPresent",) if profile == 2
+                    else ("ownConsumedAttemptRemovedByTestFixture",)),
+            "system observation values")
+    if profile == 2:
+        observation = value["systemObservation"]
+        require(observation["gateAttemptName"] == "attempt-" + value["attemptUUID"]
+                and re.fullmatch(r"projected-cohort-[0-9a-f]{64}\.bin",
+                                 observation["gateCapsuleName"]) is not None
+                and valid_hex(observation["gateCapsuleSHA256"])
+                and exact_int(observation["gateCapsuleByteCount"],
+                              "gate capsule bytes", 1) <= 1_069_056,
+                "consumed Gate residue observation")
+    if profile in (2, 3):
+        root_cause = value["rootCauseObservation"]
+        exact_object(root_cause, {"source", "process", "observedAtUTC",
+            "errorDomain", "errorCode", "reason",
+            "driverExecutableSHA256", "driverSigningIdentifier",
+            "driverAdHoc", "driverEntitlementKeys"}, "root cause")
+        require(root_cause["source"] == "macOSUnifiedLog"
+                and root_cause["process"] == "/usr/libexec/amfid"
+                and root_cause["observedAtUTC"]
+                    == "2026-09-07T01:31:20.854626Z"
+                and root_cause["errorDomain"]
+                    == "AppleMobileFileIntegrityError"
+                and root_cause["errorCode"] == -423
+                and root_cause["reason"]
+                    == "adhocSignedOrUnknownCertificateChain"
+                and valid_hex(root_cause["driverExecutableSHA256"])
+                and root_cause["driverSigningIdentifier"]
+                    == "com.eriklee.stornaut.investigation.machine-driver"
+                and root_cause["driverAdHoc"] is True
+                and root_cause["driverEntitlementKeys"]
+                    == ["com.apple.application-identifier"],
+                "AMFI root-cause observation")
+    if profile == 3:
+        prior = value["priorGateResidueObservation"]
+        exact_object(prior, {"gateAttemptName", "gateCapsuleName",
+            "gateCapsuleSHA256", "gateCapsuleByteCount"},
+            "prior Gate residue")
+        require(prior["gateAttemptName"] == "attempt-" + value["attemptUUID"]
+                and prior["gateCapsuleName"]
+                    == "projected-cohort-c4e325d6a26ffb7b9eb074bd665d9fd7b84a2efe85c1e0b748486bce974b30eb.bin"
+                and prior["gateCapsuleSHA256"]
+                    == "74be60f6fab16aba9e73fc090bbcf6c38def74726473b8ddc61ca5d7b84459f8"
+                and exact_int(prior["gateCapsuleByteCount"],
+                              "prior Gate capsule bytes", 1) == 28_997,
+                "prior Gate residue observation")
+        mutation = value["postDispositionMutation"]
+        exact_object(mutation, {"schemaVersion", "classification",
+            "observedAtUTC", "priorDispositionSHA256", "source",
+            "testSuite", "testName", "verifierRejection",
+            "recoverySearchResult"}, "post-disposition mutation")
+        require(mutation["schemaVersion"] == 1
+                and mutation["classification"]
+                    == "testFixtureStaleRecoveryRemovedConsumedGateResidue"
+                and mutation["observedAtUTC"] == "2026-09-07T09:57:23Z"
+                and mutation["priorDispositionSHA256"]
+                    == "9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252"
+                and mutation["source"] == "swiftTestingSerialRegression"
+                and mutation["testSuite"]
+                    == "Investigation fixed gate handoff physical evidence"
+                and mutation["testName"]
+                    == "userOwnedTemporaryGateFailsClosedBeforeSpawn"
+                and mutation["verifierRejection"]
+                    == "consumed Gate attempt absent"
+                and mutation["recoverySearchResult"]
+                    == "exactCapsuleBytesUnavailable",
+                "post-disposition mutation observation")
+        for name in ("gateBaseChangeTimeNanoseconds", "gateBaseDevice",
+                     "gateBaseInode",
+                     "gateBaseGeneration", "ownerLockDevice",
+                     "ownerLockInode", "ownerLockGeneration",
+                     "ownerLockChangeTimeNanoseconds"):
+            require(isinstance(value["systemObservation"][name], str)
+                    and value["systemObservation"][name].isdecimal(),
+                    "post-mutation node identity")
+        digest_text(value["systemObservation"]["ownerLockSHA256"],
+                    "owner lock")
+    expected_nonclaims = [
         "no manifest or external seal",
         "no uninstall or global post-teardown artifact",
         "no machine admission",
         "no L3c3d authenticated model success",
         "no Task 39 readiness",
-    ], "non-claims")
+    ]
+    if profile == 3:
+        expected_nonclaims += [
+            "no verified recovery of removed Gate capsule",
+            "owner-lock-only state is not successful campaign cleanup",
+        ]
+    require(value["nonClaims"] == expected_nonclaims, "non-claims")
+    value["_files"] = files
+    value["_expectedEventKinds"] = ([1, 3, 5] if profile == 1
+        else [1, 3, 5, 6])
     return value
 
 
@@ -671,7 +792,7 @@ def process_paths():
     return paths
 
 
-def observe_system(expected):
+def observe_system(expected, report):
     for path in FIXED_PATHS:
         try:
             os.lstat(path)
@@ -697,35 +818,101 @@ def observe_system(expected):
     require(fixed_process_count == 0, "fixed Stornaut process present")
     gate_base = account_gate_base()
     if not os.path.lexists(gate_base):
-        gate_state = "absent"
+        require(expected["gateBaseState"] == "ownAttemptAbsent",
+                "required Gate base absent")
+        gate_state = "ownAttemptAbsent"
     else:
         gate_fd, gate_walk = open_absolute(
             gate_base, DIRECTORY_FLAGS, False, 0o700)
         gate_before = os.fstat(gate_fd)
         held_files = []
+        attempt_fd = -1
         try:
-            require(inventory(gate_fd) == [".owner-lock-v1"],
-                    "gate base has attempt residue")
+            gate_inventory = inventory(gate_fd)
+            require(".owner-lock-v1" in gate_inventory
+                    and all(name == ".owner-lock-v1"
+                        or re.fullmatch(r"attempt-[0-9a-f-]{36}", name)
+                        for name in gate_inventory),
+                    "gate base residue inventory")
+            if expected["gateBaseState"] == "ownConsumedAttemptPresent":
+                require(expected["gateAttemptName"] in gate_inventory,
+                        "consumed Gate attempt absent")
+            elif expected["gateBaseState"] \
+                    == "ownConsumedAttemptRemovedByTestFixture":
+                require(gate_inventory == [".owner-lock-v1"],
+                        "post-mutation Gate base inventory")
+            else:
+                require("attempt-" + report["attemptUUID"]
+                        not in gate_inventory,
+                        "historical attempt residue unexpectedly present")
             lock, _ = read_child(
                 gate_fd, ".owner-lock-v1", 1, held_files, 0o600,
                 allow_empty=True)
             require(lock == b"", "owner lock content")
+            if expected["gateBaseState"] \
+                    == "ownConsumedAttemptRemovedByTestFixture":
+                lock_identity = os.fstat(held_files[-1][2])
+                require(str(gate_before.st_ctime_ns)
+                            == expected["gateBaseChangeTimeNanoseconds"]
+                        and str(gate_before.st_dev) == expected["gateBaseDevice"]
+                        and str(gate_before.st_ino)
+                            == expected["gateBaseInode"]
+                        and str(gate_before.st_gen)
+                            == expected["gateBaseGeneration"]
+                        and str(lock_identity.st_dev)
+                            == expected["ownerLockDevice"]
+                        and str(lock_identity.st_ino)
+                            == expected["ownerLockInode"]
+                        and str(lock_identity.st_gen)
+                            == expected["ownerLockGeneration"]
+                        and str(lock_identity.st_ctime_ns)
+                            == expected["ownerLockChangeTimeNanoseconds"]
+                        and hashlib.sha256(lock).hexdigest()
+                            == expected["ownerLockSHA256"],
+                        "post-mutation Gate node binding")
+            if expected["gateBaseState"] == "ownConsumedAttemptPresent":
+                attempt_name = expected["gateAttemptName"]
+                named_attempt = os.stat(
+                    attempt_name, dir_fd=gate_fd, follow_symlinks=False)
+                attempt_fd = os.open(attempt_name, DIRECTORY_FLAGS, dir_fd=gate_fd)
+                watch(attempt_fd, True)
+                attempt_held = validate_descriptor(
+                    attempt_fd, named_attempt, 0o700, False)
+                capsule_name = expected["gateCapsuleName"]
+                require(inventory(attempt_fd) == [capsule_name],
+                        "Gate attempt inventory")
+                capsule, _ = read_child(
+                    attempt_fd, capsule_name, 1_069_056, held_files, 0o600)
+                require(len(capsule) == expected["gateCapsuleByteCount"]
+                        and hashlib.sha256(capsule).hexdigest()
+                            == expected["gateCapsuleSHA256"],
+                        "Gate capsule binding")
+                require(node_identity(os.fstat(attempt_fd))
+                        == node_identity(attempt_held)
+                        == node_identity(os.stat(
+                            attempt_name, dir_fd=gate_fd, follow_symlinks=False))
+                        and inventory(attempt_fd) == [capsule_name],
+                        "Gate attempt changed during verification")
             for record in held_files:
-                revalidate_file(record)
+                if stat.S_ISREG(os.fstat(record[2]).st_mode):
+                    revalidate_file(record)
             require(node_identity(os.fstat(gate_fd)) == node_identity(gate_before),
                     "gate base changed during verification")
             revalidate_walk(gate_walk)
             require(change_queue.control(None, 1, 0) == [],
                     "gate base changed during verification")
-            gate_state = "ownerLockOnly"
+            gate_state = expected["gateBaseState"]
         finally:
             for record in reversed(held_files):
                 os.close(record[2])
+            if attempt_fd >= 0:
+                os.close(attempt_fd)
             close_walk(gate_walk)
     observed = {"fixedPathsAbsent": True, "fixedServiceAbsent": True,
                 "fixedProcessCount": fixed_process_count,
                 "gateBaseState": gate_state}
-    require(observed == expected, "system observation drift")
+    require(all(observed[key] == expected[key] for key in observed),
+            "system observation drift")
 
 
 def verify(root_path, report_path, expected_self_sha, verifier_fd):
@@ -779,7 +966,7 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
         require(inventory(root_fd) == list(PHASES), "failure root inventory")
         contents = {}
         expected_by_phase = {phase: [] for phase in PHASES}
-        for path in FILES:
+        for path in report["_files"]:
             phase, leaf = path.split("/")
             expected_by_phase[phase].append(leaf)
         for phase in PHASES:
@@ -810,10 +997,12 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
                 require(not os.path.lexists(os.path.join(root_path, missing)),
                         "completion artifact unexpectedly present")
         source = validate_json_artifacts(contents, report)
-        events = [parse_event(contents[path]) for path in FILES
+        events = [parse_event(contents[path]) for path in report["_files"]
                   if "/attempt-event-" in path]
-        require([event["sequence"] for event in events] == [1, 2, 3]
-                and [event["kind"] for event in events] == [1, 3, 5]
+        require([event["sequence"] for event in events]
+                    == list(range(1, len(events) + 1))
+                and [event["kind"] for event in events]
+                    == report["_expectedEventKinds"]
                 and all(event["attempt"] == report["attemptUUID"]
                         for event in events), "consumed transport-loss event chain")
         for index, event in enumerate(events):
@@ -828,7 +1017,7 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
         require(evidence_sets == {report["evidenceSetSHA256"]}
                 and source["preArmFrameSHA256"] == report["evidenceSetSHA256"],
                 "event evidence-set binding")
-        observe_system(report["systemObservation"])
+        observe_system(report["systemObservation"], report)
         for record in held_files:
             revalidate_file(record)
         for phase, descriptor, expected, expected_names in phase_records:
@@ -874,5 +1063,5 @@ except (OSError, Rejected, ValueError, KeyError, TypeError,
           file=sys.stderr)
     raise SystemExit(1)
 change_queue.close()
-print("stornaut ii-c consumed transport-loss disposition verified; admission rejected; retry forbidden")
+print("stornaut ii-c consumed failure disposition verified; admission rejected; retry forbidden")
 PY

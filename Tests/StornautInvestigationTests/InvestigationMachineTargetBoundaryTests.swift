@@ -517,18 +517,31 @@ struct InvestigationMachineTargetBoundaryTests {
         let evidence = try String(contentsOf: root.appending(
             path: "docs/reports/evidence/task-39-iic-v8-failure-disposition.json"),
             encoding: .utf8)
+        let v9Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v9-failure-disposition.json"),
+            encoding: .utf8)
 
         for marker in [
             "iicc_failure_self_sha=", "/usr/bin/python3 -I",
-            "stornaut.task39.iic.failure-disposition.v1",
+            "profile in (1, 2, 3)",
+            "f\"stornaut.task39.iic.failure-disposition.v{profile}\"",
             "consumedTransportLoss", "admission\"] == \"rejected",
             "retry\"] == \"forbidden",
             "[\"prepared\", \"armedConsumed\", \"spawnUncertain\"]",
             "manifest.bin", "../seal.json",
             "05-uninstall/uninstall.json",
             "06-verifier/global-post-teardown.json",
-            "fixed Stornaut process present", "gate base has attempt residue",
+            "fixed Stornaut process present", "gate base residue inventory",
+            "historical attempt residue unexpectedly present",
+            "consumed Gate attempt absent",
+            "required Gate base absent",
             "pwd.getpwuid(user_id)", "record.pw_dir",
+            "consumedDriverExecutionPolicyDenial",
+            "ownConsumedAttemptPresent",
+            "ownConsumedAttemptRemovedByTestFixture",
+            "testFixtureStaleRecoveryRemovedConsumedGateResidue",
+            "exactCapsuleBytesUnavailable",
+            "AMFI root-cause observation",
         ] {
             #expect(verifier.contains(marker), "missing: \(marker)")
         }
@@ -554,6 +567,7 @@ struct InvestigationMachineTargetBoundaryTests {
             path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
             encoding: .utf8)
         for marker in [
+            "failureDispositionVerifierNormalizesMissingGateBaseOnlyForV1",
             "let churnCountBeforeVerification = await state.successCount",
             "#expect(successfulChurns > churnCountBeforeVerification)",
             "#expect(churnFailure == nil)",
@@ -583,16 +597,16 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"7978b9bf4266bb1bbc1220fef2ce9cdbd87a9b7028882c01b654e1ee3c29a4db\")",
-            "(Path(\"README.md\"), \"7ac2fe61c7dcc155ea40194b6206a18a8bc75506c1ec9dc39869ed78a832c195\")",
-            "(Path(\"docs/README.md\"), \"38dc526526703bacae3524dc9437d3c66ab3729944782d0e2222679ec761bcd7\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"0d094ac8f305b77fc3492b562901f786c19703dc7ec7aaf9c8130639e76330ab\")",
-            "(Path(\"docs/plans/active/README.md\"), \"d8b4388eebb32c9181ff2cc38fb6abf82d6c50c3f32879fdb3cfa7284a047b7d\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"dbce2f21fa932b41456423b38ed640c4927e50ed5fbf4d0bd1b2b887eb4c198a\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"2f52947ace84f272d55a6ef7efcec83da3bf1dfc81bd037ecc052c5cd563a307\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"198559a2e202083b765993563418f5df98a46e077f5768c4b565bcc6841b26db\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"98b1801e65a180b8e1d74f7452cc16a3618dc994c1d39b6830bf363c0d775108\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"8cffd0c92ecffedd8fb7e4aa5ba7447ac65dbed2d5984ca8c0db12ce37f4f4da\")",
+            "(Path(\"AGENTS.md\"), \"352bc6cb360676f258aab9d85713a0beeb87effb24e14384828de6f78a8ea23f\")",
+            "(Path(\"README.md\"), \"3e4d1da941cb2fbece0a516c1f485175d6bf1ce039b3c12e70acc8342457080d\")",
+            "(Path(\"docs/README.md\"), \"28c2a6d3988d2dda519315f592c63e6e0609d3a60c4051d382295820edc3e443\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"292fd25cb6b02dd12a2ead75c19390427df2c8c0b49b9c1797d5e21ce1fff7ac\")",
+            "(Path(\"docs/plans/active/README.md\"), \"aac8836da17d430d3609564cc933d16cf42fb767bf399551133ad637eb4a1584\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"c795089bd07a6c7ae4c3bcd4416300d282c3c070accae5bbe6fe582cdadfeec1\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"fe992575e337ed230443326e503d32478289d1f8ca3e5262c10b837431028ab8\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"902d85e34914e722b11fbf40b934685108c551b6db5c49d8862cc71bf337cf40\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"ad40743bc2d20e0eb5cb2450bc60c765c52c3a3522a236ad229c92b8400b887d\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"b5e01a495b35d9ba63b293d74742667877be7a0a33d77d6fd892c0a163329195\")",
             "len(active_status_entries) != 10",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
@@ -602,6 +616,20 @@ struct InvestigationMachineTargetBoundaryTests {
             #expect(boundarySource(root).contains(marker), "missing: \(marker)")
         }
         #expect(!evidence.contains("signedInvestigationRuntimeReady"))
+        let v9Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v9Evidence.utf8)) as? [String: Any])
+        #expect(v9Object["classification"] as? String
+            == "consumedDriverExecutionPolicyDenial")
+        #expect(v9Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v9Object["admission"] as? String == "rejected")
+        #expect(v9Object["retry"] as? String == "forbidden")
+        #expect(v9Object["schemaVersion"] as? Int == 3)
+        let currentObservation = try #require(
+            v9Object["systemObservation"] as? [String: Any])
+        #expect(currentObservation["gateBaseState"] as? String
+            == "ownConsumedAttemptRemovedByTestFixture")
+        #expect(!v9Evidence.contains("signedInvestigationRuntimeReady"))
     }
 
     private func boundarySource(_ root: URL) -> String {
@@ -4622,6 +4650,8 @@ struct InvestigationMachineTargetBoundaryTests {
                 "CODE_SIGN_IDENTITY = \"-\";",
                 "CODE_SIGN_STYLE = Manual;",
                 "CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;",
+                "ENTITLEMENTS_ALLOWED = NO;",
+                "ENTITLEMENTS_REQUIRED = NO;",
                 "ARCHS = arm64;",
                 #"OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";"#,
                 "SKIP_INSTALL = YES;",

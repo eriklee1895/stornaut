@@ -4,6 +4,46 @@ import Testing
 @Suite("Investigation fixed gate handoff physical evidence", .serialized)
 struct InvestigationFixedGateHandoffPhysicalTests {
     @Test
+    func physicalFixtureEnablementRejectsHistoricalAttempts() throws {
+        let parent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-fixed-gate-enablement-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        let root = parent.appending(
+            path: "com.eriklee.stornaut.task39-machine-gate",
+            directoryHint: .isDirectory
+        )
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        #expect(physicalGateFixtureCanRun(at: root))
+        try FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        #expect(physicalGateFixtureCanRun(at: root))
+        let lock = root.appending(path: ".owner-lock-v1")
+        try Data().write(to: lock)
+        try #require(chmod(lock.path, 0o600) == 0)
+        #expect(physicalGateFixtureCanRun(at: root))
+
+        try FileManager.default.createDirectory(
+            at: root.appending(
+                path: "attempt-00000000-0000-0000-0000-000000000001",
+                directoryHint: .isDirectory
+            ),
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        #expect(!physicalGateFixtureCanRun(at: root))
+    }
+
+    @Test(
+        .enabled(
+            if: physicalFixedGateFixtureOptIn
+                && physicalGateFixtureCanRun(at: physicalFixedMachineGateRoot),
+            "Requires explicit opt-in and no preserved Task 39 campaign attempts"
+        )
+    )
     func userOwnedTemporaryGateFailsClosedBeforeSpawn() throws {
         try #require(geteuid() == 501)
         try #require(getegid() == 20)
@@ -20,6 +60,9 @@ struct InvestigationFixedGateHandoffPhysicalTests {
         #expect(gateStatus.st_gid != 0)
         #expect(gateStatus.st_mode & 0o777 == 0o755)
 
+        try #require(
+            physicalGateFixtureCanRun(at: physicalFixedMachineGateRoot)
+        )
         let evidence = try fixture.run(.success)
         let report = evidence.report
 
@@ -36,6 +79,43 @@ struct InvestigationFixedGateHandoffPhysicalTests {
         #expect(report.foregroundRestored)
         #expect(try fixture.machineGateAttemptNames().isEmpty)
     }
+}
+
+private let physicalFixedMachineGateRoot = FileManager.default
+    .homeDirectoryForCurrentUser
+    .appending(
+        path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate",
+        directoryHint: .isDirectory
+    )
+private let physicalFixedGateFixtureOptIn = ProcessInfo.processInfo.environment[
+    "STORNAUT_RUN_FIXED_GATE_HANDOFF_PHYSICAL"
+] == "1"
+
+private func physicalGateFixtureCanRun(at root: URL) -> Bool {
+    var rootStatus = stat()
+    guard lstat(root.path, &rootStatus) == 0 else { return errno == ENOENT }
+    guard rootStatus.st_mode & S_IFMT == S_IFDIR,
+          rootStatus.st_mode & S_IFMT != S_IFLNK,
+          rootStatus.st_uid == geteuid(),
+          rootStatus.st_gid == getegid(),
+          rootStatus.st_mode & 0o777 == 0o700,
+          let entries = try? FileManager.default.contentsOfDirectory(
+              atPath: root.path
+          ),
+          entries.allSatisfy({ $0 == ".owner-lock-v1" })
+    else { return false }
+    guard !entries.isEmpty else { return true }
+
+    var lockStatus = stat()
+    let lock = root.appending(path: ".owner-lock-v1")
+    return lstat(lock.path, &lockStatus) == 0
+        && lockStatus.st_mode & S_IFMT == S_IFREG
+        && lockStatus.st_mode & S_IFMT != S_IFLNK
+        && lockStatus.st_uid == geteuid()
+        && lockStatus.st_gid == getegid()
+        && lockStatus.st_mode & 0o777 == 0o600
+        && lockStatus.st_nlink == 1
+        && lockStatus.st_size == 0
 }
 
 private enum HandoffPhysicalMode: String {
