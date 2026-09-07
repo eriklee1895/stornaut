@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=a05ba254b5a749813dd5e9161c933d1f6802d0c68b8a2b4d682b1df71e7392bf
+# iicb1_app_self_sha=bc7a9c9735c21afea085516a279a50a9ca5c3674893fafc3d3f33fb7e13222b2
 if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-c-suspended-sudo-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
