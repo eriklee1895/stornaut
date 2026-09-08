@@ -9,9 +9,9 @@
 
 ## Decision
 
-The v12 campaign remains unstarted and unconsumed. Its authorization is
-suspended because production source must change; the user must explicitly
-rebind the one-shot authorization to the pushed repair commit before launch.
+The v12 campaign remains unstarted and unconsumed. The original authorization
+was suspended because production source had to change; after the repair was
+reviewed and pushed, the user explicitly rebound it to `0a17726`.
 
 The repair adds an exact, closed preservation contract for a consumed historical
 Gate capsule. A preserved node is identified by all of: outer attempt UUID,

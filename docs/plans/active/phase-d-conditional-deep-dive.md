@@ -4,8 +4,8 @@
 > Task 38 passed implementation, independent review, an 811-test serialized
 > regression and the 23/23-stage authoritative full verifier. Task 39 is
 > active/incomplete after consumed replacement campaigns v9, v10 and v11; one
-> fresh v12 privileged campaign bound to `4fd9c53` was suspended before launch
-> and remains unconsumed/rebind-required pending preservation repair;
+> preserved-capsule repair is complete and one fresh v12 privileged campaign is
+> explicitly rebound to `0a17726`; it is authorized/pending/unconsumed;
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is
@@ -1037,9 +1037,9 @@ Checkpoint status:
   and non-admitting. v11 then failed about 16.259 seconds after durable arm;
   its legacy generic reason cannot distinguish the exact post-arm failure, so
   it is sealed as `consumedPostArmFailureUnclassified`. The successor
-  schema-v2 diagnostic projection is complete/non-admitting. The fresh v12
-  replacement campaign approved against `4fd9c53` is suspended/unconsumed and
-  requires explicit rebind after preservation repair.
+  schema-v2 diagnostic projection and preserved-capsule repair are
+  complete/non-admitting. The fresh v12 replacement campaign is explicitly
+  rebound to `0a17726` and is authorized/pending/unconsumed.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

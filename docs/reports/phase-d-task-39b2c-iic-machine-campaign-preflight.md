@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8-v11 consumed failures disposed / v12 suspended before launch, unconsumed and rebind-required
+> Status: frozen / v8-v11 consumed failures disposed / v12 authorized, pending and unconsumed at `0a17726`
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: preservation repair -> explicit v12 rebind -> one-shot campaign -> L3c3d -> L3c4
+> Remaining order: authorization-only descendant -> one-shot v12 campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -27,10 +27,10 @@
 > 70. The legacy generic reason cannot support an exact root-cause claim; v11 is
 > consumed/non-admitting/non-retryable and the successor closed schema-v2
 > post-arm diagnostic projection is complete/non-admitting.
-> The user approved one fresh v12 campaign bound to pushed baseline
-> `4fd9c539dbc2a7d9c659147c041712b945fa3b00`; preflight suspended it before
-> launch because stale recovery would remove retained v11 Gate evidence. It is
-> unconsumed and requires explicit rebind after preservation repair.
+> The preserved-capsule repair is complete and independently reviewed. The user
+> explicitly rebound one fresh v12 campaign to pushed baseline
+> `0a17726176b0cae0839f398da5fae2f09e6ccef5`; it is
+> authorized/pending/unconsumed.
 
 ## 1. Decision
 

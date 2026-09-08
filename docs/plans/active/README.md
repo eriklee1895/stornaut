@@ -24,10 +24,9 @@ the retained campaign artifacts do not bind that value. Because its legacy schem
 reason was only `campaign-incomplete`, the checked disposition is
 `consumedPostArmFailureUnclassified`. The successor source closes that
 diagnostic gap with a bounded schema-v2 reason and remains non-admitting. The
-user approved one fresh v12 privileged campaign bound to `4fd9c53`, but
-preflight suspended it before launch because stale recovery would remove the
-retained v11 Gate capsule. It is unconsumed and requires rebinding after the
-preservation repair. Checkpoints 39A,
+preservation repair is complete. The user explicitly rebound one fresh v12
+privileged campaign to `0a17726`; it is authorized/pending/unconsumed.
+Checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
 39B1b-i closed the package-scoped transport/non-product composition seam.
@@ -478,7 +477,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8/v9/v10/v11 consumed; v12 suspended/unconsumed/rebind required; preservation repair active; L3c3d/L3c4 unproven |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8/v9/v10/v11 consumed; preservation repair complete; v12 authorized/pending/unconsumed at `0a17726`; L3c3d/L3c4 unproven |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

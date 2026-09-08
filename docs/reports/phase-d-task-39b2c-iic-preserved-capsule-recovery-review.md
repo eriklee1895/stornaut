@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c preserved-capsule recovery review
 
-> Status: complete / non-admitting / v12 rebind required
+> Status: complete / non-admitting / v12 rebound to `0a17726`
 >
 > Date: 2026-09-09
 >
@@ -50,7 +50,7 @@ and verifier reviews found no remaining P0-P2.
 
 ## Remaining gate
 
-The previously granted v12 authority is still suspended and unconsumed because
-it was bound to `4fd9c53`. After this repair is committed and pushed, the user
-must explicitly rebind the one-shot v12 authorization to that new commit. Only
-then may one fresh campaign generate its UUIDs and evidence root.
+The user explicitly rebound the one-shot v12 authorization to pushed repair
+commit `0a17726176b0cae0839f398da5fae2f09e6ccef5`. It is authorized, pending and
+unconsumed. The authorization-only descendant must be pushed before one fresh
+campaign generates its UUIDs and evidence root.

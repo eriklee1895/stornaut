@@ -448,9 +448,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   不足以判定 credential/sudo/Gate/protocol/transport 根因，已只读固化为
   `consumedPostArmFailureUnclassified`、non-admitting/non-retryable；
   后继 schema-v2 closed diagnostic projection 已完成并通过 focused tests。用户
-  已批准基于 `4fd9c53` 的一次 fresh v12 machine campaign，但 preflight 发现
-  stale recovery 会删除 retained v11 Gate capsule，故授权 suspended / unconsumed /
-  rebind required；preservation repair 推送并重新授权后才可启动。
+  已完成 retained v11 Gate capsule preservation repair；用户现已将一次 fresh
+  v12 machine campaign 授权明确重绑至 `0a17726`，状态为 authorized /
+  pending / unconsumed；授权状态 descendant 推送后才可启动。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -954,8 +954,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   structural、真实 Debug build 与 Debug/Release component gate。后续 v10
   已消费并因 1,200 秒 outer deadline exhaustion 失败；1,400 秒 deadline-budget
   repair 随后已完成。v11 也已消费失败，post-arm diagnostic repair 已完成且
-  non-admitting；fresh v12 privileged campaign 已批准但因 preservation prerequisite
-  suspended/unconsumed，修复后须重新绑定授权，
+  non-admitting；preservation prerequisite 已完成，fresh v12 privileged campaign
+  已重新绑定至 `0a17726`，当前 authorized/pending/unconsumed，
   L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。

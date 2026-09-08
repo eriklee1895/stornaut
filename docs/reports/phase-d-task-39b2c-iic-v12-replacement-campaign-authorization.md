@@ -1,22 +1,23 @@
 # Phase D Task 39B2c ii-c-c v12 replacement campaign authorization
 
-> Status: approved / suspended before launch / unconsumed / rebind required
+> Status: authorized / pending / unconsumed
 >
-> Authorized source baseline: `4fd9c539dbc2a7d9c659147c041712b945fa3b00`
+> Authorized source baseline: `0a17726176b0cae0839f398da5fae2f09e6ccef5`
 >
-> Authorized source tree: `0d8c4b56347f4f92a3f188a31bef7f2d3fc90843`
+> Authorized source tree: `00e2c9ebebaed29e205a4676f27c81e009c64791`
 
 ## Authorization
 
 The user explicitly authorized one fresh privileged Task 39 ii-c replacement
-machine campaign bound to the pushed v11 failure-closure baseline above. This
-authorization permits the sealed zero-argument campaign executable to generate
+machine campaign, now explicitly rebound to the pushed preserved-capsule repair
+baseline above. This authorization permits the sealed zero-argument campaign
+executable to generate
 one fresh nonzero campaign UUID, one fresh nonzero attempt UUID and one fresh
 owner-private evidence root at launch. It must not retry, append to, rewrite,
 remove or reinterpret any v8, v9, v10 or v11 artifact, receipt, Gate capsule or
 evidence root.
 
-The authorization-only descendant may change status documentation, structural
+The reauthorization-only descendant may change status documentation, structural
 status assertions and their digest pins. It must not change production Swift,
 the campaign/helper/driver/Gate/coordinator/plist/service binaries, the fixed
 prompts, the 1,400-second campaign horizon or any security boundary. Before the
@@ -66,11 +67,11 @@ production Deep Dive availability is authorized by this amendment.
 ## Preflight order
 
 Before any root/install/sudo action, the source tree must be clean and pushed as
-the exact authorization-only descendant of `4fd9c53`; the checked v8 receipt
+the exact authorization-only descendant of `0a17726`; the checked v8 receipt
 must retain its documented historical tree-loss non-claim, and the still-present
 v9-v11 evidence trees must verify read-only; the fixed runtime must be absent;
-preserved historical
-Gate residue must remain unchanged; structural, focused, component/final-Mach-O
+preserved historical Gate residue must remain unchanged; structural, focused,
+component/final-Mach-O
 and independent-review gates required by the frozen ii-c plan must be green.
 The campaign is then launched exactly once from an interactive Terminal.
 
@@ -78,12 +79,16 @@ No campaign UUID, attempt UUID or evidence root exists at authorization time.
 The sealed executable generates all three at the unique launch and the retained
 evidence binds their exact values.
 
-## Pre-launch suspension
+## Superseded pre-launch suspension
 
 Independent authorization review found that baseline `4fd9c53` would invoke
 mandatory stale recovery and remove the preserved v11 Gate capsule before a new
 publication, conflicting with this authorization's explicit historical-evidence
 boundary. No v12 executable was launched, no identifier/evidence root was
-created, and the authorization remains unconsumed. The campaign is suspended
-until the preserved-capsule prerequisite is implemented, reviewed and pushed,
-and the user explicitly rebinds this one-shot authorization to that new commit.
+created, and the authorization remained unconsumed. The campaign was suspended
+until the preserved-capsule prerequisite was implemented, reviewed and pushed.
+That prerequisite is now complete, both post-fix reviews have no unresolved
+P0-P2, and the user explicitly rebound the one-shot authorization to
+`0a17726176b0cae0839f398da5fae2f09e6ccef5` on 2026-09-09. This descendant
+still performs no campaign launch; the UUIDs and evidence root remain uncreated
+until the single executable invocation.

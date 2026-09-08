@@ -8,8 +8,9 @@
 >
 > Historical status note: this audit closed the v8 result. The user later
 > authorized one fresh replacement v9 and, after v9's consumed no-go, one
-> independent v10 campaign; v11 also ran and failed. A fresh v12 campaign bound
-> to `4fd9c53` was suspended before launch and remains unconsumed/rebind-required.
+> independent v10 campaign; v11 also ran and failed. The preserved-capsule
+> repair completed and the user rebound one fresh v12 campaign to `0a17726`; it
+> is authorized/pending/unconsumed.
 > Task 39 remains incomplete
 > and Task 40 remains blocked.
 
