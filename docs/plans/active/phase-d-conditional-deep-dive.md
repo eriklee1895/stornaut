@@ -124,13 +124,15 @@
 > arm and failed `spawnUncertain → terminal`; v9 is consumed/non-admitting/
 > non-retryable. AMFI code `-423` identified the ad-hoc MachineDriver's restricted
 > application-identifier entitlement as the root cause. Its non-privileged
-> tests-first repair is green, but a new campaign has not been authorized. Task
-> A later serial validation exposed a historical physical fixture that invoked
+> tests-first repair was green. That v9-era status is historical: v10 and v11
+> were subsequently authorized and consumed; both failed, are non-admitting and
+> non-retryable, and no machine campaign is currently authorized. A later serial
+> validation exposed a historical physical fixture that invoked
 > production stale-recovery and removed the preserved v9 Gate capsule. Its exact
 > bytes were not recoverable; the original v2 receipt, v3 predecessor and current
 > v5 receipt preserve the truthful audit chain, and the fixture now requires
 > explicit opt-in plus discovery/entry guards.
-> 40 remains blocked under the
+> Task 40 remains blocked under the
 > approved sequential plan; Task 44 remains blocked
 > from `go` until a fresh successful machine cohort is separately authorized and
 > admitted. Local findings remain within their owning

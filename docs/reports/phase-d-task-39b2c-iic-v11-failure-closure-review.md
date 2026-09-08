@@ -14,7 +14,7 @@ spawnUncertain → terminal`, it produced no epoch or completion artifacts, and
 the fixed installed runtime is absent. The checked schema-v6 disposition binds
 the nine retained artifacts, exact timeline, source identity, current v11 Gate
 capsule and zero credential-retention attestation. It makes no credential
-validity or exact root-cause claim.
+validity, campaign-exit-status or exact root-cause claim.
 
 The legacy v11 event recorded only `campaign-incomplete`. Successor source now
 projects the harness primary failure, exact POSIX wait result, receipt EOF,
@@ -41,6 +41,30 @@ Independent review found and closed four issues:
 
 Post-fix review found no unresolved P0–P2.
 
+The resumed closure audit then found and fixed three additional non-admitting
+evidence issues before merge: schema-v2 accepted individually valid but
+producer-impossible primary/wait/cleanup combinations; the v11 disposition
+treated an external launcher exit status as if the nine retained campaign
+artifacts proved it; and byte-digest status pins preserved two superseded
+frontier statements. Swift and both independent Python verifiers now enforce
+the same minimal producer-state implications, the unbound exit status is an
+explicit non-claim, and the active status gate checks semantic markers in
+addition to file digests. The aggregate contract's historical
+staged/worktree-divergence fixture was also corrected to mutate its historical
+index blob rather than current HEAD source.
+
+Final frozen-byte review then completed the same producer-state proof across
+primary failure, exact wait, receipt/terminal EOF, cleanup bits and event-chain
+shape. In particular it closed the remaining `diagnosticOverflow`,
+`receiptInvalid`, `unexpectedResponse` and `childTerminated` implications, made
+terminal-less schema-v2 failure exclusive to `transportUncertain`, and retained
+the valid stopped-then-reaped `childTerminated/exited-0` path. The Python
+verifier now also rejects malformed short reasons without leaking an
+`IndexError`, and valid two-event pre-arm evidence bypasses the schema-v2
+post-arm join. A stale v9-era sentence in the Phase D plan was marked historical
+and included in the semantic status gate. Final grouped and cross-group review
+found no unresolved P0–P2.
+
 ## Validation
 
 - focused post-fix selection: 6/6 passed;
@@ -50,7 +74,10 @@ Post-fix review found no unresolved P0–P2.
 - v9/v10/v11 independent external-evidence verifiers: 3/3 passed read-only;
 - ii-c-c failure/source, evidence-verification source and deadline contracts:
   passed;
+- aggregate `scripts/verify-contract --iic-c-contract-only`: passed;
 - ii-c-b2a2 independent verifier mutation contract: passed;
+- final grouped runtime/verifier review and cross-group contract review: no
+  unresolved P0–P2;
 - serialized SwiftPM regression: 1,935 tests / 99 suites completed with one
   pre-existing load-sensitive performance threshold issue; the exact
   `cleanupPlanBuilderStreamsFourThousandRowsAndRetainsLateProfiles` case

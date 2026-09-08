@@ -443,11 +443,13 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   outer deadline，已消费、non-admitting 且不可重试。其只读 disposition 与
   1,400 秒 bounded deadline repair 已完成非提权验收并保持 non-admitting；
   v11 从 `8a286ea` 执行，在 durable arm 后约 16.259 秒记录
-  `spawnUncertain → terminal` 并以 70 退出。其 legacy generic reason
+  `spawnUncertain → terminal`；外部 launcher 曾记录 70，但 retained campaign
+  artifacts 未绑定该值。其 legacy generic reason
   不足以判定 credential/sudo/Gate/protocol/transport 根因，已只读固化为
   `consumedPostArmFailureUnclassified`、non-admitting/non-retryable；
   后继 schema-v2 closed diagnostic projection 已完成并通过 focused tests。当前
-  machine frontier 为 fresh authorization → replacement campaign → L3c3d → L3c4。
+  没有已授权 machine campaign；任何 replacement 必须先取得 fresh authorization，
+  成功后才可按 replacement campaign → L3c3d → L3c4 前进。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -950,7 +952,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   tests-first 修复现仅对 MachineDriver 禁止 entitlement 生成并通过 focused、
   structural、真实 Debug build 与 Debug/Release component gate。后续 v10
   已消费并因 1,200 秒 outer deadline exhaustion 失败；1,400 秒 deadline-budget
-  repair 正在收口，新的 privileged campaign 仍需明确授权，L3c3d/L3c4 仍未证明；
+  repair 随后已完成。v11 也已消费失败，post-arm diagnostic repair 已完成且
+  non-admitting；当前没有已授权 privileged campaign，L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

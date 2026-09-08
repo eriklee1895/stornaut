@@ -19,7 +19,8 @@ arm, and exhausted the 1,200-second outer deadline before a coordinator receipt.
 Its failure disposition is checked, and the machine-only 1,400-second
 deadline-budget repair is complete and non-admitting. v11 then ran from
 `8a286ea`, reached durable arm and recorded `spawnUncertain → terminal`
-about 16.259 seconds later with exit status 70. Because its legacy schema-v1
+about 16.259 seconds later. An external launcher recorded exit status 70, but
+the retained campaign artifacts do not bind that value. Because its legacy schema-v1
 reason was only `campaign-incomplete`, the checked disposition is
 `consumedPostArmFailureUnclassified`. The successor source closes that
 diagnostic gap with a bounded schema-v2 reason and remains non-admitting. A further privileged

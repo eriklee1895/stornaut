@@ -10798,7 +10798,7 @@ if len(mutations) != 51:
 expected = (
     "7d86510b67b92f8dd1e2773faca3f1faeccaeb113a1292fb91a17db5f4386613",
     "2ae5f50fd8d60135caf007096d171315d3fed228da10f6fbfff3bde1187a3dd5",
-    "27cc3a6739eef39f8c990031defb2b884fae4494c40e89607ae78e950206e78a",
+    "23910d514135f5360cffe9ae3d0c3c3caf832aa9df8224cca486d4239a02e798",
     "7c52fc0d80edc6170b9e376aa54143b5c4fd1734f5bd465d76762b74d8980e83",
     "0de2813f9416833b1fd80c6d0a3ee78d0cb365fc3dfd961d031008dcbc7a412b",
 )
@@ -13022,7 +13022,7 @@ checked_digests = {
     evidence: "7351c8312315b5673c7610a3421a20eb14fdb53fb6bdd181abfde4732d16b072",
     v9_evidence: "931e57d14609bc8bf4a8480aa7aff63e51cfc9e8b7073f02710e125cbad561f9",
     v10_evidence: "178a87626086f7a4be9e8d80c82f2d5f21f79aa4f847173e6712b02b7a8e097d",
-    v11_evidence: "a8c8aa5393ca25872831fefde4db20fb32325f6c0a1d787d9652d05e47a11b64",
+    v11_evidence: "c70594ea5bd6d7ee3acc53f45e7f7e803e762c33cc01570cc48f098b89f96d48",
 }
 for checked_path, classification, events in checked:
     if hashlib.sha256(checked_path.read_bytes()).hexdigest() \
@@ -13142,18 +13142,18 @@ for marker in (
     if marker not in v11_report_source:
         raise SystemExit("ii-c-c v11 failure disposition report drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "391f16231fffdc3fbd24b50056a40ddb5f92e7a940a1663b8a82dda14a242a78"),
-    (Path("README.md"), "fb9a8db29580364e24ccfca70e97a2c57f2579ed157a1e84ef2d7a9bada90878"),
+    (Path("AGENTS.md"), "2605eb6915170e7ff7bc69feb205ca92b9af1c60e03ad0933c7206bd8bd75f05"),
+    (Path("README.md"), "6eed7747b52fe37a00acc0780390c7e29fb2314946e078e9bdbd5fbcb97b7544"),
     (Path("docs/README.md"), "4d0b73bdd6d25264fce4f7e1aa74c72e20a2c772a1dce85956dd3be6fea4f105"),
     (Path("docs/agent/coding-agent-handoff.md"), "6f28b66956d3b2038ff294b20e78f84dcf411ef808dfbb7ddff6ebf1ed5f189c"),
-    (Path("docs/plans/active/README.md"), "f05b125cfe1b4f6ed5e3307ae8fcf09f70a6c98ee92cb372e99ee7181f727e75"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "dfe32774a86f2df53ced850ba5f59d252b5ab20cbb0d6e64c1b1e1f3803953c5"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "9c528244bfe75562af758c27f0cfbaba69fd0f719cb4b1b4fa0afc27c8802e32"),
+    (Path("docs/plans/active/README.md"), "19fc44141849e7af4977f6c0e067c82af8242a9a76ae4e2553c0fd7b8650ca32"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "d94a32483372a0dc3bd71b79f57dc677ee5532a611c5a98b9cec8ddffcecffe5"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "137b897793cbd6679de0e46366beb9de2a23869ab7a2ee953050479b5665b422"),
     (Path("docs/plans/active/task-40-implementation-brief.md"), "6152cfe6666410a51e7a00149179f3ca9443c5267be96fe27877752328716cd4"),
     (Path("docs/plans/roadmap.md"), "3198295f3bdd111cc3006dee8e0981767831e44497d8f0e8e42cd84470cc5e96"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "c927a25ccc09d35d9992f2f11b33829bae616a80ef3fab40b59875c04500c9bd"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13180,6 +13180,55 @@ for active_path, expected_digest in active_status_entries:
                 != expected_digest):
         raise SystemExit(
             "ii-c-c blocked status docs drifted: " + str(active_path))
+semantic_status = {
+    Path("AGENTS.md"): (
+        "v8 与 replacement v9", "v10", "v11",
+        "没有已授权 machine campaign", "Task 40 仍 blocked",
+    ),
+    Path("docs/plans/active/README.md"): (
+        "v8, v9, v10 and v11", "consumed/no-go records",
+        "post-arm diagnostic repair complete/non-admitting",
+        "blocked on Task 39 under the approved sequential plan",
+    ),
+    Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
+        "That v9-era status is historical",
+        "v10 and v11", "were subsequently authorized and consumed",
+        "no machine campaign is currently authorized",
+        "Task 40 remains blocked",
+    ),
+    Path("docs/plans/active/task-39-implementation-brief.md"): (
+        "v8, v9, v10 and v11 are conclusive",
+        "A future privileged\n> campaign still requires fresh explicit authorization",
+        "Task 40 start condition remains blocked",
+    ),
+    Path("docs/plans/active/task-40-implementation-brief.md"): (
+        "v8, v9, v10 and v11", "do not satisfy",
+        "blocked on pushed Task 39 Ready baseline",
+    ),
+}
+for active_path, markers in semantic_status.items():
+    active_source = active_path.read_text(encoding="utf-8")
+    if any(marker not in active_source for marker in markers):
+        raise SystemExit(
+            "ii-c-c blocked status semantics drifted: " + str(active_path))
+task39_status = " ".join(
+    Path("docs/plans/active/task-39-implementation-brief.md")
+    .read_text(encoding="utf-8")
+    .split()
+)
+if "No machine campaign is currently authorized" not in task39_status:
+    raise SystemExit("ii-c-c current campaign authorization state drifted")
+for stale in (
+    "1,400 秒 deadline-budget\n  repair 正在收口",
+    "v9 is also consumed/non-retryable; the current frontier is the\nreviewed AMFI root-cause repair",
+    "repair is green, but a new campaign has not been authorized",
+):
+    if stale in "\n".join(path.read_text(encoding="utf-8") for path in (
+        Path("AGENTS.md"),
+        Path("docs/plans/active/phase-d-conditional-deep-dive.md"),
+        Path("docs/plans/active/task-39-implementation-brief.md"),
+    )):
+        raise SystemExit("ii-c-c stale active frontier text admitted")
 PY
 }
 

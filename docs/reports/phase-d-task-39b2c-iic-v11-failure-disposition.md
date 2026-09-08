@@ -16,7 +16,9 @@ The newly authorized campaign durably recorded prepared, armedConsumed,
 spawnUncertain and terminal. The operator interaction was observed after the
 exact fixed driver prompt, and no credential bytes were retained. The campaign
 produced no epoch evidence, coordinator receipt, diagnostic output, manifest or
-external seal. It exited with status 70.
+external seal. An external launcher recorded exit status 70, but no retained
+campaign artifact independently binds that value, so it is not a checked
+disposition field or an input to the classification.
 
 The attempt is consumed, non-admitting and non-retryable. A second
 authorization cannot retry this attempt.

@@ -49,7 +49,6 @@
   "retry" : "forbidden",
   "rootCauseObservation" : {
     "armedConsumedObservedAtUTCMicroseconds" : "1788835011400828",
-    "campaignExitStatus" : 70,
     "credentialRetainedByteCount" : 0,
     "driverEpochArtifactCount" : 0,
     "elapsedAfterArmMicroseconds" : "16258704",
@@ -92,5 +91,5 @@
     "gateCapsuleName" : "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
     "gateCapsuleSHA256" : "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72"
   },
-  "verifierExecutableSHA256" : "897a0d7a2498287039cac973a507b06d07f62d007b44aa63bdf50a1593f26cdf"
+  "verifierExecutableSHA256" : "d53f62be4f2d98cb262106b3c98b9b4fb9276e68627d4c5b828913724bafc7d8"
 }

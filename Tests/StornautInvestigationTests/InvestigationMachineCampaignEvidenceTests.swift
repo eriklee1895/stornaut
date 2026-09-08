@@ -1244,8 +1244,12 @@ struct InvestigationMachineCampaignEvidenceTests {
         let attempt = CampaignEvidenceFixture.uuid(0x41)
         let accepted = [
             "postArmFailure/transportUncertain/exited-1/receipt-open/terminal-open/cleanup-00",
-            "postArmFailure/receiptInvalid/signaled-15/receipt-eof/terminal-eof/cleanup-08",
-            "postArmFailure/exactReapUncertain/wait-unavailable/receipt-open/terminal-eof/cleanup-04",
+            "postArmFailure/receiptInvalid/signaled-15/receipt-open/terminal-open/cleanup-08",
+            "postArmFailure/exactReapUncertain/wait-unavailable/receipt-eof/terminal-eof/cleanup-04",
+            "postArmFailure/residueUncertain/exited-0/receipt-eof/terminal-eof/cleanup-10",
+            "postArmFailure/transportUncertain/exited-0/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/childTerminated/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/childTerminated/stopped-15/receipt-eof/terminal-eof/cleanup-04",
         ]
         for reason in accepted {
             let payload = try InvestigationMachineEvidenceJSON.canonicalData([
@@ -1281,6 +1285,28 @@ struct InvestigationMachineCampaignEvidenceTests {
             "postArmFailure/receiptInvalid/signaled-0/receipt-eof/terminal-eof/cleanup-08",
             "postArmFailure/receiptInvalid/stopped-32/receipt-eof/terminal-eof/cleanup-08",
             "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-eof/cleanup-20",
+            "postArmFailure/alreadyConsumed/exited-1/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/bindingInvalid/exited-1/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/spawnUncertain/exited-1/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/wait-unavailable/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/stopped-15/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/exactReapUncertain/exited-1/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/exactReapUncertain/stopped-15/receipt-eof/terminal-eof/cleanup-04",
+            "postArmFailure/exactReapUncertain/exited-1/receipt-open/terminal-eof/cleanup-04",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-eof/cleanup-01",
+            "postArmFailure/residueUncertain/signaled-15/receipt-open/terminal-open/cleanup-00",
+            "postArmFailure/residueUncertain/exited-1/receipt-eof/terminal-eof/cleanup-10",
+            "postArmFailure/deadlineExceeded/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/cancelled/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/diagnosticOverflow/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/identityMismatch/exited-0/receipt-open/terminal-eof/cleanup-00",
+            "postArmFailure/childTerminated/signaled-15/receipt-eof/terminal-open/cleanup-00",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c",
+            "postArmFailure/transportUncertain/exited-1/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/transportUncertain/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/unexpectedResponse/signaled-15/receipt-eof/terminal-eof/cleanup-10",
+            "postArmFailure/childTerminated/wait-unavailable/receipt-eof/terminal-eof/cleanup-04",
+            "postArmFailure/childTerminated/signaled-15/receipt-eof/terminal-eof/cleanup-04",
         ] {
             var object = try #require(
                 JSONSerialization.jsonObject(with: generic) as? [String: Any]
@@ -1333,6 +1359,30 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(try InvestigationMachineAttemptEventChain.summary(
             [prepared, armed, uncertain], mode: .privileged).outcome
             == .transportLoss)
+        let schemaTwoNonTransport = try Self.event(
+            sequence: 3, attempt: attempt, kind: .spawnUncertain,
+            previous: .hashing(try armed.encoded()),
+            reason: "postArmFailure/deadlineExceeded/exited-0/receipt-open/terminal-open/cleanup-00"
+        )
+        #expect(throws: InvestigationMachineEvidenceContractError.invalidTransition) {
+            try InvestigationMachineAttemptEventChain.validateComplete(
+                [prepared, armed, schemaTwoNonTransport], mode: .privileged)
+        }
+        let schemaTwoTransport = try Self.event(
+            sequence: 3, attempt: attempt, kind: .spawnUncertain,
+            previous: .hashing(try armed.encoded()),
+            reason: "postArmFailure/transportUncertain/exited-1/receipt-open/terminal-open/cleanup-00"
+        )
+        let transportTerminal = try Self.event(
+            sequence: 4, attempt: attempt, kind: .terminal,
+            previous: .hashing(try schemaTwoTransport.encoded())
+        )
+        #expect(throws: InvestigationMachineEvidenceContractError.invalidTransition) {
+            try InvestigationMachineAttemptEventChain.validateComplete(
+                [prepared, armed, schemaTwoTransport, transportTerminal],
+                mode: .privileged
+            )
+        }
         #expect(try InvestigationMachineAttemptEventV1.decode(
             terminal.encoded()) == terminal)
     }
@@ -1775,7 +1825,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             disposition["rootCauseObservation"] as? [String: Any])
         #expect(cause["reason"] as? String
             == "legacyGenericPostArmFailureProjection")
-        #expect(cause["campaignExitStatus"] as? Int == 70)
+        #expect(cause["campaignExitStatus"] == nil)
         #expect(cause["exactWaitClassification"] as? String
             == "unavailableInLegacyEvidence")
         #expect(cause["credentialRetainedByteCount"] as? Int == 0)
@@ -2303,10 +2353,14 @@ struct InvestigationMachineCampaignEvidenceTests {
     @Test
     func independentVerifierAcceptsOnlyClosedSchemaTwoPostArmReason() throws {
         let accepted = try schemaTwoFailureVerifierResult(reason:
-            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c")
+            "postArmFailure/receiptInvalid/exited-1/receipt-open/terminal-open/cleanup-0c")
         #expect(accepted.status != 0)
         #expect(accepted.stderr.contains("consumed failure is non-admitting"))
         #expect(!accepted.stderr.contains("closed failure projection reason"))
+        let impossibleTerminal = try schemaTwoFailureVerifierResult(reason:
+            "postArmFailure/transportUncertain/exited-1/receipt-open/terminal-open/cleanup-00")
+        #expect(impossibleTerminal.status != 0)
+        #expect(impossibleTerminal.stderr.contains("schema-two terminal-shape binding"))
 
         for reason in [
             "campaign-incomplete",
@@ -2314,6 +2368,23 @@ struct InvestigationMachineCampaignEvidenceTests {
             "postArmFailure/receiptInvalid/exited-01/receipt-eof/terminal-open/cleanup-0c",
             "postArmFailure/receiptInvalid/signaled-0/receipt-eof/terminal-open/cleanup-0c",
             "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-20",
+            "postArmFailure/alreadyConsumed/exited-1/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/wait-unavailable/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/stopped-15/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/exactReapUncertain/exited-1/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/exactReapUncertain/stopped-15/receipt-eof/terminal-eof/cleanup-04",
+            "postArmFailure/exactReapUncertain/exited-1/receipt-open/terminal-eof/cleanup-04",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-eof/cleanup-01",
+            "postArmFailure/residueUncertain/signaled-15/receipt-open/terminal-open/cleanup-00",
+            "postArmFailure/deadlineExceeded/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/identityMismatch/exited-0/receipt-open/terminal-eof/cleanup-00",
+            "postArmFailure/diagnosticOverflow/exited-0/receipt-open/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c",
+            "postArmFailure/transportUncertain/exited-1/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/transportUncertain/exited-0/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/unexpectedResponse/signaled-15/receipt-eof/terminal-eof/cleanup-10",
+            "postArmFailure/childTerminated/wait-unavailable/receipt-eof/terminal-eof/cleanup-04",
+            "postArmFailure/childTerminated/signaled-15/receipt-eof/terminal-eof/cleanup-04",
         ] {
             let rejected = try schemaTwoFailureVerifierResult(reason: reason)
             #expect(rejected.status != 0)
@@ -2328,7 +2399,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         defer { fixture.remove() }
         let writer = try fixture.makeWriter(mode: .privileged)
         let acceptedReason =
-            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c"
+            "postArmFailure/receiptInvalid/exited-1/receipt-open/terminal-open/cleanup-0c"
         for (index, kind) in [
             InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
             .spawnUncertain, .terminal,
@@ -2631,13 +2702,24 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     fileprivate static func event(
         sequence: UInt32, attempt: UUID, kind: InvestigationMachineAttemptEventKind,
-        previous: InvestigationHandoffSHA256
+        previous: InvestigationHandoffSHA256, reason: String? = nil
     ) throws -> InvestigationMachineAttemptEventV1 {
-        try .init(
+        let payload: Data
+        if let reason {
+            payload = try InvestigationMachineEvidenceJSON.canonicalData([
+                "schemaVersion": 2, "kind": "spawnUncertain",
+                "attemptUUID": attempt.uuidString.lowercased(),
+                "evidenceSetSHA256": digest(0xd1).lowercaseHex,
+                "reason": reason,
+            ])
+        } else {
+            payload = try eventPayload(kind: kind, attempt: attempt)
+        }
+        return try .init(
             sequence: sequence, attemptUUID: attempt, kind: kind,
             previousEventSHA256: previous,
             observedAt: .init(rawValue: Int64(sequence)),
-            payload: try eventPayload(kind: kind, attempt: attempt)
+            payload: payload
         )
     }
 

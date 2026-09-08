@@ -27,7 +27,9 @@ production Deep Dive availability was authorized.
 The single v11 launch used campaign
 `4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b` and attempt
 `18a85048-5e1c-40c5-99e4-3785185070d3`. It durably recorded
-`armedConsumed` and then `spawnUncertain → terminal` with exit status 70.
+`armedConsumed` and then `spawnUncertain → terminal`. An external launcher
+recorded exit status 70, but the retained campaign artifacts do not bind that
+value and the checked disposition does not rely on it.
 The authorization is consumed. This attempt cannot be retried or reauthorized.
 
 The checked read-only outcome is recorded in

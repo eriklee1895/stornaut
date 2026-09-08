@@ -12,12 +12,12 @@ struct InvestigationMachineCampaignHarnessTests {
         let failure = InvestigationMachineCampaignHarnessFailureResult(
             primary: .receiptInvalid,
             cleanupIssues: [.closeFailed, .waitFailed, .closeFailed],
-            exactWait: .exited(status: 1), receiptReachedEOF: true,
+            exactWait: .exited(status: 1), receiptReachedEOF: false,
             terminalReachedEOF: false
         )
 
         #expect(failure.postArmEvidenceReason
-            == "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c")
+            == "postArmFailure/receiptInvalid/exited-1/receipt-open/terminal-open/cleanup-0c")
         #expect(!failure.postArmEvidenceReason.contains("credential"))
         #expect(InvestigationMachineCampaignHarnessFailureResult
             .postArmEvidenceReason(

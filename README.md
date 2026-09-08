@@ -122,7 +122,8 @@ attempt。v10 随后从 `b9ade5e` 执行并越过 AMFI 边界，但在 durable a
 1,195.056190 秒耗尽 1,200 秒 outer deadline；v10 已消费、non-admitting 且
 不可重试。1,400 秒 machine-only deadline-budget 修复随后完成并推送。用户
 授权的 v11 从 `8a286ea` 执行，在 durable arm 后约 16.259 秒记录
-`spawnUncertain → terminal` 并以 70 退出；旧 schema-v1 reason 只保留
+`spawnUncertain → terminal`；外部 launcher 曾记录 70，但 retained campaign
+artifacts 未绑定该值；旧 schema-v1 reason 只保留
 `campaign-incomplete`，无法严谨区分 sudo/wait/receipt/protocol/transport，
 因此 v11 被只读固化为 `consumedPostArmFailureUnclassified`、
 non-admitting、non-retryable。后续源码已改为闭合 schema-v2 post-arm

@@ -606,22 +606,28 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"391f16231fffdc3fbd24b50056a40ddb5f92e7a940a1663b8a82dda14a242a78\")",
-            "(Path(\"README.md\"), \"fb9a8db29580364e24ccfca70e97a2c57f2579ed157a1e84ef2d7a9bada90878\")",
+            "(Path(\"AGENTS.md\"), \"2605eb6915170e7ff7bc69feb205ca92b9af1c60e03ad0933c7206bd8bd75f05\")",
+            "(Path(\"README.md\"), \"6eed7747b52fe37a00acc0780390c7e29fb2314946e078e9bdbd5fbcb97b7544\")",
             "(Path(\"docs/README.md\"), \"4d0b73bdd6d25264fce4f7e1aa74c72e20a2c772a1dce85956dd3be6fea4f105\")",
             "(Path(\"docs/agent/coding-agent-handoff.md\"), \"6f28b66956d3b2038ff294b20e78f84dcf411ef808dfbb7ddff6ebf1ed5f189c\")",
-            "(Path(\"docs/plans/active/README.md\"), \"f05b125cfe1b4f6ed5e3307ae8fcf09f70a6c98ee92cb372e99ee7181f727e75\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"dfe32774a86f2df53ced850ba5f59d252b5ab20cbb0d6e64c1b1e1f3803953c5\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"9c528244bfe75562af758c27f0cfbaba69fd0f719cb4b1b4fa0afc27c8802e32\")",
+            "(Path(\"docs/plans/active/README.md\"), \"19fc44141849e7af4977f6c0e067c82af8242a9a76ae4e2553c0fd7b8650ca32\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"d94a32483372a0dc3bd71b79f57dc677ee5532a611c5a98b9cec8ddffcecffe5\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"137b897793cbd6679de0e46366beb9de2a23869ab7a2ee953050479b5665b422\")",
             "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"6152cfe6666410a51e7a00149179f3ca9443c5267be96fe27877752328716cd4\")",
             "(Path(\"docs/plans/roadmap.md\"), \"3198295f3bdd111cc3006dee8e0981767831e44497d8f0e8e42cd84470cc5e96\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"c927a25ccc09d35d9992f2f11b33829bae616a80ef3fab40b59875c04500c9bd\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
             "len(active_status_entries) != 12",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
             "ii-c-c blocked status docs inventory drifted",
+            "ii-c-c blocked status semantics drifted",
+            "ii-c-c stale active frontier text admitted",
+            "That v9-era status is historical",
+            "were subsequently authorized and consumed",
+            "No machine campaign is currently authorized",
+            "Task 40 start condition remains blocked",
         ]
         for marker in pinnedStatusDocs {
             #expect(boundarySource(root).contains(marker), "missing: \(marker)")

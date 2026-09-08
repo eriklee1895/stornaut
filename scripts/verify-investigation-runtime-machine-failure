@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_failure_self_sha=fd8f6c56df35f8077ab7e43244975aeff2d10169b58cafd9fa396e3ea17ee1f6 # iicc-failure-self-seal
+typeset -r iicc_failure_self_sha=7e8f08d0056966a7f8b37cc7d66aa413cfa28cff774fc973dda2a0610fbcf835 # iicc-failure-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -502,12 +502,46 @@ def parse_event(data):
                     else 1 <= int(wait_match.group(2)) <= 31))
             cleanup_match = (re.fullmatch(r"cleanup-([0-9a-f]{2})", parts[5])
                 if len(parts) == 6 else None)
+            cleanup_mask = (int(cleanup_match.group(1), 16)
+                            if cleanup_match is not None else 0x100)
+            wait_failed = cleanup_mask & 0x04 != 0
+            both_eof = (len(parts) == 6
+                        and parts[3] == "receipt-eof"
+                        and parts[4] == "terminal-eof")
+            producible = (len(parts) == 6
+                and parts[1] not in ("alreadyConsumed", "bindingInvalid",
+                                     "spawnUncertain")
+                and cleanup_mask & 0x01 == 0
+                and (wait not in ("wait-unavailable",)
+                     and not wait.startswith("stopped-") or wait_failed)
+                and (parts[1] != "exactReapUncertain"
+                     or wait_failed and not wait.startswith("stopped-")
+                     and parts[3] == "receipt-eof"
+                     and parts[4] == "terminal-eof")
+                and (parts[1] not in ("identityMismatch", "childTerminated",
+                                      "exactReapUncertain", "residueUncertain")
+                     or both_eof)
+                and (parts[1] not in ("deadlineExceeded", "cancelled",
+                                      "diagnosticOverflow") or not both_eof)
+                and (parts[1] != "diagnosticOverflow"
+                     or parts[4] == "terminal-open")
+                and (parts[1] != "receiptInvalid"
+                     or parts[3] == "receipt-open" or both_eof)
+                and (parts[1] != "residueUncertain"
+                     or wait == "exited-0" and cleanup_mask in (0x00, 0x10))
+                and (parts[1] != "transportUncertain" or not both_eof
+                     or wait == "exited-0" and cleanup_mask in (0x08, 0x18))
+                and (parts[1] != "unexpectedResponse" or not both_eof
+                     or wait == "exited-0" and cleanup_mask == 0)
+                and (parts[1] != "childTerminated"
+                     or wait != "wait-unavailable"
+                     and (not wait_failed or wait.startswith("stopped-"))))
             require(len(parts) == 6 and parts[0] == "postArmFailure"
                     and parts[1] in primary and wait_valid
                     and parts[3] in ("receipt-open", "receipt-eof")
                     and parts[4] in ("terminal-open", "terminal-eof")
                     and cleanup_match is not None
-                    and int(cleanup_match.group(1), 16) <= 0x1f,
+                    and cleanup_mask <= 0x1f and producible,
                     "closed failure projection reason")
     require(hashlib.sha256(fields[5]).digest() == fields[6],
             "event payload digest")
@@ -762,7 +796,7 @@ def validate_report(data):
     elif profile == 6:
         root_cause = value["rootCauseObservation"]
         exact_object(root_cause, {"source", "reason",
-            "campaignExitStatus", "armedConsumedObservedAtUTCMicroseconds",
+            "armedConsumedObservedAtUTCMicroseconds",
             "spawnUncertainObservedAtUTCMicroseconds",
             "terminalObservedAtUTCMicroseconds", "elapsedAfterArmMicroseconds",
             "driverEpochArtifactCount", "machinePromptObserved",
@@ -773,8 +807,6 @@ def validate_report(data):
                     == "durableAttemptTimelineAndBoundedArtifacts"
                 and root_cause["reason"]
                     == "legacyGenericPostArmFailureProjection"
-                and exact_int(root_cause["campaignExitStatus"],
-                              "campaign exit status") == 70
                 and root_cause["armedConsumedObservedAtUTCMicroseconds"]
                     == "1788835011400828"
                 and root_cause["spawnUncertainObservedAtUTCMicroseconds"]
@@ -1212,6 +1244,11 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
                     == report["_expectedEventKinds"]
                 and all(event["attempt"] == report["attemptUUID"]
                         for event in events), "consumed transport-loss event chain")
+        if events[2]["payload"]["schemaVersion"] == 2:
+            primary = events[2]["payload"]["reason"].split("/")[1]
+            terminal_published = events[-1]["kind"] == 6
+            require((primary == "transportUncertain") != terminal_published,
+                    "schema-two terminal-shape binding")
         if report["schemaVersion"] in (4, 6):
             root_cause = report["rootCauseObservation"]
             require(str(events[1]["observed"])

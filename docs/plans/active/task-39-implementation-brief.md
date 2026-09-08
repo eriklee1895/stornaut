@@ -187,9 +187,9 @@
 > `11e1a0a`: bounded typed failure receipt, exact exit/EOF/residue verification,
 > physical compact-frame coverage and exact nine-path mutation closure have no
 > unresolved P0-P2. The unique privileged attempt v8 is consumed and may not be
-> retried. The v8 read-only failure closure is complete at `4147e45`; the current
-> frontier is the reviewed AMFI root-cause repair followed by a separately
-> authorized fresh campaign. v8 and v9 are both consumed and cannot be reused.
+> retried. The v8 read-only failure closure is complete at `4147e45`. The
+> following AMFI-repair routing is historical and superseded by the current
+> v8–v11 disposition below; v8 and v9 are both consumed and cannot be reused.
 > These repairs are machine-campaign prerequisite checkpoints,
 > not recursively named new Tasks. Local findings remain in their owning
 > checkpoint. L3c4 alone owns final admission and the remaining full.
@@ -1544,10 +1544,11 @@ completed. Interactive-native identity binding `531f79f` / consumer seal
 non-admitting. ii-c-a, ii-c-b1, ii-c-b2a1 and ii-c-b2a2 are
 complete/non-admitting; ii-c-b2b and resolved-lineage L1/L2 implementation are
 complete/non-admitting; L2 final verifier review returned no finding. The
-historical pre-v8 order was ii-c-c → L3c3d → L3c4. v8 is consumed, failed and
-non-retryable. v9 is also consumed/non-retryable; the current frontier is the
-reviewed AMFI root-cause repair followed by a separately authorized fresh
-campaign. These repairs are
+historical pre-v8 order was ii-c-c → L3c3d → L3c4. v8–v11 are consumed, failed
+and non-retryable. The AMFI and deadline repairs are historical and complete;
+the post-arm diagnostic repair is complete/non-admitting. No machine campaign
+is currently authorized. Any replacement requires fresh authorization and only
+a green cohort may continue to L3c3d → L3c4. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the
 [shared-deadline audit](../../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)

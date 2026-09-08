@@ -978,7 +978,12 @@ package enum InvestigationMachineEvidenceJSON {
                       validWaitReason(fields[2]),
                       ["receipt-open", "receipt-eof"].contains(fields[3]),
                       ["terminal-open", "terminal-eof"].contains(fields[4]),
-                      validCleanupReason(fields[5])
+                      let cleanupMask = cleanupReason(fields[5]),
+                      produciblePostArmFailure(
+                        primary: fields[1], wait: fields[2],
+                        receipt: fields[3], terminal: fields[4],
+                        cleanupMask: cleanupMask
+                      )
                 else { throw invalid() }
             }
         }
@@ -1001,15 +1006,90 @@ package enum InvestigationMachineEvidenceJSON {
         return String(number) == suffix && variant.range.contains(number)
     }
 
-    private static func validCleanupReason(_ value: String) -> Bool {
+    private static func cleanupReason(_ value: String) -> UInt8? {
         guard value.utf8.count == 10, value.hasPrefix("cleanup-") else {
-            return false
+            return nil
         }
         guard value.dropFirst(8).utf8.allSatisfy({
             (48...57).contains($0) || (97...102).contains($0)
         }), let mask = UInt8(value.dropFirst(8), radix: 16)
+        else { return nil }
+        return mask & ~0x1f == 0 ? mask : nil
+    }
+
+    private static func produciblePostArmFailure(
+        primary: String, wait: String, receipt: String, terminal: String,
+        cleanupMask: UInt8
+    ) -> Bool {
+        guard !["alreadyConsumed", "bindingInvalid", "spawnUncertain"]
+            .contains(primary), cleanupMask & 0x01 == 0
         else { return false }
-        return mask & ~0x1f == 0
+        let waitFailed = cleanupMask & 0x04 != 0
+        if wait == "wait-unavailable" || wait.hasPrefix("stopped-") {
+            guard waitFailed else { return false }
+        }
+        if primary == "exactReapUncertain" {
+            guard waitFailed, !wait.hasPrefix("stopped-"),
+                  receipt == "receipt-eof", terminal == "terminal-eof"
+            else { return false }
+        }
+        let bothChannelsReachedEOF =
+            receipt == "receipt-eof" && terminal == "terminal-eof"
+        if ["identityMismatch", "childTerminated",
+            "exactReapUncertain", "residueUncertain"].contains(primary),
+           !bothChannelsReachedEOF
+        {
+            return false
+        }
+        if ["deadlineExceeded", "cancelled", "diagnosticOverflow"]
+            .contains(primary), bothChannelsReachedEOF
+        {
+            return false
+        }
+        if primary == "diagnosticOverflow", terminal != "terminal-open" {
+            return false
+        }
+        if primary == "receiptInvalid",
+           receipt != "receipt-open" && !bothChannelsReachedEOF
+        {
+            return false
+        }
+        if primary == "residueUncertain",
+           wait != "exited-0" || ![0x00, 0x10].contains(cleanupMask)
+        {
+            return false
+        }
+        if primary == "transportUncertain", bothChannelsReachedEOF,
+           wait != "exited-0" || ![0x08, 0x18].contains(cleanupMask)
+        {
+            return false
+        }
+        if primary == "unexpectedResponse", bothChannelsReachedEOF,
+           wait != "exited-0" || cleanupMask != 0
+        {
+            return false
+        }
+        if primary == "childTerminated", wait == "wait-unavailable" {
+            return false
+        }
+        if primary == "childTerminated", waitFailed,
+           !wait.hasPrefix("stopped-")
+        {
+            return false
+        }
+        return true
+    }
+
+    fileprivate static func schemaTwoPostArmFailurePrimary(
+        _ payload: Data
+    ) throws -> String? {
+        let value = try object(payload)
+        guard integer(value, "schemaVersion") == 2 else { return nil }
+        let fields = string(value, "reason")?.split(
+            separator: "/", omittingEmptySubsequences: false
+        ).map(String.init)
+        guard let fields, fields.count == 6 else { throw invalid() }
+        return fields[1]
     }
 
     private static let commonKeys: Set<String> = [
@@ -1179,6 +1259,17 @@ package enum InvestigationMachineAttemptEventChain {
         }
         guard complete.contains(kinds) else {
             throw InvestigationMachineEvidenceContractError.invalidTransition
+        }
+        if mode == .privileged, events.count >= 3,
+           events[2].kind == .spawnUncertain,
+           let primary = try InvestigationMachineEvidenceJSON
+            .schemaTwoPostArmFailurePrimary(events[2].payload)
+        {
+            let terminalWasPublished = events.last?.kind == .terminal
+            guard (primary == "transportUncertain") != terminalWasPublished
+            else {
+                throw InvestigationMachineEvidenceContractError.invalidTransition
+            }
         }
     }
 

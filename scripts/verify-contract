@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=925565928ccaa7b1fc6283d52d221a33070b7c6c31ce962452438c5c96747989
+# ib2_self_sha=588c4474416accdbeed8c6592dfb1492b430cb33779c38fe12cb0642f05c5df3
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -4416,7 +4416,7 @@ PY
                 "$failure_baseline"
             continue;;
           staged-worktree-divergence)
-            failure_blob=$( { <"$failure_main";
+            failure_blob=$( { GIT_INDEX_FILE=$failure_index git show ":$failure_main";
                     print '// iicc-prearm-failure-divergence'; } \
                 | git hash-object -w --stdin)
             GIT_INDEX_FILE=$failure_bad git update-index \
