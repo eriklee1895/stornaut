@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8, v9, v10 and v11 consumed failures disposed / post-arm diagnostic repair complete and non-admitting
+> Status: frozen / v8-v11 consumed failures disposed / v12 suspended before launch, unconsumed and rebind-required
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: fresh authorization -> replacement campaign -> L3c3d -> L3c4
+> Remaining order: preservation repair -> explicit v12 rebind -> one-shot campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -20,14 +20,17 @@
 > `b9ade5e49131619c05f8b57e35cc310276b3a6f7`, reached durable arm and
 > exhausted the 1,200-second outer deadline before a coordinator receipt. v10
 > is consumed, non-admitting and non-retryable. Its checked disposition and the
-> 1,400-second bounded deadline repair is complete and non-admitting. Any
-> replacement campaign requires fresh explicit authorization.
+> 1,400-second bounded deadline repair is complete and non-admitting.
 > On 2026-09-08 the user authorized one fresh v11 campaign from pushed baseline
 > `8a286ea41d73b0874c6775cc6f79736f972782fe`. It reached durable arm,
 > recorded `spawnUncertain → terminal` about 16.259 seconds later and exited
 > 70. The legacy generic reason cannot support an exact root-cause claim; v11 is
 > consumed/non-admitting/non-retryable and the successor closed schema-v2
 > post-arm diagnostic projection is complete/non-admitting.
+> The user approved one fresh v12 campaign bound to pushed baseline
+> `4fd9c539dbc2a7d9c659147c041712b945fa3b00`; preflight suspended it before
+> launch because stale recovery would remove retained v11 Gate evidence. It is
+> unconsumed and requires explicit rebind after preservation repair.
 
 ## 1. Decision
 

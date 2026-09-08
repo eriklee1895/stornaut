@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import StornautInvestigationHandoffContract
 
 #if DEBUG
 enum InvestigationMachineGateOwnershipError: Error, Equatable, Sendable {
@@ -466,7 +467,8 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
 
     func publishCanonicalCapsule(
         _ request: InvestigationOwnerOnlyCapsulePublicationRequest,
-        borrower: (any InvestigationOwnerOnlyCapsuleBorrowing)?
+        borrower: (any InvestigationOwnerOnlyCapsuleBorrowing)?,
+        preservedCapsules: [InvestigationHistoricalGateCapsule]
     ) throws -> InvestigationOwnerOnlyCapsuleLease {
         lock.lock()
         defer { lock.unlock() }
@@ -485,7 +487,8 @@ final class InvestigationMachineGateOwnership: @unchecked Sendable {
             )
             let reader = try InvestigationOwnerOnlyCapsulePublication.publish(
                 request, baseDescriptor: active.baseDescriptor,
-                baseMetadata: base, system: capsuleSystem
+                baseMetadata: base, preservedCapsules: preservedCapsules,
+                system: capsuleSystem
             )
             return InvestigationOwnerOnlyCapsuleLease.make(
                 owner: self, reader: reader, request: request,

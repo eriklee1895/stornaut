@@ -278,6 +278,17 @@ package enum InvestigationMachineCampaignExecutable {
         }
         private struct CommandCapture { let status: Int32; let stdout, stderr: Data }
         private struct TerminalEvidence { let bundle:Data;let epochs:[InvestigationMachineCampaignVerifiedEpoch];let diagnostic:Data;let rawGateReceipt:Data;let finalReceipt:InvestigationMachineCoordinatorRawReceiptV1 };private var spawned:InvestigationMachineCampaignSpawnedProcess?;private var deadline:UInt64?;private var channelsClosed=false,bootstrapVerified=false,activationPrepared=false,preparedPublished=false,armedConsumed=false,promptObserved=false,humanActionObserved=false,attestationPublished=false
+        private struct GlobalObservation {
+            let processCounts: [Int]
+            let preserved: InvestigationHistoricalGateCapsule
+            var canonicalObject: [String: Any] {
+                ["processCounts": processCounts,
+                 "preservedGateAttemptUUID": preserved.outerAttemptUUID.uuidString.lowercased(),
+                 "preservedGateWholeInputSHA256": preserved.wholeInputSHA256.lowercaseHex,
+                 "preservedGateCapsuleByteCount": preserved.byteCount,
+                 "preservedGateCapsuleSHA256": preserved.fileSHA256.lowercaseHex]
+            }
+        }
         private var preparedFrameSHA256:Data?;private var bufferedReceipt=Data();private var evidenceWriter:InvestigationMachineRawEvidenceWriter?;private var evidenceParentDescriptor:Int32 = -1;private var lastEvidenceTime:Int64=0;private var installReceipt:[String:Any]?;private var lifecyclePayload:(root:String,bytes:Data,hashes:[String],plist:String)?
         private var policyProbe:CommandCapture?;private var campaignUUID:UUID?;private var evidenceParentPath:String?;private var validatedTerminal:TerminalEvidence?;private var activePreArm:InvestigationMachineCampaignPreArmFrame?;private var preArmWire=Data();private var lastIdentity:InvestigationMachineCampaignOuterIdentity?;private var lastResidue:InvestigationMachineCampaignResidueObservation?
 
@@ -730,9 +741,10 @@ package enum InvestigationMachineCampaignExecutable {
 
         private func writeJSON(_ extra: [String: Any], role: InvestigationMachineEvidenceRole,
             phase: InvestigationMachineEvidencePhase, leaf: String,
-            preArm: InvestigationMachineCampaignPreArmFrame) throws {
+            preArm: InvestigationMachineCampaignPreArmFrame,
+            schemaVersion: Int = 1) throws {
             guard let writer = evidenceWriter, let campaignUUID else { throw Failure.invalid }
-            var object = extra; object["schemaVersion"] = 1
+            var object = extra; object["schemaVersion"] = schemaVersion
             object["role"] = roleName(role)
             object["campaignUUID"] = campaignUUID.uuidString.lowercased()
             object["attemptUUID"] = preArm.outerAttemptUUID.uuidString.lowercased()
@@ -851,7 +863,8 @@ package enum InvestigationMachineCampaignExecutable {
         private static func writePreArmFailureReport(
             _ value: InvestigationMachineCampaignPreArmFailureFrame,
             exactWait: InvestigationMachineCampaignExactWait?,
-            install: [String: Any], uninstall: [String: Any], global: [Int]
+            install: [String: Any], uninstall: [String: Any],
+            global: GlobalObservation
         ) throws {
             let data = try InvestigationMachineCampaignPreArmFailureReport
                 .canonicalData(
@@ -861,7 +874,9 @@ package enum InvestigationMachineCampaignExecutable {
                     globalPostTeardown: true,
                     installReceiptSHA256: digest(try canonical(install)),
                     uninstallReceiptSHA256: digest(try canonical(uninstall)),
-                    globalObservationSHA256: digest(try canonical(global))
+                    globalObservationSHA256: digest(try canonical(
+                        global.canonicalObject
+                    ))
                 )
             var offset = 0
             while offset < data.count {
@@ -964,7 +979,8 @@ package enum InvestigationMachineCampaignExecutable {
                     else if n<0,errno==EINTR{continue}else{return}}}
         }
         private func writeTeardown(_ uninstall:[String:Any],
-            preArm: InvestigationMachineCampaignPreArmFrame, global: [Int],
+            preArm: InvestigationMachineCampaignPreArmFrame,
+            global: GlobalObservation,
             expectedConsumed: Bool, expectedEpochCount: Int) throws {
             var un:[String:Any]=["transactionReceiptSHA256":Self.digest(try Self.canonical(uninstall)),
                 "bootoutCompleted":true,"installedRootRemoved":true,"installedAppRemoved":true,
@@ -973,15 +989,26 @@ package enum InvestigationMachineCampaignExecutable {
                 "helperExecutableSHA256","machineDriverExecutableSHA256","gateExecutableSHA256",
                 "coordinatorExecutableSHA256"]{un[key]=uninstall[key]}
             try writeJSON(un,role:.uninstallEvidence,phase:.uninstall,leaf:"uninstall.json",preArm:preArm)
-            try writeJSON(["observationReceiptSHA256":Self.digest(try Self.canonical(uninstall)),
-                "appProcessCount":global[0],"helperProcessCount":global[1],
-                "driverProcessCount":global[2],"gateProcessCount":global[3],
-                "coordinatorProcessCount":global[4],"childCount":global[5],
-                "descendantCount":global[6],"openChannelCount":global[7],
-                "ownedProcessGroupMemberCount":global[8],
+            try writeJSON([
+                "observationReceiptSHA256":Self.digest(try Self.canonical(uninstall)),
+                "appProcessCount":global.processCounts[0],
+                "helperProcessCount":global.processCounts[1],
+                "driverProcessCount":global.processCounts[2],
+                "gateProcessCount":global.processCounts[3],
+                "coordinatorProcessCount":global.processCounts[4],
+                "childCount":global.processCounts[5],
+                "descendantCount":global.processCounts[6],
+                "openChannelCount":global.processCounts[7],
+                "ownedProcessGroupMemberCount":global.processCounts[8],
                 "serviceAbsent":true,"gateOwnerLockRevalidated":true,"gateAttemptEntryCount":0,
-                "gateCapsuleEntryCount":0],role:.globalPostTeardown,phase:.verifier,
-                leaf:"global-post-teardown.json",preArm:preArm)
+                "gateCapsuleEntryCount":0,"preservedGateAttemptEntryCount":1,
+                "preservedGateCapsuleEntryCount":1,
+                "preservedGateAttemptUUID":global.preserved.outerAttemptUUID.uuidString.lowercased(),
+                "preservedGateWholeInputSHA256":global.preserved.wholeInputSHA256.lowercaseHex,
+                "preservedGateCapsuleByteCount":global.preserved.byteCount,
+                "preservedGateCapsuleSHA256":global.preserved.fileSHA256.lowercaseHex],
+                role:.globalPostTeardown,phase:.verifier,
+                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2)
             try writeJSON(["expectedConsumed":expectedConsumed,
                 "expectedEpochCount":expectedEpochCount,
                 "evidenceSetSHA256":preArm.frameSHA256.lowercaseHex,
@@ -1059,7 +1086,7 @@ package enum InvestigationMachineCampaignExecutable {
         private static func scenario(_ index:Int)->String{["success","cancellation","timeout",
             "invalidEnvelope","identityMismatch","transportLoss","lifecycleRecovery",
             "artifactCleanupFailure"][index]}
-        private func globalObservation()throws->[Int]{
+        private func globalObservation()throws->GlobalObservation{
             let exact=["/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic","/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper","/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver","/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGate",installedCoordinator]
             var counts=[Int](repeating:0,count:9),capacity=4096
             while capacity<=131072{var pids=[pid_t](repeating:0,count:capacity);let n=pids.withUnsafeMutableBytes{proc_listallpids($0.baseAddress,Int32($0.count))};guard n>=0 else{throw Failure.posix(errno)};if n<capacity{for pid in pids.prefix(Int(n)) where pid>1{var path=[CChar](repeating:0,count:Int(MAXPATHLEN));let size=proc_pidpath(pid,&path,UInt32(path.count));if size>0,let value=String(bytes:path.prefix(Int(size)).map(UInt8.init(bitPattern:)),encoding:.utf8),let i=exact.firstIndex(of:value){counts[i]+=1}};break};capacity*=2}
@@ -1071,12 +1098,32 @@ package enum InvestigationMachineCampaignExecutable {
                 errno==ENOENT else{throw Failure.invalid}}
             guard let pw=getpwuid(getuid()) else{throw Failure.invalid}
             let base=String(cString:pw.pointee.pw_dir)+"/Library/Caches/com.eriklee.stornaut.task39-machine-gate"
-            let names=try FileManager.default.contentsOfDirectory(atPath:base)
-            guard names==[".owner-lock-v1"] else{throw Failure.invalid}
+            let preserved=try InvestigationHistoricalGateCapsule.retainedV11()
+            let names=try FileManager.default.contentsOfDirectory(atPath:base).sorted()
+            guard names==[".owner-lock-v1",preserved.attemptName].sorted()
+            else{throw Failure.invalid}
             var lock=stat();guard lstat(base+"/.owner-lock-v1",&lock)==0,
                   lock.st_mode&S_IFMT==S_IFREG,lock.st_uid==getuid(),lock.st_nlink==1
             else{throw Failure.invalid}
-            return counts}
+            let attempt=base+"/"+preserved.attemptName, capsule=attempt+"/"+preserved.capsuleName
+            var attemptNode=stat(),capsuleNode=stat()
+            guard lstat(attempt,&attemptNode)==0,attemptNode.st_mode&S_IFMT==S_IFDIR,
+                  attemptNode.st_mode&0o7777==0o700,attemptNode.st_uid==getuid(),
+                  attemptNode.st_gid==getgid(),
+                  try FileManager.default.contentsOfDirectory(atPath:attempt)
+                    == [preserved.capsuleName],
+                  lstat(capsule,&capsuleNode)==0,capsuleNode.st_mode&S_IFMT==S_IFREG,
+                  capsuleNode.st_mode&0o7777==0o600,capsuleNode.st_uid==getuid(),
+                  capsuleNode.st_gid==getgid(),capsuleNode.st_nlink==1,
+                  capsuleNode.st_size==preserved.byteCount,
+                  let bytes=Self.stableFileBytes(capsule,privateParent:true,
+                    maximum:preserved.byteCount),
+                  InvestigationHandoffSHA256.hashing(bytes)==preserved.fileSHA256,
+                  let decoded=try? InvestigationProjectedCohortInput.decode(bytes),
+                  decoded.capsule.outerAttemptUUID==preserved.outerAttemptUUID,
+                  decoded.wholeInputSHA256==preserved.wholeInputSHA256
+            else{throw Failure.invalid}
+            return .init(processCounts: counts, preserved: preserved)}
 
         nonisolated var isBootstrapInvocation: Bool {
             CommandLine.argc == 1 && getpid() > 1 && getsid(0) == getpid()

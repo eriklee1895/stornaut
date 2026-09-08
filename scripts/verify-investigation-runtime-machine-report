@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_self_sha=599bd8bd199ff2f264d257d491776d0eb54f864a516205fc01af8e19098d3786 # iicc-self-seal
+typeset -r iicc_self_sha=d8de62d0459478d5363767010b4ec400c46662bba49f6b329298b120c8b41c29 # iicc-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -22,6 +22,7 @@ import fcntl
 import hashlib
 import json
 import os
+import pwd
 import re
 import select
 import stat
@@ -45,6 +46,10 @@ MAX_RECEIPT = 4_096
 MAX_CAPSULE = 1_069_056
 MAX_EPOCH = 256 << 10
 MAX_BUNDLE = 3 << 20
+PRESERVED_GATE_ATTEMPT = "18a85048-5e1c-40c5-99e4-3785185070d3"
+PRESERVED_GATE_WHOLE = "a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104"
+PRESERVED_GATE_SIZE = 28_997
+PRESERVED_GATE_SHA256 = "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72"
 ROOT_DRIVER_CLAIM_BYTES = 1_006
 DRIVER_COMPLETION_V3_BYTES = 180
 FIXED_DRIVER_PATH = ("/Library/Application Support/Stornaut/"
@@ -289,7 +294,8 @@ def decoded_base64(value, name, maximum=MAX_ARTIFACT):
             and base64.b64encode(decoded).decode() == value, f"{name} base64")
     return decoded
 def common_json(value, role, manifest):
-    require(exact_int(value["schemaVersion"], "evidence schema") == 1
+    version = exact_int(value["schemaVersion"], "evidence schema")
+    require((version == 1 or role == 11 and version == 2)
             and value["role"] == ROLE_NAMES[role]
             and exact_uuid(value["campaignUUID"], "evidence campaign") == manifest["campaign"]
             and exact_uuid(value["attemptUUID"], "evidence attempt") == manifest["attempt"], "evidence common binding")
@@ -332,6 +338,30 @@ def parse_capsule(data):
             and len({uuid_text(fields[0])} | {value["epoch"] for value in epochs}
                     | {value["nonce"] for value in epochs}) == 17, "capsule identities")
     return {"attempt":uuid_text(fields[0]),"sha":fields[2],"epochs":epochs,"raw":data}
+
+def parse_projected_input(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.l3c3cii.projected-cohort-input",
+        [(1,MAX_CAPSULE),(4,4),(32,32)] + [(1,2_048)]*8, MAX_CAPSULE)
+    require(u32(fields[1]) == 8, "projected input count")
+    zeroed = list(fields); zeroed[2] = bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.l3c3cii.projected-cohort-input", zeroed)).digest()
+        == fields[2], "projected input self hash")
+    capsule = parse_capsule(fields[0])
+    projections = [parse_projection(value) for value in fields[3:]]
+    selections = []
+    for epoch, projection in zip(capsule["epochs"], projections):
+        require(epoch["epoch"] == projection["epoch"]
+                and epoch["nonce"] == projection["nonce"]
+                and epoch["configuration"].hex() == projection["configuration"]
+                and epoch["signed"].hex() == projection["signed"],
+                "projected selection")
+        selections.append({"attempt":capsule["attempt"],
+            "capsule":capsule["sha"],"whole":fields[2],
+            "epoch":epoch,"projection":projection})
+    return {"capsule":capsule,"whole":fields[2],
+        "projections":projections,"selections":selections,"raw":data}
 def parse_process_identity(data, expected_role=None):
     fields = parse_transcript(data, "stornaut.task39.machine-claim.process-identity", [(1,1),(4,4),(4,4),(4,4),(4,4),(32,32)], 1_024)
     role = fields[0][0]; require(role in (1,2), "process role")
@@ -465,8 +495,16 @@ def validate_json_artifacts(manifest, contents):
             require(all(value[n] is True for n in {"bootoutCompleted","installedRootRemoved","installedAppRemoved","plistRemoved","runtimeRootRemoved","leaseRootRemoved"}), "uninstall absence")
         elif role == 11:
             zeros = {"appProcessCount","helperProcessCount","driverProcessCount","gateProcessCount","coordinatorProcessCount","childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount","gateAttemptEntryCount","gateCapsuleEntryCount"}
-            exact_object(value, common | zeros | {"observationReceiptSHA256","serviceAbsent","gateOwnerLockRevalidated"}, "global teardown")
+            preserved = {"preservedGateAttemptEntryCount","preservedGateCapsuleEntryCount","preservedGateAttemptUUID","preservedGateWholeInputSHA256","preservedGateCapsuleByteCount","preservedGateCapsuleSHA256"} if value["schemaVersion"] == 2 else set()
+            exact_object(value, common | zeros | preserved | {"observationReceiptSHA256","serviceAbsent","gateOwnerLockRevalidated"}, "global teardown")
             require(all(exact_int(value[n], n) == 0 for n in zeros) and value["serviceAbsent"] is True and value["gateOwnerLockRevalidated"] is True, "global teardown values")
+            if value["schemaVersion"] == 2:
+                require(exact_int(value["preservedGateAttemptEntryCount"], "preserved attempt count") == 1
+                    and exact_int(value["preservedGateCapsuleEntryCount"], "preserved capsule count") == 1
+                    and exact_uuid(value["preservedGateAttemptUUID"], "preserved attempt") == PRESERVED_GATE_ATTEMPT
+                    and digest_text(value["preservedGateWholeInputSHA256"], "preserved whole input") == PRESERVED_GATE_WHOLE
+                    and exact_int(value["preservedGateCapsuleByteCount"], "preserved capsule bytes") == PRESERVED_GATE_SIZE
+                    and digest_text(value["preservedGateCapsuleSHA256"], "preserved capsule sha") == PRESERVED_GATE_SHA256, "preserved Gate evidence")
             digest_text(value["observationReceiptSHA256"], "teardown receipt")
         elif role == 12:
             exact_object(value, common | {"expectedConsumed","expectedEpochCount","evidenceSetSHA256","verifierExecutableSHA256"}, "verifier input")
@@ -756,30 +794,14 @@ def parse_prearm(data, manifest):
             and fields[2] == manifest["source"] and fields[3] == manifest["build"]
             and fields[4] == manifest["signed"] and uuid_text(fields[5]) == manifest["attempt"],
             "pre-arm source binding")
-    projected = parse_transcript(fields[8],
-        "stornaut.task39.l3c3cii.projected-cohort-input",
-        [(1,MAX_CAPSULE),(4,4),(32,32)] + [(1,2_048)]*8, MAX_CAPSULE)
-    require(u32(projected[1]) == 8 and projected[2] == fields[7],
-            "pre-arm projected input")
-    zeroed = list(projected); zeroed[2] = bytes(32)
-    require(hashlib.sha256(encode_transcript(
-        "stornaut.task39.l3c3cii.projected-cohort-input", zeroed)).digest()
-        == projected[2], "projected input self hash")
-    capsule = parse_capsule(projected[0])
-    projections = [parse_projection(value) for value in projected[3:]]
-    require(capsule["attempt"] == uuid_text(fields[5])
+    projected = parse_projected_input(fields[8])
+    capsule = projected["capsule"]
+    require(projected["whole"] == fields[7]
+            and capsule["attempt"] == uuid_text(fields[5])
             and capsule["sha"] == fields[6], "pre-arm capsule binding")
-    selections = []
-    for epoch, projection in zip(capsule["epochs"], projections):
-        require(epoch["epoch"] == projection["epoch"]
-                and epoch["nonce"] == projection["nonce"]
-                and epoch["configuration"].hex() == projection["configuration"]
-                and epoch["signed"].hex() == projection["signed"],
-                "projected selection")
-        selections.append({"attempt":capsule["attempt"],"capsule":capsule["sha"],
-            "whole":fields[7],"epoch":epoch,"projection":projection})
     return {"capsule":fields[6],"whole":fields[7],"projected":fields[8],
-        "projections":projections,"selections":selections,"sha":fields[9]}
+        "projections":projected["projections"],
+        "selections":projected["selections"],"sha":fields[9]}
 def parse_gate_receipt(data, manifest, prearm):
     require(len(data) == 422 and data[:4] == b"STNG" and u16(data[4:6]) == 1
             and data[6:8] == b"\x02\x02" and u32(data[8:12]) == 410,
@@ -1321,6 +1343,87 @@ def read_seal(path, evidence_root, evidence_identity):
         close_absolute_walk(walk)
         raise
 
+def open_preserved_gate(owner):
+    require(owner == (501, 20), "preserved Gate verifier identity")
+    account = pwd.getpwuid(owner[0])
+    home = account.pw_dir
+    require(isinstance(home, str) and home.startswith("/") and home != "/",
+            "preserved Gate account home")
+    base_path = canonical_absolute_path(
+        home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+    base_fd, base_walk, base_node = open_absolute(
+        base_path, DIRECTORY_FLAGS, False)
+    attempt_fd = -1
+    held_files = []
+    try:
+        parent_fd, leaf, _, _, _ = base_node
+        named_base = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        device = named_base.st_dev
+        base_before = validate_open_fd(
+            base_fd, named_base, owner, device, 0o700, False)
+        attempt_name = "attempt-" + PRESERVED_GATE_ATTEMPT
+        capsule_name = "projected-cohort-" + PRESERVED_GATE_WHOLE + ".bin"
+        require(inventory(base_fd, 2) == [".owner-lock-v1", attempt_name],
+                "preserved Gate base inventory")
+        lock_bytes = read_child(
+            base_fd, ".owner-lock-v1", 0, owner, device, held_files)
+        require(lock_bytes == b"", "preserved Gate lock bytes")
+        named_attempt = os.stat(
+            attempt_name, dir_fd=base_fd, follow_symlinks=False)
+        attempt_fd = os.open(attempt_name, DIRECTORY_FLAGS, dir_fd=base_fd)
+        watch(attempt_fd, True)
+        attempt_before = validate_open_fd(
+            attempt_fd, named_attempt, owner, device, 0o700, False)
+        require(inventory(attempt_fd, 1) == [capsule_name],
+                "preserved Gate attempt inventory")
+        capsule = read_child(
+            attempt_fd, capsule_name, PRESERVED_GATE_SIZE, owner, device,
+            held_files)
+        require(len(capsule) == PRESERVED_GATE_SIZE
+                and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,
+                "preserved Gate capsule bytes")
+        projected = parse_projected_input(capsule)
+        require(projected["capsule"]["attempt"] == PRESERVED_GATE_ATTEMPT
+                and projected["whole"].hex() == PRESERVED_GATE_WHOLE,
+                "preserved Gate capsule contract")
+        return {
+            "base_fd": base_fd, "base_walk": base_walk,
+            "base_node": base_node, "base_before": base_before,
+            "attempt_fd": attempt_fd, "attempt_name": attempt_name,
+            "attempt_before": attempt_before, "capsule_name": capsule_name,
+            "held_files": held_files, "device": device,
+        }
+    except BaseException:
+        close_descriptors([record[2] for record in reversed(held_files)])
+        if attempt_fd >= 0:
+            os.close(attempt_fd)
+        close_absolute_walk(base_walk)
+        raise
+
+def revalidate_preserved_gate(gate, owner):
+    for record in gate["held_files"]:
+        revalidate_held_file(record, owner, gate["device"])
+    attempt_after = validate_open_fd(
+        gate["attempt_fd"], os.stat(
+            gate["attempt_name"], dir_fd=gate["base_fd"],
+            follow_symlinks=False), owner, gate["device"], 0o700, False)
+    require(path_identity(attempt_after)
+            == path_identity(gate["attempt_before"]),
+            "preserved Gate attempt identity")
+    require(inventory(gate["attempt_fd"], 1) == [gate["capsule_name"]],
+            "preserved Gate final attempt inventory")
+    parent_fd, leaf, _, _, _ = gate["base_node"]
+    base_after = validate_open_fd(
+        gate["base_fd"], os.stat(
+            leaf, dir_fd=parent_fd, follow_symlinks=False), owner,
+        gate["device"], 0o700, False)
+    require(path_identity(base_after) == path_identity(gate["base_before"]),
+            "preserved Gate base identity")
+    require(inventory(gate["base_fd"], 2)
+            == [".owner-lock-v1", gate["attempt_name"]],
+            "preserved Gate final base inventory")
+    revalidate_absolute_walk(gate["base_walk"])
+
 def verify(root_path, seal_path, expected_self_sha, verifier_fd):
     root_path = canonical_absolute_path(root_path)
     seal_path = canonical_absolute_path(seal_path)
@@ -1330,6 +1433,7 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
     held_files = []
     held_phases = []
     non_admitting = False
+    preserved_gate = None
     try:
         verifier_before = os.fstat(verifier_fd)
         validate_metadata(verifier_before, (os.geteuid(), os.getegid()),
@@ -1425,6 +1529,10 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
             expected_epochs = values[12][0][1]["expectedEpochCount"]
             admitting = (expected_epochs == 8
                          and summary["outcome"] == 2)
+            require(not admitting or values[11][0][1]["schemaVersion"] == 2,
+                    "admitting preservation schema")
+            if admitting:
+                preserved_gate = open_preserved_gate(owner)
             trusted_action = (values[4][0][1]["attestationKind"]
                     == "trustedOperatorInteractiveAction"
                     and values[4][0][1]["machinePromptObserved"] is True
@@ -1480,6 +1588,8 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
                 (root_after.st_dev, root_after.st_ino, root_after.st_gen,
                  root_after.st_size), "root post-read identity")
         revalidate_absolute_walk(root_walk)
+        if preserved_gate is not None:
+            revalidate_preserved_gate(preserved_gate, owner)
         verifier_after = os.fstat(verifier_fd)
         require(path_identity(verifier_before) == path_identity(verifier_after)
                 and verifier_before.st_size == verifier_after.st_size
@@ -1495,6 +1605,12 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
         descriptors += [record[1] for record in reversed(held_phases)]
         if seal_walk is not None:
             descriptors += list(reversed(seal_walk["fds"]))
+        if preserved_gate is not None:
+            descriptors += [record[2] for record in reversed(
+                preserved_gate["held_files"])]
+            descriptors.append(preserved_gate["attempt_fd"])
+            descriptors += list(reversed(
+                preserved_gate["base_walk"]["fds"]))
         descriptors += list(reversed(root_walk["fds"]))
         descriptors.append(verifier_fd)
         close_descriptors(descriptors)

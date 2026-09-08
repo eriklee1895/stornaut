@@ -341,11 +341,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 lifecycle call-graph drifted",
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
-            "2ab9f885f5e8a1807c1250bf24c2015d71aa65a56797c975e810e1e0bf9d08d4",
+            "3deb098918bebe1410f4fb96f90db9b0d6a84cf09fdaabe0cb16398151bdab57",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
-            "94f0fc8a73596dbe6c693f5975d23da5c68df2d6bbb81c3f2924f3d28ff6330a",
+            "16654f4917423c11d334fec6aa1e5cbd386571332386232966b9d688383b5831",
             "require_body_digest(",
             "28abaf3aa77391cc679715a824f3f5df3af44d78d5b66bef458f21416215d615",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
@@ -508,6 +508,76 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func iiCCPreservedHistoricalGateCapsuleContractIsClosed() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = boundarySource(root)
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-runtime-machine-report"),
+            encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift"),
+            encoding: .utf8)
+        let capsule = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift"),
+            encoding: .utf8)
+        for marker in [
+            "--iic-c-preserved-capsule-contract-only",
+            "--iic-c-preserved-capsule-mutation-contract-only",
+            "--iic-c-preserved-capsule-staged-scope-contract-only",
+            "function verify_iicc_preserved_capsule_contract()",
+            "function verify_iicc_preserved_capsule_staged_scope()",
+            "ii-c-c preserved-capsule verifier gained authority",
+            "ii-c-c preserved-capsule verifier self-seal drifted",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "def open_preserved_gate(owner):",
+            "def revalidate_preserved_gate(gate, owner):",
+            "preserved Gate base inventory",
+            "preserved Gate capsule contract",
+        ] {
+            #expect(verifier.contains(marker), "missing: \(marker)")
+        }
+        #expect(contract.contains("struct InvestigationHistoricalGateCapsule"))
+        #expect(contract.contains("static func retainedV11() throws -> Self"))
+        #expect(capsule.contains("for preserved in preserving"))
+        #expect(capsule.contains(
+            "InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256"
+        ))
+        let evidenceTests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
+            encoding: .utf8)
+        #expect(evidenceTests.contains(
+            "independentVerifierBindsExactPreservedV11GateWhenOptedIn"
+        ))
+        #expect(evidenceTests.contains(
+            "independentVerifierRejectsAdmittingSchemaOneTeardown"
+        ))
+        #expect(verifier.contains("admitting preservation schema"))
+        for forbidden in [
+            "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+            "os.remove", "os.unlink", "os.rename", "os.mkdir",
+            "shutil", "SIGTERM", "SIGKILL",
+            "signedInvestigationRuntimeReady",
+        ] {
+            #expect(!verifier.contains(forbidden), "forbidden: \(forbidden)")
+        }
+        let aggregate = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "preserved-sha-bypass", "production-preservation-drop",
+            "teardown-preserved-count-zero",
+            "swift-evidence-preserved-sha-bypass", "verifier-gate-skip",
+            "producer-schema-downgrade",
+            "verifier-preserved-sha-bypass",
+        ] {
+            #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
     func iiCCFailureDispositionVerifierRemainsReadOnlyAndNonAdmitting() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -606,19 +676,20 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"2605eb6915170e7ff7bc69feb205ca92b9af1c60e03ad0933c7206bd8bd75f05\")",
-            "(Path(\"README.md\"), \"6eed7747b52fe37a00acc0780390c7e29fb2314946e078e9bdbd5fbcb97b7544\")",
-            "(Path(\"docs/README.md\"), \"4d0b73bdd6d25264fce4f7e1aa74c72e20a2c772a1dce85956dd3be6fea4f105\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"6f28b66956d3b2038ff294b20e78f84dcf411ef808dfbb7ddff6ebf1ed5f189c\")",
-            "(Path(\"docs/plans/active/README.md\"), \"19fc44141849e7af4977f6c0e067c82af8242a9a76ae4e2553c0fd7b8650ca32\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"d94a32483372a0dc3bd71b79f57dc677ee5532a611c5a98b9cec8ddffcecffe5\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"137b897793cbd6679de0e46366beb9de2a23869ab7a2ee953050479b5665b422\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"6152cfe6666410a51e7a00149179f3ca9443c5267be96fe27877752328716cd4\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"3198295f3bdd111cc3006dee8e0981767831e44497d8f0e8e42cd84470cc5e96\")",
+            "(Path(\"AGENTS.md\"), \"e12fd7f677b5a73944637d1b50944a6572fcaaad790868505adc934db30fb602\")",
+            "(Path(\"README.md\"), \"b68435392eda4f54fce59798514b29c84699ba92da81826a8c997c566fcda294\")",
+            "(Path(\"docs/README.md\"), \"59736745834739cf306d6d0f2305ade8ed5d693ea903ab448080c64960a2d258\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"4d6dc78e5bd6b920bda35b93a1c59ce87c977ad9840a6d47de59fe532c782608\")",
+            "(Path(\"docs/plans/active/README.md\"), \"327e90aa92730c68bcef1f712579a42d5f7f96a596e58f9cbc082ec74b3d057a\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"e768a3eede5a299f6a7e9ccbdf93c701b09193eb3ee4b67a782f9f45a48d50ac\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"b55f39b767b4143621ac42a039e688ae3820bc495c7a7d889e5876b7f858210c\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"092c2e3705ab45a3729915a8a55d793c07dba08c3f08bc930b9ed7725792cc51\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"6f13ca81ea05c8aa7142851dc89402811f618e2be495e919400f74bfcd93cc8c\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
-            "len(active_status_entries) != 12",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"27362f9b0e2e3288cb72f7c3146fce212ecc77d5b9856e3f2a92e68fdfb0208c\")",
+            "len(active_status_entries) != 13",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
             "ii-c-c blocked status docs inventory drifted",
@@ -626,7 +697,8 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c stale active frontier text admitted",
             "That v9-era status is historical",
             "were subsequently authorized and consumed",
-            "No machine campaign is currently authorized",
+            "suspended/unconsumed/rebind-required",
+            "Status: approved / suspended before launch / unconsumed / rebind required",
             "Task 40 start condition remains blocked",
         ]
         for marker in pinnedStatusDocs {

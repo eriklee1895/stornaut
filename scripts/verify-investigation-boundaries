@@ -357,6 +357,14 @@ iicc_suspended_sudo_contract_only=false
 iicc_suspended_sudo_sources=()
 iicc_failure_disposition_contract_only=false
 iicc_deadline_budget_contract_only=false
+iicc_preserved_capsule_contract_only=false
+iicc_preserved_capsule_mutation_contract_only=false
+iicc_preserved_capsule_mutation_name=
+iicc_preserved_capsule_mutation_slot=
+iicc_preserved_capsule_mutation_sha=
+iicc_preserved_capsule_sources=()
+iicc_preserved_capsule_scope_only=false
+iicc_preserved_capsule_scope_baseline=4fd9c539dbc2a7d9c659147c041712b945fa3b00
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -990,6 +998,21 @@ if (( $# > 0 )); then
     elif (( $# == 1 )) \
         && [[ $1 == --iic-c-deadline-budget-contract-only ]]; then
         iicc_deadline_budget_contract_only=true
+    elif (( $# == 1 || $# == 12 )) \
+        && [[ $1 == --iic-c-preserved-capsule-contract-only ]]; then
+        iicc_preserved_capsule_contract_only=true
+        iicc_preserved_capsule_sources=("${@:2}")
+    elif (( $# == 15 )) \
+        && [[ $1 == --iic-c-preserved-capsule-mutation-contract-only ]]; then
+        iicc_preserved_capsule_mutation_contract_only=true
+        iicc_preserved_capsule_mutation_name=$2
+        iicc_preserved_capsule_mutation_slot=$3
+        iicc_preserved_capsule_mutation_sha=$4
+        iicc_preserved_capsule_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-preserved-capsule-staged-scope-contract-only ]]; then
+        iicc_preserved_capsule_scope_only=true
+        iicc_preserved_capsule_scope_baseline=${2:-4fd9c539dbc2a7d9c659147c041712b945fa3b00}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -10798,7 +10821,7 @@ if len(mutations) != 51:
 expected = (
     "7d86510b67b92f8dd1e2773faca3f1faeccaeb113a1292fb91a17db5f4386613",
     "2ae5f50fd8d60135caf007096d171315d3fed228da10f6fbfff3bde1187a3dd5",
-    "23910d514135f5360cffe9ae3d0c3c3caf832aa9df8224cca486d4239a02e798",
+    "a1262163cab175fb707a772adda2bc1d68839b7c2b68f99e9710ca5df2182700",
     "7c52fc0d80edc6170b9e376aa54143b5c4fd1734f5bd465d76762b74d8980e83",
     "0de2813f9416833b1fd80c6d0a3ee78d0cb365fc3dfd961d031008dcbc7a412b",
 )
@@ -11814,7 +11837,7 @@ if executable.count(actor_end) != 1:
 actor_block = executable[executable.index(actor_marker):
                          executable.index(actor_end, executable.index(actor_marker)) + len('\n    }')]
 if hashlib.sha256(actor_block.encode()).hexdigest() != \
-        '94f0fc8a73596dbe6c693f5975d23da5c68df2d6bbb81c3f2924f3d28ff6330a':
+        '16654f4917423c11d334fec6aa1e5cbd386571332386232966b9d688383b5831':
     raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
 def require_body_digest(start, end, expected):
     if executable.count(start) != 1 or executable.count(end) != 1:
@@ -11914,7 +11937,7 @@ if executable.count(debug_end) != 1:
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 debug_executable = executable[:executable.index(debug_end)]
 if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-        '2ab9f885f5e8a1807c1250bf24c2015d71aa65a56797c975e810e1e0bf9d08d4':
+        '3deb098918bebe1410f4fb96f90db9b0d6a84cf09fdaabe0cb16398151bdab57':
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 authority_surface = active_executable
 for marker in allowed_sudo:
@@ -12603,7 +12626,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     actor_block = main[main.index(actor_marker):
                        main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
     if hashlib.sha256(actor_block.encode()).hexdigest() != \
-            '94f0fc8a73596dbe6c693f5975d23da5c68df2d6bbb81c3f2924f3d28ff6330a':
+            '16654f4917423c11d334fec6aa1e5cbd386571332386232966b9d688383b5831':
         raise SystemExit("ii-c-c lifecycle actor drifted")
     def require_body_digest(start, end, expected):
         if main.count(start) != 1 or main.count(end) != 1:
@@ -12638,7 +12661,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '2ab9f885f5e8a1807c1250bf24c2015d71aa65a56797c975e810e1e0bf9d08d4':
+            '3deb098918bebe1410f4fb96f90db9b0d6a84cf09fdaabe0cb16398151bdab57':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -13142,18 +13165,19 @@ for marker in (
     if marker not in v11_report_source:
         raise SystemExit("ii-c-c v11 failure disposition report drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "2605eb6915170e7ff7bc69feb205ca92b9af1c60e03ad0933c7206bd8bd75f05"),
-    (Path("README.md"), "6eed7747b52fe37a00acc0780390c7e29fb2314946e078e9bdbd5fbcb97b7544"),
-    (Path("docs/README.md"), "4d0b73bdd6d25264fce4f7e1aa74c72e20a2c772a1dce85956dd3be6fea4f105"),
-    (Path("docs/agent/coding-agent-handoff.md"), "6f28b66956d3b2038ff294b20e78f84dcf411ef808dfbb7ddff6ebf1ed5f189c"),
-    (Path("docs/plans/active/README.md"), "19fc44141849e7af4977f6c0e067c82af8242a9a76ae4e2553c0fd7b8650ca32"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "d94a32483372a0dc3bd71b79f57dc677ee5532a611c5a98b9cec8ddffcecffe5"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "137b897793cbd6679de0e46366beb9de2a23869ab7a2ee953050479b5665b422"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "6152cfe6666410a51e7a00149179f3ca9443c5267be96fe27877752328716cd4"),
-    (Path("docs/plans/roadmap.md"), "3198295f3bdd111cc3006dee8e0981767831e44497d8f0e8e42cd84470cc5e96"),
+    (Path("AGENTS.md"), "e12fd7f677b5a73944637d1b50944a6572fcaaad790868505adc934db30fb602"),
+    (Path("README.md"), "b68435392eda4f54fce59798514b29c84699ba92da81826a8c997c566fcda294"),
+    (Path("docs/README.md"), "59736745834739cf306d6d0f2305ade8ed5d693ea903ab448080c64960a2d258"),
+    (Path("docs/agent/coding-agent-handoff.md"), "4d6dc78e5bd6b920bda35b93a1c59ce87c977ad9840a6d47de59fe532c782608"),
+    (Path("docs/plans/active/README.md"), "327e90aa92730c68bcef1f712579a42d5f7f96a596e58f9cbc082ec74b3d057a"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "e768a3eede5a299f6a7e9ccbdf93c701b09193eb3ee4b67a782f9f45a48d50ac"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "b55f39b767b4143621ac42a039e688ae3820bc495c7a7d889e5876b7f858210c"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "092c2e3705ab45a3729915a8a55d793c07dba08c3f08bc930b9ed7725792cc51"),
+    (Path("docs/plans/roadmap.md"), "6f13ca81ea05c8aa7142851dc89402811f618e2be495e919400f74bfcd93cc8c"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"), "27362f9b0e2e3288cb72f7c3146fce212ecc77d5b9856e3f2a92e68fdfb0208c"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13168,9 +13192,10 @@ active_status_expected_paths = {
     Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"),
 }
 active_status_paths = [path for path, _ in active_status_entries]
-if (len(active_status_entries) != 12
+if (len(active_status_entries) != 13
         or len(set(active_status_paths)) != len(active_status_paths)
         or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
@@ -13183,27 +13208,39 @@ for active_path, expected_digest in active_status_entries:
 semantic_status = {
     Path("AGENTS.md"): (
         "v8 与 replacement v9", "v10", "v11",
-        "没有已授权 machine campaign", "Task 40 仍 blocked",
+        "fresh v12 machine campaign", "suspended / unconsumed /\n  rebind required",
+        "Task 40 仍 blocked",
     ),
     Path("docs/plans/active/README.md"): (
         "v8, v9, v10 and v11", "consumed/no-go records",
-        "post-arm diagnostic repair complete/non-admitting",
+        "bounded schema-v2 reason and remains non-admitting",
+        "approved one fresh v12 privileged campaign bound to `4fd9c53`, but",
+        "preflight suspended it before launch",
         "blocked on Task 39 under the approved sequential plan",
     ),
     Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
         "That v9-era status is historical",
         "v10 and v11", "were subsequently authorized and consumed",
-        "no machine campaign is currently authorized",
+        "fresh v12", "suspended/unconsumed",
+        "requires explicit rebind after preservation repair",
         "Task 40 remains blocked",
     ),
     Path("docs/plans/active/task-39-implementation-brief.md"): (
         "v8, v9, v10 and v11 are conclusive",
-        "A future privileged\n> campaign still requires fresh explicit authorization",
+        "fresh v12 machine\ncampaign approved against `4fd9c53`",
+        "suspended/unconsumed/rebind-required",
         "Task 40 start condition remains blocked",
     ),
     Path("docs/plans/active/task-40-implementation-brief.md"): (
         "v8, v9, v10 and v11", "do not satisfy",
+        "v12 authorization is suspended/unconsumed pending a preservation",
         "blocked on pushed Task 39 Ready baseline",
+    ),
+    Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"): (
+        "Status: approved / suspended before launch / unconsumed / rebind required",
+        "4fd9c539dbc2a7d9c659147c041712b945fa3b00",
+        "one fresh nonzero campaign UUID", "forbids automatic retry",
+        "Task 40 remains blocked",
     ),
 }
 for active_path, markers in semantic_status.items():
@@ -13216,12 +13253,13 @@ task39_status = " ".join(
     .read_text(encoding="utf-8")
     .split()
 )
-if "No machine campaign is currently authorized" not in task39_status:
+if "suspended/unconsumed/rebind-required" not in task39_status:
     raise SystemExit("ii-c-c current campaign authorization state drifted")
 for stale in (
     "1,400 秒 deadline-budget\n  repair 正在收口",
     "v9 is also consumed/non-retryable; the current frontier is the\nreviewed AMFI root-cause repair",
     "repair is green, but a new campaign has not been authorized",
+    "no machine campaign is currently authorized",
 ):
     if stale in "\n".join(path.read_text(encoding="utf-8") for path in (
         Path("AGENTS.md"),
@@ -13230,6 +13268,250 @@ for stale in (
     )):
         raise SystemExit("ii-c-c stale active frontier text admitted")
 PY
+}
+
+function verify_iicc_preserved_capsule_contract() {
+    local -a p=("${iicc_preserved_capsule_sources[@]}")
+    if (( ${#p} == 0 )); then p=(
+        Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+        Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-investigation-runtime-machine-report
+    ); fi
+    local contract=${p[1]} capsule=${p[2]} ownership=${p[3]} handoff=${p[4]}
+    local coordinator=${p[5]} campaign=${p[6]} evidence=${p[7]}
+    local capsule_tests=${p[8]} evidence_tests=${p[9]} boundary_tests=${p[10]}
+    local verifier=${p[11]}
+    local path
+    for path in $contract $capsule $ownership $handoff $coordinator $campaign \
+        $evidence $capsule_tests $evidence_tests $boundary_tests $verifier; do
+        [[ -f $path && ! -L $path ]] || {
+            print -u2 "ii-c-c preserved-capsule source unavailable: $path"
+            return 1
+        }
+    done
+    /bin/zsh -n $verifier || return $?
+    /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+        $contract $capsule $ownership $handoff $coordinator $campaign $evidence \
+        $capsule_tests $evidence_tests $boundary_tests || return $?
+    /usr/bin/python3 -I - "$iicc_preserved_capsule_mutation_contract_only" \
+        "$iicc_preserved_capsule_mutation_name" \
+        "$iicc_preserved_capsule_mutation_slot" \
+        "$iicc_preserved_capsule_mutation_sha" \
+        $contract $capsule $ownership $handoff $coordinator \
+        $campaign $evidence $capsule_tests $evidence_tests $boundary_tests \
+        $verifier <<'PY'
+from pathlib import Path
+import hashlib, re, sys
+mutation_mode, mutation_name, mutation_slot, mutation_sha = sys.argv[1:5]
+paths = tuple(map(Path, sys.argv[5:]))
+if len(paths) != 11:
+    raise SystemExit("ii-c-c preserved-capsule source cardinality drifted")
+sources = [path.read_text(encoding="utf-8") for path in paths]
+slots = ("contract","capsule","ownership","handoff","coordinator",
+    "campaign","evidence","capsule_tests","evidence_tests",
+    "boundary_tests","verifier")
+canonical_paths = tuple(map(Path, (
+    "Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift",
+    "Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift",
+    "Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift",
+    "Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift",
+    "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift",
+    "Sources/StornautInvestigationMachineCampaign/main.swift",
+    "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift",
+    "Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
+    "scripts/verify-investigation-runtime-machine-report",
+)))
+canonical = [path.read_text(encoding="utf-8") for path in canonical_paths]
+mutations = {
+    "preserved-sha-bypass": ("capsule",
+        "InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256",
+        "true"),
+    "production-preservation-drop": ("coordinator",
+        "preservedCapsules: [try .retainedV11()]",
+        "preservedCapsules: []"),
+    "teardown-preserved-count-zero": ("campaign",
+        '"preservedGateAttemptEntryCount":1',
+        '"preservedGateAttemptEntryCount":0'),
+    "swift-evidence-preserved-sha-bypass": ("evidence",
+        "== preserved.fileSHA256.lowercaseHex", "!= preserved.fileSHA256.lowercaseHex"),
+    "verifier-gate-skip": ("verifier",
+        'if values[11][0][1]["schemaVersion"] == 2:', "if False:"),
+    "producer-schema-downgrade": ("campaign",
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2',
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:1'),
+    "verifier-preserved-sha-bypass": ("verifier",
+        "and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,",
+        "and True,"),
+}
+if mutation_mode == "true":
+    if mutation_name not in mutations or mutation_slot not in slots \
+            or re.fullmatch(r"[0-9a-f]{64}", mutation_sha) is None:
+        raise SystemExit("ii-c-c preserved-capsule mutation contract drifted")
+    expected_slot, old, new = mutations[mutation_name]
+    index = slots.index(mutation_slot)
+    if mutation_slot != expected_slot or paths[index] == canonical_paths[index] \
+            or canonical[index].count(old) != 1 \
+            or sources[index] != canonical[index].replace(old, new, 1) \
+            or hashlib.sha256(paths[index].read_bytes()).hexdigest() != mutation_sha \
+            or any(sources[i] != canonical[i] for i in range(len(slots)) if i != index):
+        raise SystemExit("ii-c-c preserved-capsule unrecognized mutation")
+elif mutation_mode != "false" or mutation_name or mutation_slot or mutation_sha \
+        or paths != canonical_paths or sources != canonical:
+    raise SystemExit("ii-c-c preserved-capsule canonical source drifted")
+contract, capsule, ownership, handoff, coordinator, campaign, evidence, \
+capsule_tests, evidence_tests, boundary_tests, verifier = sources
+preserved = (
+    "18a85048-5e1c-40c5-99e4-3785185070d3",
+    "a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104",
+    "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72",
+)
+for marker in preserved:
+    if marker not in contract or marker not in verifier:
+        raise SystemExit("ii-c-c preserved-capsule identity drifted")
+required = {
+    "contract": ("struct InvestigationHistoricalGateCapsule",
+        "static func retainedV11() throws -> Self",
+        '"projected-cohort-" + wholeInputSHA256.lowercaseHex + ".bin"'),
+    "capsule": ("preserving: [InvestigationHistoricalGateCapsule]",
+        "Set(preserving.map(\\.attemptName)).isSubset(of: Set(entries))",
+        "for preserved in preserving",
+        "for plan in plans where preservationByAttempt[plan.attempt] == nil",
+        "try validatePreserved(plan, expected: preserved)",
+        "InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256"),
+    "ownership": ("preservedCapsules: [InvestigationHistoricalGateCapsule]",
+        "preservedCapsules: preservedCapsules"),
+    "handoff": ("preservedCapsules: [InvestigationHistoricalGateCapsule] = []",
+        "InvestigationOwnerOnlyCapsulePublisher("),
+    "coordinator": ("preservedCapsules: [try .retainedV11()]",),
+    "campaign": ("private struct GlobalObservation",
+        '"preservedGateAttemptEntryCount":1',
+        '"preservedGateCapsuleEntryCount":1',
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2',
+        "InvestigationProjectedCohortInput.decode(bytes)",
+        "decoded.wholeInputSHA256==preserved.wholeInputSHA256"),
+    "evidence": ("acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown",
+        '"preservedGateAttemptEntryCount"',
+        "InvestigationHistoricalGateCapsule.retainedV11()",
+        "== preserved.fileSHA256.lowercaseHex"),
+    "capsule_tests": ("exactHistoricalCapsuleIsPreservedWhileOtherStaleAndFreshNodesSettle",
+        "historicalCapsuleMismatchFailsBeforeCleanupOrPublication",
+        "historicalCapsuleDriftDuringOtherStaleCleanupBlocksFreshPublication",
+        "#expect(system.unlinkCalls.isEmpty)",
+        "#expect(system.createCalls.isEmpty)"),
+    "evidence_tests": ("globalTeardownV2AcceptsOnlyExactPreservedV11Capsule",
+        "independentVerifierRejectsAdmittingSchemaOneTeardown",
+        "independentVerifierBindsExactPreservedV11GateWhenOptedIn",
+        '"STORNAUT_TASK39_V11_GATE_BASE"',
+        "#expect(try Self.treeSnapshot(base) == before)"),
+    "boundary_tests": ("iiCCPreservedHistoricalGateCapsuleContractIsClosed",),
+    "verifier": ("def parse_projected_input(data):",
+        "def open_preserved_gate(owner):",
+        "def revalidate_preserved_gate(gate, owner):",
+        '"preserved Gate base inventory"',
+        '"preserved Gate capsule contract"',
+        "if admitting:",
+        '"admitting preservation schema"',
+        "and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,",
+        "revalidate_preserved_gate(preserved_gate, owner)"),
+}
+named = dict(zip(("contract","capsule","ownership","handoff",
+    "coordinator","campaign","evidence","capsule_tests",
+    "evidence_tests","boundary_tests","verifier"), sources))
+for slot, markers in required.items():
+    for marker in markers:
+        if named[slot].count(marker) < 1:
+            raise SystemExit("ii-c-c preserved-capsule contract drifted: " + marker)
+for forbidden in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+                  "os.remove", "os.unlink", "os.rename", "os.mkdir",
+                  "shutil", "SIGTERM", "SIGKILL",
+                  "signedInvestigationRuntimeReady"):
+    if forbidden in verifier:
+        raise SystemExit("ii-c-c preserved-capsule verifier gained authority: " + forbidden)
+normalized, count = re.subn(
+    r"(?m)^typeset -r iicc_self_sha=[0-9a-f]{64} # iicc-self-seal$",
+    "typeset -r iicc_self_sha=SELF # iicc-self-seal", verifier)
+match = re.search(
+    r"(?m)^typeset -r iicc_self_sha=([0-9a-f]{64}) # iicc-self-seal$",
+    verifier)
+if count != 1 or match is None or hashlib.sha256(normalized.encode()).hexdigest() \
+        != match.group(1):
+    raise SystemExit("ii-c-c preserved-capsule verifier self-seal drifted")
+PY
+}
+
+function verify_iicc_preserved_capsule_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-$iicc_preserved_capsule_scope_baseline}
+    local expected_baseline=4fd9c539dbc2a7d9c659147c041712b945fa3b00
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        $expected_baseline ]] || {
+        print -u2 "ii-c-c preserved-capsule baseline drifted"; return 1
+    }
+    local -A ceilings=(
+        Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift 160
+        Sources/StornautInvestigationMachineCampaign/main.swift 220
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift 160
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 20
+        Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift 60
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift 30
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift 220
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 360
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 160
+        Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift 260
+        scripts/verify-contract 240
+        scripts/verify-investigation-boundaries 700
+        scripts/verify-investigation-runtime-machine-report 320
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#expected} == 13 && ${#observed} == 13 )) \
+        && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "ii-c-c preserved-capsule paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md \
+            || $checkpoint_path == README.md ]] \
+            && continue
+        [[ $add != - && $delete != - ]] || {
+            print -u2 "ii-c-c preserved-capsule binary path rejected"; return 1
+        }
+        (( add + delete <= ceilings[$checkpoint_path] )) || {
+            print -u2 "ii-c-c preserved-capsule path budget drifted: $checkpoint_path"
+            return 1
+        }
+        (( total += add + delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 2400 )) || {
+        print -u2 "ii-c-c preserved-capsule aggregate budget drifted"; return 1
+    }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "ii-c-c preserved-capsule index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" == \
+            "$(git hash-object -- "$checkpoint_path")" ]] || {
+            print -u2 "ii-c-c preserved-capsule staged source drifted: $checkpoint_path"
+            return 1
+        }
+    done
 }
 
 function verify_iicc_staged_scope() {
@@ -18105,6 +18387,18 @@ if $iicc_deadline_budget_contract_only; then
     print "ii-c-c deadline budget contract verification passed."
     exit 0
 fi
+if $iicc_preserved_capsule_contract_only \
+    || $iicc_preserved_capsule_mutation_contract_only; then
+    verify_iicc_preserved_capsule_contract
+    print "ii-c-c preserved-capsule contract verification passed."
+    exit 0
+fi
+if $iicc_preserved_capsule_scope_only; then
+    verify_iicc_preserved_capsule_staged_scope \
+        "$iicc_preserved_capsule_scope_baseline"
+    print "ii-c-c preserved-capsule staged scope verification passed."
+    exit 0
+fi
 if $iicc_scope_contract_only; then
     verify_iicc_staged_scope "$iicc_scope_baseline"
     print "ii-c-c staged scope verification passed."
@@ -18366,6 +18660,7 @@ verify_iicc_source_contract
 verify_iicc_deadline_budget_contract
 verify_iicc_suspended_sudo_contract
 verify_iicc_failure_disposition_contract
+verify_iicc_preserved_capsule_contract
 verify_iib5biib_app_identity_contract \
     Package.swift \
     Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c \

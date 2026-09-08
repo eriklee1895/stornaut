@@ -1,5 +1,58 @@
 import Foundation
 
+package struct InvestigationHistoricalGateCapsule: Sendable, Equatable {
+    package let outerAttemptUUID: UUID
+    package let wholeInputSHA256: InvestigationHandoffSHA256
+    package let byteCount: Int64
+    package let fileSHA256: InvestigationHandoffSHA256
+
+    package init(
+        outerAttemptUUID: UUID,
+        wholeInputSHA256: InvestigationHandoffSHA256,
+        byteCount: Int64,
+        fileSHA256: InvestigationHandoffSHA256
+    ) throws {
+        guard
+            outerAttemptUUID.uuidString.lowercased()
+                != "00000000-0000-0000-0000-000000000000",
+            byteCount > 0,
+            byteCount <= Int64(InvestigationProjectedCohortInput.maximumByteCount),
+            wholeInputSHA256.rawBytes.contains(where: { $0 != 0 }),
+            fileSHA256.rawBytes.contains(where: { $0 != 0 })
+        else {
+            throw InvestigationHandoffContractError.invalidValue
+        }
+        self.outerAttemptUUID = outerAttemptUUID
+        self.wholeInputSHA256 = wholeInputSHA256
+        self.byteCount = byteCount
+        self.fileSHA256 = fileSHA256
+    }
+
+    package var attemptName: String {
+        "attempt-" + outerAttemptUUID.uuidString.lowercased()
+    }
+
+    package var capsuleName: String {
+        "projected-cohort-" + wholeInputSHA256.lowercaseHex + ".bin"
+    }
+
+    package static func retainedV11() throws -> Self {
+        guard let attempt = UUID(
+            uuidString: "18a85048-5e1c-40c5-99e4-3785185070d3"
+        ) else {
+            throw InvestigationHandoffContractError.invalidValue
+        }
+        return try Self(
+            outerAttemptUUID: attempt,
+            wholeInputSHA256: .init(lowercaseHex:
+                "a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104"),
+            byteCount: 28_997,
+            fileSHA256: .init(lowercaseHex:
+                "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72")
+        )
+    }
+}
+
 package struct InvestigationProjectedCohortSelection:
     Sendable,
     Equatable

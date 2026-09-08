@@ -5,7 +5,13 @@ import StornautInvestigationMachineGateSupport
 
 #if DEBUG
 extension InvestigationFixedGateHandoff {
-    package convenience init() { self.init(system: DarwinInvestigationFixedGateHandoffSystem()) }
+    package convenience init(
+        preservedCapsules: [InvestigationHistoricalGateCapsule] = []
+    ) throws {
+        self.init(system: try DarwinInvestigationFixedGateHandoffSystem(
+            preservedCapsules: preservedCapsules
+        ))
+    }
 }
 
 enum InvestigationFixedGateDarwinProjectionStage: Sendable {
@@ -22,13 +28,21 @@ enum InvestigationFixedGateDarwinProjectionStage: Sendable {
 
 private final class DarwinInvestigationFixedGateHandoffSystem: @unchecked Sendable, InvestigationFixedGateHandoffSystem {
     private typealias Stage = InvestigationFixedGateDarwinProjectionStage
-    private let publisher = InvestigationOwnerOnlyCapsulePublisher()
+    private let publisher: InvestigationOwnerOnlyCapsulePublisher
     private let lifecycle = InvestigationFixedGateDarwinLifecycle(system: DarwinInvestigationFixedGateLifecycleSystem())
     private var stage = Stage.initial
     private var lease: InvestigationOwnerOnlyCapsuleLease?
     private var replay: InvestigationFixedGateDarwinLifecycleReplay?
     private var exactProof: InvestigationOwnerOnlyCapsuleExactGateReapedProof?
     private var neverProof: InvestigationOwnerOnlyCapsuleNeverHandedOffProof?
+
+    init(
+        preservedCapsules: [InvestigationHistoricalGateCapsule]
+    ) throws {
+        publisher = InvestigationOwnerOnlyCapsulePublisher(
+            preservedCapsules: preservedCapsules
+        )
+    }
 
     func perform(_ operation: InvestigationFixedGateHandoffOperation) throws -> InvestigationFixedGateHandoffResponse {
         switch operation {

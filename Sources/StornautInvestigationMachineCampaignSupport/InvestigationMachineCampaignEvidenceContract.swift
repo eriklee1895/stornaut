@@ -724,8 +724,13 @@ package enum InvestigationMachineEvidenceJSON {
         campaignUUID: UUID, attemptUUID: UUID,
         sourceBinding: InvestigationMachineCampaignSourceBinding
     ) throws {
-        try exactCommon(object, role: roleName(role), campaignUUID: campaignUUID,
-            attemptUUID: attemptUUID)
+        let acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown
+            ? [schemaVersion, 2] : [schemaVersion]
+        try exactCommon(
+            object, role: roleName(role), campaignUUID: campaignUUID,
+            attemptUUID: attemptUUID,
+            acceptedSchemaVersions: acceptedSchemaVersions
+        )
         switch role {
         case .sourceBuildIdentity:
             try exact(object, commonKeys.union([
@@ -877,24 +882,52 @@ package enum InvestigationMachineEvidenceJSON {
                     .allSatisfy({ boolean(object, $0) == true })
             else { throw invalid() }
         case .globalPostTeardown:
-            try exact(object, commonKeys.union([
+            let processCounts = [
+                "appProcessCount", "helperProcessCount", "driverProcessCount",
+                "gateProcessCount", "coordinatorProcessCount", "childCount",
+                "descendantCount", "openChannelCount",
+                "ownedProcessGroupMemberCount", "gateAttemptEntryCount",
+                "gateCapsuleEntryCount",
+            ]
+            var keys = commonKeys.union([
                 "observationReceiptSHA256", "appProcessCount",
                 "helperProcessCount", "driverProcessCount", "gateProcessCount",
                 "coordinatorProcessCount", "childCount", "descendantCount",
                 "openChannelCount", "ownedProcessGroupMemberCount",
                 "serviceAbsent", "gateOwnerLockRevalidated",
                 "gateAttemptEntryCount", "gateCapsuleEntryCount",
-            ]))
+            ])
+            if integer(object, "schemaVersion") == 2 {
+                keys.formUnion([
+                    "preservedGateAttemptEntryCount",
+                    "preservedGateCapsuleEntryCount",
+                    "preservedGateAttemptUUID",
+                    "preservedGateWholeInputSHA256",
+                    "preservedGateCapsuleByteCount",
+                    "preservedGateCapsuleSHA256",
+                ])
+            }
+            try exact(object, keys)
             guard digest(object, "observationReceiptSHA256") != nil,
-                  ["appProcessCount", "helperProcessCount", "driverProcessCount",
-                   "gateProcessCount", "coordinatorProcessCount", "childCount",
-                   "descendantCount", "openChannelCount",
-                   "ownedProcessGroupMemberCount", "gateAttemptEntryCount",
-                   "gateCapsuleEntryCount"]
-                    .allSatisfy({ integer(object, $0) == 0 }),
+                  processCounts.allSatisfy({ integer(object, $0) == 0 }),
                   boolean(object, "serviceAbsent") == true,
                   boolean(object, "gateOwnerLockRevalidated") == true
             else { throw invalid() }
+            if integer(object, "schemaVersion") == 2 {
+                let preserved = try InvestigationHistoricalGateCapsule.retainedV11()
+                guard
+                    integer(object, "preservedGateAttemptEntryCount") == 1,
+                    integer(object, "preservedGateCapsuleEntryCount") == 1,
+                    uuid(object, "preservedGateAttemptUUID")
+                        == preserved.outerAttemptUUID,
+                    digest(object, "preservedGateWholeInputSHA256")
+                        == preserved.wholeInputSHA256.lowercaseHex,
+                    integer(object, "preservedGateCapsuleByteCount")
+                        == Int(preserved.byteCount),
+                    digest(object, "preservedGateCapsuleSHA256")
+                        == preserved.fileSHA256.lowercaseHex
+                else { throw invalid() }
+            }
         case .verifierInput:
             try exact(object, commonKeys.union([
                 "expectedConsumed", "expectedEpochCount", "evidenceSetSHA256",
@@ -1104,9 +1137,10 @@ package enum InvestigationMachineEvidenceJSON {
     }
     private static func exactCommon(
         _ value: [String: Any], role: String, campaignUUID: UUID,
-        attemptUUID: UUID
+        attemptUUID: UUID, acceptedSchemaVersions: Set<Int>? = nil
     ) throws {
-        guard integer(value, "schemaVersion") == schemaVersion,
+        guard let version = integer(value, "schemaVersion"),
+              (acceptedSchemaVersions ?? [schemaVersion]).contains(version),
               string(value, "role") == role,
               uuid(value, "campaignUUID") == campaignUUID,
               uuid(value, "attemptUUID") == attemptUUID

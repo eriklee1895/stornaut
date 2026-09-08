@@ -35,8 +35,9 @@ Trash, Registered Actions or a second Policy/Executor path.
 Task 40 starts after Tasks 36–39 are independently committed and pushed. The
 Task 39 blocked/no-go disposition does not satisfy that sequential prerequisite;
 the consumed/non-admitting v8, v9, v10 and v11 campaigns also do not satisfy it.
-The completed non-admitting deadline and post-arm diagnostic repairs still require a newly authorized
-replacement campaign before Task 39 can produce and push a Ready baseline.
+The first v12 authorization is suspended/unconsumed pending a preservation
+repair and explicit rebind; Task 40 remains blocked until the rebound campaign
+and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
 Inputs are:
 
 - one persisted Task 37 immutable partial/final Investigation report;

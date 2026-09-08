@@ -304,6 +304,58 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(InvestigationMachineEvidenceRole.attemptEvent.allowsMultiple)
     }
 
+    @Test
+    func globalTeardownV2AcceptsOnlyExactPreservedV11Capsule() throws {
+        let fixture = try CampaignEvidenceFixture.make()
+        let path = try InvestigationMachineEvidenceRelativePath(
+            phase: .verifier, leafName: "global-post-teardown.json"
+        )
+        let exact = try Self.globalTeardownV2(
+            campaignUUID: fixture.campaignUUID,
+            attemptUUID: fixture.attemptUUID
+        )
+        try InvestigationMachineEvidenceJSON.validate(
+            InvestigationMachineEvidenceJSON.canonicalData(exact),
+            role: .globalPostTeardown, path: path,
+            campaignUUID: fixture.campaignUUID,
+            attemptUUID: fixture.attemptUUID,
+            sourceBinding: fixture.sourceBinding
+        )
+
+        var mutations: [[String: Any]] = []
+        for (key, value) in [
+            ("preservedGateAttemptEntryCount", 0 as Any),
+            ("preservedGateCapsuleEntryCount", 0 as Any),
+            ("preservedGateAttemptUUID", UUID().uuidString.lowercased() as Any),
+            ("preservedGateWholeInputSHA256", Self.digest(0xe1).lowercaseHex as Any),
+            ("preservedGateCapsuleByteCount", 28_998 as Any),
+            ("preservedGateCapsuleSHA256", Self.digest(0xe2).lowercaseHex as Any),
+            ("schemaVersion", 3 as Any),
+        ] {
+            var mutation = exact
+            mutation[key] = value
+            mutations.append(mutation)
+        }
+        var missing = exact
+        missing.removeValue(forKey: "preservedGateCapsuleSHA256")
+        mutations.append(missing)
+        var unknown = exact
+        unknown["preservedGateUnknown"] = true
+        mutations.append(unknown)
+
+        for mutation in mutations {
+            let bytes = try InvestigationMachineEvidenceJSON.canonicalData(mutation)
+            #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
+                try InvestigationMachineEvidenceJSON.validate(
+                    bytes, role: .globalPostTeardown, path: path,
+                    campaignUUID: fixture.campaignUUID,
+                    attemptUUID: fixture.attemptUUID,
+                    sourceBinding: fixture.sourceBinding
+                )
+            }
+        }
+    }
+
     @Test(arguments: [
         "", ".", "..", "/absolute", "upper.JSON", "two/parts",
         "two\\parts", "trailing-", ".hidden", "manifest.bin",
@@ -2496,13 +2548,46 @@ struct InvestigationMachineCampaignEvidenceTests {
     func independentVerifierAdmitsOnlyCompletePairedPrefix(
         _ epochCount: Int
     ) throws {
-        let result = try privilegedVerifierResult(epochCount: epochCount)
+        let result = try privilegedVerifierResult(
+            epochCount: epochCount, preservedGlobal: epochCount == 8
+        )
         if epochCount == 8 {
             #expect(result.status == 0, Comment(rawValue: result.stderr))
         } else {
             #expect(result.status != 0)
             #expect(result.stderr.contains("non-admitting"))
         }
+    }
+
+    @Test
+    func independentVerifierRejectsAdmittingSchemaOneTeardown() throws {
+        let result = try privilegedVerifierResult(
+            epochCount: 8, preservedGlobal: false,
+            sealName: "legacy-schema-one-admitting-seal.json"
+        )
+        #expect(result.status != 0)
+        #expect(result.stderr.contains("admitting preservation schema"))
+    }
+
+    @Test
+    func independentVerifierBindsExactPreservedV11GateWhenOptedIn() throws {
+        guard let rawBase = ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V11_GATE_BASE"
+        ] else { return }
+        let expectedBase = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path:
+                "Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+        let base = URL(filePath: rawBase, directoryHint: .isDirectory)
+        try #require(base.path == expectedBase.path)
+        let before = try Self.treeSnapshot(base)
+
+        let result = try privilegedVerifierResult(
+            preservedGlobal: true, sealName: "preserved-v11-gate-seal.json"
+        )
+
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(result.stdout == "stornaut ii-c machine evidence verified\n")
+        #expect(try Self.treeSnapshot(base) == before)
     }
 
     @Test
@@ -2549,6 +2634,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         epochSemanticMutation: CampaignEpochSemanticMutation? = nil,
         joinMutation: CampaignVerifierJoinMutation? = nil,
         diagnosticMutation: CampaignDiagnosticMutation? = nil,
+        preservedGlobal: Bool = false,
         sealName: String = "seal.json") throws -> CampaignVerifierResult {
         let fixture = try CampaignEvidenceDiskFixture.make()
         defer { fixture.remove() }
@@ -2558,13 +2644,15 @@ struct InvestigationMachineCampaignEvidenceTests {
         return try privilegedVerifierResult(
             fixture: fixture, transport: transport, epochCount: epochCount,
             semanticForgery: semanticForgery, promptVerifierForgery: promptVerifierForgery,
-            joinMutation: joinMutation, sealName: sealName)
+            joinMutation: joinMutation, preservedGlobal: preservedGlobal,
+            sealName: sealName)
     }
 
     private func privilegedVerifierResult(fixture: CampaignEvidenceDiskFixture,
         transport: CampaignPrivilegedTransport, epochCount: Int = 8,
         semanticForgery: Bool = false, promptVerifierForgery: Bool = false,
         joinMutation: CampaignVerifierJoinMutation? = nil,
+        preservedGlobal: Bool = false,
         sealName: String = "seal.json") throws -> CampaignVerifierResult {
         let writer = try fixture.makeWriter(mode: .privileged)
         for (index, kind) in [
@@ -2578,7 +2666,8 @@ struct InvestigationMachineCampaignEvidenceTests {
         try fixture.populatePrivilegedArtifacts(
             writer, epochCount: epochCount, semanticForgery: semanticForgery,
             promptVerifierForgery: promptVerifierForgery,
-            joinMutation: joinMutation, transport: transport)
+            joinMutation: joinMutation, transport: transport,
+            preservedGlobal: preservedGlobal)
         var seal = try writer.finalize()
         if epochCount == 8 {
             seal = try fixture.completePrivilegedCorpus(
@@ -2725,6 +2814,32 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     fileprivate static func zeroDigest() throws -> InvestigationHandoffSHA256 {
         try .init(rawBytes: Data(repeating: 0, count: 32))
+    }
+
+    private static func globalTeardownV2(
+        campaignUUID: UUID, attemptUUID: UUID
+    ) throws -> [String: Any] {
+        let preserved = try InvestigationHistoricalGateCapsule.retainedV11()
+        return [
+            "schemaVersion": 2, "role": "globalPostTeardown",
+            "campaignUUID": campaignUUID.uuidString.lowercased(),
+            "attemptUUID": attemptUUID.uuidString.lowercased(),
+            "observationReceiptSHA256": digest(0xd3).lowercaseHex,
+            "appProcessCount": 0, "helperProcessCount": 0,
+            "driverProcessCount": 0, "gateProcessCount": 0,
+            "coordinatorProcessCount": 0, "childCount": 0,
+            "descendantCount": 0, "openChannelCount": 0,
+            "ownedProcessGroupMemberCount": 0, "serviceAbsent": true,
+            "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0,
+            "gateCapsuleEntryCount": 0, "preservedGateAttemptEntryCount": 1,
+            "preservedGateCapsuleEntryCount": 1,
+            "preservedGateAttemptUUID":
+                preserved.outerAttemptUUID.uuidString.lowercased(),
+            "preservedGateWholeInputSHA256":
+                preserved.wholeInputSHA256.lowercaseHex,
+            "preservedGateCapsuleByteCount": Int(preserved.byteCount),
+            "preservedGateCapsuleSHA256": preserved.fileSHA256.lowercaseHex,
+        ]
     }
 
     private static func runVerifier(
@@ -3950,7 +4065,8 @@ private final class CampaignEvidenceDiskFixture {
         promptVerifierForgery: Bool = false,
         epochSemanticMutation: CampaignEpochSemanticMutation? = nil,
         joinMutation: CampaignVerifierJoinMutation? = nil,
-        transport suppliedTransport: CampaignPrivilegedTransport? = nil
+        transport suppliedTransport: CampaignPrivilegedTransport? = nil,
+        preservedGlobal: Bool = false
     ) throws {
         let transport = try suppliedTransport ?? privilegedTransport(
             joinMutation: joinMutation,
@@ -3961,7 +4077,8 @@ private final class CampaignEvidenceDiskFixture {
             cancellationAttestation: promptVerifierForgery,
             preArmFrameSHA256: joinMutation == .sourcePreArm
                 ? InvestigationMachineCampaignEvidenceTests.digest(0xee)
-                : transport.preArmFrameSHA256)
+                : transport.preArmFrameSHA256,
+            preservedGlobal: preservedGlobal)
         if epochCount == 8 {
             values.insert(contentsOf: [
                 (.driverEpochs, "coordinator-receipt.bin", .protocolReceipt,
@@ -4130,7 +4247,7 @@ private final class CampaignEvidenceDiskFixture {
 
     private typealias Artifact = (InvestigationMachineEvidencePhase, String, InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)
 
-    private func commonArtifacts(expectedConsumed: Bool, epochCount: Int, cancellationAttestation: Bool, preArmFrameSHA256: InvestigationHandoffSHA256? = nil) throws -> [Artifact] {
+    private func commonArtifacts(expectedConsumed: Bool, epochCount: Int, cancellationAttestation: Bool, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, preservedGlobal: Bool = false) throws -> [Artifact] {
         try [
             (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, typed(.sourceBuildIdentity, preArmFrameSHA256: preArmFrameSHA256)),
             (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, typed(.builtStagingInstalledIdentity)),
@@ -4138,7 +4255,7 @@ private final class CampaignEvidenceDiskFixture {
             (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, typed(.humanPromptAttestation, cancellationAttestation: cancellationAttestation)),
             (.authorization, "capability-counts.json", .noAuthModelNetworkCounters, .strictJSON, typed(.noAuthModelNetworkCounters)),
             (.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, typed(.uninstallEvidence)),
-            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, typed(.globalPostTeardown)),
+            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, typed(.globalPostTeardown, preservedGlobal: preservedGlobal)),
             (.verifier, "verification-input.json", .verifierInput, .strictJSON, typed(.verifierInput, ordinal: epochCount, expectedConsumed: expectedConsumed)),
         ]
     }
@@ -4319,7 +4436,7 @@ private final class CampaignEvidenceDiskFixture {
     }
     private func framed(_ bytes: Data) -> Data { handoffData(UInt32(bytes.count)) + bytes }
 
-    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, installedL2Proof: Data? = nil, claimEvidenceSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil, terminalEvidence: Data? = nil, helperIdentitySHA256: InvestigationHandoffSHA256? = nil, completionBindingSHA256: InvestigationHandoffSHA256? = nil) throws -> Data {
+    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, installedL2Proof: Data? = nil, claimEvidenceSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil, terminalEvidence: Data? = nil, helperIdentitySHA256: InvestigationHandoffSHA256? = nil, completionBindingSHA256: InvestigationHandoffSHA256? = nil, preservedGlobal: Bool = false) throws -> Data {
         let digest = InvestigationMachineCampaignEvidenceTests.digest
         let hex: (UInt8) -> String = { digest($0).lowercaseHex }
         var value: [String: Any] = ["schemaVersion": 1, "role": roleName(role), "campaignUUID": campaignUUID.uuidString.lowercased(), "attemptUUID": attemptUUID.uuidString.lowercased()]
@@ -4345,7 +4462,20 @@ private final class CampaignEvidenceDiskFixture {
         case .uninstallEvidence:
             fields = ["transactionReceiptSHA256": hex(0xd2), "installedIdentitySHA256": hex(0x65), "plistSHA256": hex(0x67), "appExecutableSHA256": hex(0x71), "helperExecutableSHA256": hex(0x72), "machineDriverExecutableSHA256": hex(0x73), "gateExecutableSHA256": hex(0x74), "coordinatorExecutableSHA256": hex(0xe5), "bootoutCompleted": true, "installedRootRemoved": true, "installedAppRemoved": true, "plistRemoved": true, "runtimeRootRemoved": true, "leaseRootRemoved": true]
         case .globalPostTeardown:
-            fields = ["observationReceiptSHA256": hex(0xd3), "appProcessCount": 0, "helperProcessCount": 0, "driverProcessCount": 0, "gateProcessCount": 0, "coordinatorProcessCount": 0, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "serviceAbsent": true, "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0, "gateCapsuleEntryCount": 0]
+            var teardown: [String: Any] = ["observationReceiptSHA256": hex(0xd3), "appProcessCount": 0, "helperProcessCount": 0, "driverProcessCount": 0, "gateProcessCount": 0, "coordinatorProcessCount": 0, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "serviceAbsent": true, "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0, "gateCapsuleEntryCount": 0]
+            if preservedGlobal {
+                let preserved = try InvestigationHistoricalGateCapsule.retainedV11()
+                value["schemaVersion"] = 2
+                teardown.merge([
+                    "preservedGateAttemptEntryCount": 1,
+                    "preservedGateCapsuleEntryCount": 1,
+                    "preservedGateAttemptUUID": preserved.outerAttemptUUID.uuidString.lowercased(),
+                    "preservedGateWholeInputSHA256": preserved.wholeInputSHA256.lowercaseHex,
+                    "preservedGateCapsuleByteCount": Int(preserved.byteCount),
+                    "preservedGateCapsuleSHA256": preserved.fileSHA256.lowercaseHex,
+                ]) { _, new in new }
+            }
+            fields = teardown
         case .verifierInput:
             let verifier = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appending(path: "scripts/verify-investigation-runtime-machine-report")
             fields = ["expectedConsumed": expectedConsumed, "expectedEpochCount": ordinal, "evidenceSetSHA256": hex(0xd1), "verifierExecutableSHA256": InvestigationHandoffSHA256.hashing(try Data(contentsOf: verifier)).lowercaseHex]

@@ -251,26 +251,33 @@ final class InvestigationOwnerOnlyCapsuleSettlementToken: @unchecked Sendable {
 package struct InvestigationOwnerOnlyCapsulePublisher: Sendable {
     private let acquirer: InvestigationMachineGateOwnershipAcquirer
     private let borrower: (any InvestigationOwnerOnlyCapsuleBorrowing)?
+    private let preservedCapsules: [InvestigationHistoricalGateCapsule]
 
-    package init() {
+    package init(
+        preservedCapsules: [InvestigationHistoricalGateCapsule] = []
+    ) {
         acquirer = InvestigationMachineGateOwnershipAcquirer()
         borrower = nil
+        self.preservedCapsules = preservedCapsules
     }
 
     init(borrower: any InvestigationOwnerOnlyCapsuleBorrowing) {
         acquirer = InvestigationMachineGateOwnershipAcquirer()
         self.borrower = borrower
+        preservedCapsules = []
     }
 
     init(
         ownershipSystem: any InvestigationMachineGateOwnershipSystem,
         capsuleSystem: any InvestigationOwnerOnlyCapsuleSystem,
-        borrower: (any InvestigationOwnerOnlyCapsuleBorrowing)? = nil
+        borrower: (any InvestigationOwnerOnlyCapsuleBorrowing)? = nil,
+        preservedCapsules: [InvestigationHistoricalGateCapsule] = []
     ) {
         acquirer = InvestigationMachineGateOwnershipAcquirer(
             ownershipSystem: ownershipSystem, capsuleSystem: capsuleSystem
         )
         self.borrower = borrower
+        self.preservedCapsules = preservedCapsules
     }
 
     package func publish(_ bytes: Data) throws
@@ -287,7 +294,9 @@ package struct InvestigationOwnerOnlyCapsulePublisher: Sendable {
         } catch {
             throw InvestigationOwnerOnlyCapsuleError.ownershipUncertain(.none)
         }
-        return try owner.publishCanonicalCapsule(request, borrower: borrower)
+        return try owner.publishCanonicalCapsule(
+            request, borrower: borrower, preservedCapsules: preservedCapsules
+        )
     }
 }
 
@@ -391,6 +400,7 @@ enum InvestigationOwnerOnlyCapsulePublication {
         _ request: InvestigationOwnerOnlyCapsulePublicationRequest,
         baseDescriptor: Int32,
         baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        preservedCapsules: [InvestigationHistoricalGateCapsule],
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws -> InvestigationOwnerOnlyCapsuleVerifiedReader {
         var ledger = InvestigationOwnerOnlyCapsuleDescriptorLedger()
@@ -404,7 +414,8 @@ enum InvestigationOwnerOnlyCapsulePublication {
             }
             try InvestigationOwnerOnlyCapsuleSettlement.recoverStale(
                 inventory: inventory, baseDescriptor: baseDescriptor,
-                baseMetadata: baseMetadata, system: system
+                baseMetadata: baseMetadata, preserving: preservedCapsules,
+                excluding: request.outerAttemptUUID, system: system
             )
 
             do {
@@ -936,12 +947,15 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
         inventory: InvestigationOwnerOnlyCapsuleInventory,
         baseDescriptor: Int32,
         baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        preserving: [InvestigationHistoricalGateCapsule],
+        excluding freshAttemptUUID: UUID,
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws {
         do {
             try recoverStaleValidated(
                 inventory: inventory, baseDescriptor: baseDescriptor,
-                baseMetadata: baseMetadata, system: system
+                baseMetadata: baseMetadata, preserving: preserving,
+                excluding: freshAttemptUUID, system: system
             )
         } catch let value as SettlementFailure {
             throw InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
@@ -955,6 +969,8 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
         inventory: InvestigationOwnerOnlyCapsuleInventory,
         baseDescriptor: Int32,
         baseMetadata: InvestigationMachineGateMetadataSnapshot,
+        preserving: [InvestigationHistoricalGateCapsule],
+        excluding freshAttemptUUID: UUID,
         system: any InvestigationOwnerOnlyCapsuleSystem
     ) throws {
         guard inventory.reachedEnd else {
@@ -979,6 +995,15 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
         guard entries.allSatisfy(
             InvestigationOwnerOnlyCapsulePublication.isAttemptName
         ) else {
+            throw InvestigationOwnerOnlyCapsuleError.staleInventory(
+                entries.sorted()
+            )
+        }
+        let preservedAttempts = preserving.map(\.outerAttemptUUID)
+        guard Set(preservedAttempts).count == preserving.count,
+              !preservedAttempts.contains(freshAttemptUUID),
+              Set(preserving.map(\.attemptName)).isSubset(of: Set(entries))
+        else {
             throw InvestigationOwnerOnlyCapsuleError.staleInventory(
                 entries.sorted()
             )
@@ -1017,7 +1042,20 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
                 )
             }
         }
-        for plan in plans {
+        let preservationByAttempt = Dictionary(
+            uniqueKeysWithValues: preserving.map { ($0.attemptName, $0) }
+        )
+        for preserved in preserving {
+            guard let plan = plans.first(where: {
+                $0.attempt == preserved.attemptName
+            }) else {
+                throw failure(.classifyStale, .stale(
+                    entries: entries.sorted(), observationComplete: true
+                ))
+            }
+            try validatePreserved(plan, expected: preserved)
+        }
+        for plan in plans where preservationByAttempt[plan.attempt] == nil {
             do {
                 try remove(
                     plan, baseDescriptor: baseDescriptor,
@@ -1051,6 +1089,31 @@ enum InvestigationOwnerOnlyCapsuleSettlement {
                     system: system
                 )
             )
+        }
+        for preserved in preserving {
+            let plan = try classify(
+                attempt: preserved.attemptName, baseDescriptor: baseDescriptor,
+                baseMetadata: baseMetadata, system: system
+            )
+            try validatePreserved(plan, expected: preserved)
+        }
+    }
+
+    private static func validatePreserved(
+        _ plan: StalePlan, expected: InvestigationHistoricalGateCapsule
+    ) throws {
+        let residue = InvestigationOwnerOnlyCapsuleResidue.stale(
+            entries: [plan.attempt], observationComplete: true
+        )
+        guard
+            plan.attempt == expected.attemptName,
+            let file = plan.file,
+            file.name == expected.capsuleName,
+            file.metadata.size == expected.byteCount,
+            file.digest == expected.wholeInputSHA256,
+            InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256
+        else {
+            throw failure(.classifyStale, residue)
         }
     }
 

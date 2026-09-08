@@ -8,8 +8,10 @@
 >
 > Historical status note: this audit closed the v8 result. The user later
 > authorized one fresh replacement v9 and, after v9's consumed no-go, one
-> independent v10 campaign. Task 39 remains incomplete and Task 40 remains
-> blocked.
+> independent v10 campaign; v11 also ran and failed. A fresh v12 campaign bound
+> to `4fd9c53` was suspended before launch and remains unconsumed/rebind-required.
+> Task 39 remains incomplete
+> and Task 40 remains blocked.
 
 ## Outcome
 

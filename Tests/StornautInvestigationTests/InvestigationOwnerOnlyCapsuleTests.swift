@@ -592,6 +592,177 @@ struct InvestigationOwnerOnlyCapsuleTests {
         _ = try lease.finishWithoutHandoff()
     }
 
+    @Test
+    func exactHistoricalCapsuleIsPreservedWhileOtherStaleAndFreshNodesSettle() throws {
+        let historicalBytes = try canonicalProjectedInput(
+            outerAttemptUUID: capsuleUUID(0xfe)
+        ).encoded()
+        let historicalRequest = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: historicalBytes
+        )
+        let historical = try InvestigationHistoricalGateCapsule(
+            outerAttemptUUID: historicalRequest.outerAttemptUUID,
+            wholeInputSHA256: historicalRequest.wholeInputSHA256,
+            byteCount: Int64(historicalBytes.count),
+            fileSHA256: .hashing(historicalBytes)
+        )
+        let stale = "attempt-00000000-0000-0000-0000-0000000000fd"
+        let freshBytes = try canonicalProjectedInput().encoded()
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: freshBytes, inventory: .init(
+                entries: [fixedLockName, historical.attemptName, stale],
+                reachedEnd: true
+            )
+        )
+        system.staleLeaves[historical.attemptName] = .final(
+            historical.capsuleName
+        )
+        system.staleBytes[historical.attemptName] = historicalBytes
+        system.staleLeaves[stale] = .empty
+
+        let lease = try InvestigationOwnerOnlyCapsulePublisher(
+            ownershipSystem: ownership, capsuleSystem: system,
+            preservedCapsules: [historical]
+        ).publish(freshBytes)
+
+        #expect(system.recoveredAttemptNames == [stale])
+        #expect(system.baseInventory.contains(historical.attemptName))
+        #expect(!system.unlinkCalls.contains { $0.name == historical.capsuleName })
+        let proof = try lease.finishWithoutHandoff()
+        #expect(try lease.settle(neverHandedOff: proof) == .removed)
+        #expect(system.baseInventory == [fixedLockName, historical.attemptName].sorted())
+    }
+
+    @Test
+    func historicalCapsuleMismatchFailsBeforeCleanupOrPublication() throws {
+        let historicalBytes = try canonicalProjectedInput(
+            outerAttemptUUID: capsuleUUID(0xfe)
+        ).encoded()
+        let historicalRequest = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: historicalBytes
+        )
+        let freshBytes = try canonicalProjectedInput().encoded()
+        let historical = try InvestigationHistoricalGateCapsule(
+            outerAttemptUUID: historicalRequest.outerAttemptUUID,
+            wholeInputSHA256: historicalRequest.wholeInputSHA256,
+            byteCount: Int64(historicalBytes.count),
+            fileSHA256: InvestigationHandoffSHA256.hashing(Data("wrong".utf8))
+        )
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: freshBytes, inventory: .init(
+                entries: [fixedLockName, historical.attemptName],
+                reachedEnd: true
+            )
+        )
+        system.staleLeaves[historical.attemptName] = .final(
+            historical.capsuleName
+        )
+        system.staleBytes[historical.attemptName] = historicalBytes
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+            stage: .classifyStale, residue: .stale(
+                entries: [historical.attemptName], observationComplete: true
+            ), closeFailures: []
+        )) {
+            _ = try InvestigationOwnerOnlyCapsulePublisher(
+                ownershipSystem: ownership, capsuleSystem: system,
+                preservedCapsules: [historical]
+            ).publish(freshBytes)
+        }
+        #expect(system.unlinkCalls.isEmpty)
+        #expect(system.removeDirectoryCalls.isEmpty)
+        #expect(system.createCalls.isEmpty)
+        #expect(system.baseInventory.contains(historical.attemptName))
+    }
+
+    @Test
+    func missingOrDuplicateHistoricalContractFailsBeforeMutation() throws {
+        let historicalBytes = try canonicalProjectedInput(
+            outerAttemptUUID: capsuleUUID(0xfe)
+        ).encoded()
+        let historicalRequest = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: historicalBytes
+        )
+        let historical = try InvestigationHistoricalGateCapsule(
+            outerAttemptUUID: historicalRequest.outerAttemptUUID,
+            wholeInputSHA256: historicalRequest.wholeInputSHA256,
+            byteCount: Int64(historicalBytes.count),
+            fileSHA256: .hashing(historicalBytes)
+        )
+        for (entries, preserving) in [
+            ([fixedLockName], [historical]),
+            ([fixedLockName, historical.attemptName], [historical, historical]),
+        ] {
+            let ownership = CapsuleOwnershipSystem()
+            let system = CapsuleSemanticSystem(
+                bytes: try canonicalProjectedInput().encoded(),
+                inventory: .init(entries: entries, reachedEnd: true)
+            )
+            system.staleLeaves[historical.attemptName] = .final(
+                historical.capsuleName
+            )
+            system.staleBytes[historical.attemptName] = historicalBytes
+            #expect(throws: InvestigationOwnerOnlyCapsuleError.staleInventory(
+                entries.filter { $0 != fixedLockName }.sorted()
+            )) {
+                _ = try InvestigationOwnerOnlyCapsulePublisher(
+                    ownershipSystem: ownership, capsuleSystem: system,
+                    preservedCapsules: preserving
+                ).publish(try canonicalProjectedInput().encoded())
+            }
+            #expect(system.unlinkCalls.isEmpty)
+            #expect(system.removeDirectoryCalls.isEmpty)
+            #expect(system.createCalls.isEmpty)
+        }
+    }
+
+    @Test
+    func historicalCapsuleDriftDuringOtherStaleCleanupBlocksFreshPublication() throws {
+        let historicalBytes = try canonicalProjectedInput(
+            outerAttemptUUID: capsuleUUID(0xfe)
+        ).encoded()
+        let historicalRequest = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: historicalBytes
+        )
+        let historical = try InvestigationHistoricalGateCapsule(
+            outerAttemptUUID: historicalRequest.outerAttemptUUID,
+            wholeInputSHA256: historicalRequest.wholeInputSHA256,
+            byteCount: Int64(historicalBytes.count),
+            fileSHA256: .hashing(historicalBytes)
+        )
+        let stale = "attempt-00000000-0000-0000-0000-0000000000fd"
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: try canonicalProjectedInput().encoded(),
+            inventory: .init(
+                entries: [fixedLockName, historical.attemptName, stale],
+                reachedEnd: true
+            )
+        )
+        system.staleLeaves[historical.attemptName] = .final(
+            historical.capsuleName
+        )
+        system.staleBytes[historical.attemptName] = historicalBytes
+        system.staleLeaves[stale] = .empty
+        system.driftAttemptBytesAfterRemoval = historical.attemptName
+
+        #expect(throws: InvestigationOwnerOnlyCapsuleError.staleRecoveryFailed(
+            stage: .classifyStale, residue: .stale(
+                entries: [historical.attemptName], observationComplete: true
+            ), closeFailures: []
+        )) {
+            _ = try InvestigationOwnerOnlyCapsulePublisher(
+                ownershipSystem: ownership, capsuleSystem: system,
+                preservedCapsules: [historical]
+            ).publish(try canonicalProjectedInput().encoded())
+        }
+        #expect(system.recoveredAttemptNames == [stale])
+        #expect(system.createCalls.isEmpty)
+        #expect(system.baseInventory.contains(historical.attemptName))
+    }
+
     @Test(arguments: CapsuleRecoverableStaleLeaf.allCases)
     fileprivate func validStalePayloadRecoversBeforeFreshPublication(
         _ value: CapsuleRecoverableStaleLeaf
@@ -1682,10 +1853,12 @@ private final class CapsuleSemanticSystem:
     var unlinkCount = 0
     var closeErrorDescriptors: Set<Int32> = []
     var staleLeaves: [String: CapsuleStaleLeaf] = [:]
+    var staleBytes: [String: Data] = [:]
     private var additionalLeafNames: [String: Set<String>] = [:]
     var unlinkCalls: [CapsuleUnlinkCall] = []
     var removeDirectoryCalls: [CapsuleUnlinkCall] = []
     var recoveredAttemptNames: [String] = []
+    var baseInventory: [String] { baseEntries.sorted() }
     var monotonicValues: [UInt64] = [1_000_000]
     var failNextMonotonic = false
     var monotonicValueAfterBusyUnlink: UInt64?
@@ -1698,6 +1871,7 @@ private final class CapsuleSemanticSystem:
     var failNextBaseSync = false
     var armBaseSyncFailureAfterDirectoryRemoval = false
     var directoryRetryDrift: CapsuleDirectoryRetryDrift?
+    var driftAttemptBytesAfterRemoval: String?
     var failAttemptOpenAtCount: [String: Int] = [:]
     private var nextDescriptor: Int32 = 30
     private var roles: [Int32: Int] = [15: 0]
@@ -1824,7 +1998,11 @@ private final class CapsuleSemanticSystem:
             ? (mode == nil ? 3 : 2)
             : name.hasPrefix("projected-cohort-") ? 3 : 1
         nameByDescriptor[value] = name
-        if name.hasPrefix("attempt-") { attemptByDescriptor[value] = name }
+        if name.hasPrefix("attempt-") {
+            attemptByDescriptor[value] = name
+        } else if let attempt = attemptByDescriptor[parentDescriptor] {
+            attemptByDescriptor[value] = attempt
+        }
         return value
     }
 
@@ -1846,6 +2024,7 @@ private final class CapsuleSemanticSystem:
             if failure == .postReadMetadataDrift && finalMetadataCount == 2 {
                 return file(inode: 99)
             }
+            return file(size: bytesForDescriptor(descriptor).count)
         }
         if role == 1 {
             let containsLeaf = attemptByDescriptor[descriptor]
@@ -1883,6 +2062,9 @@ private final class CapsuleSemanticSystem:
             }
             if failure == .finalSymlink { return file(type: .other) }
             if failure == .finalHardLink { return file(linkCount: 2) }
+            let size = attemptByDescriptor[parentDescriptor]
+                .flatMap { staleBytes[$0] }?.count
+            return file(size: size)
         }
         if name.hasPrefix("attempt-") {
             return directory(
@@ -1972,14 +2154,15 @@ private final class CapsuleSemanticSystem:
         if failure == .interruptedReadLimit {
             throw InvestigationOwnerOnlyCapsuleSystemError.errno(EINTR)
         }
-        if offset == Int64(bytes.count) {
+        let source = bytesForDescriptor(descriptor)
+        if offset == Int64(source.count) {
             return failure == .trailingByte ? Data([0xff]) : Data()
         }
         if failure == .shortRead { return Data() }
         let start = Int(offset)
         let scripted: Int? = if case .count(let count) = result { count } else { nil }
-        let count = min(scripted ?? maximumByteCount, maximumByteCount, bytes.count - start)
-        var output = Data(bytes[start..<(start + count)])
+        let count = min(scripted ?? maximumByteCount, maximumByteCount, source.count - start)
+        var output = Data(source[start..<(start + count)])
         if failure == .digestMismatch && start == 0 { output[0] ^= 0xff }
         return output
     }
@@ -2035,6 +2218,9 @@ private final class CapsuleSemanticSystem:
                 baseEntries.removeAll { $0 == name }
                 if armBaseSyncFailureAfterDirectoryRemoval {
                     failNextBaseSync = true
+                }
+                if let driftAttemptBytesAfterRemoval {
+                    staleBytes[driftAttemptBytesAfterRemoval] = Data("drift".utf8)
                 }
             }
         } else {
@@ -2109,10 +2295,14 @@ private final class CapsuleSemanticSystem:
             break
         }
     }
+    private func bytesForDescriptor(_ descriptor: Int32) -> Data {
+        attemptByDescriptor[descriptor].flatMap { staleBytes[$0] } ?? bytes
+    }
+
     private func file(
         inode: UInt64 = 12,
         type: InvestigationMachineGateFileType = .regularFile,
-        linkCount: UInt64 = 1
+        linkCount: UInt64 = 1, size: Int? = nil
     )
         -> InvestigationMachineGateMetadataSnapshot
     {
@@ -2120,16 +2310,18 @@ private final class CapsuleSemanticSystem:
             device: 1, inode: inode, generation: generation, fileType: type,
             ownerUID: 501, ownerGID: 20, permissions: 0o600,
             linkCount: linkCount,
-            size: Int64(bytes.count), flags: 0)
+            size: Int64(size ?? bytes.count), flags: 0)
     }
     private var systemError: InvestigationOwnerOnlyCapsuleSystemError { .errno(EIO) }
 }
 
 private let fixedLockName = InvestigationMachineGateOwnershipAcquirer.lockName
 
-private func canonicalProjectedInput() throws -> InvestigationProjectedCohortInput {
+private func canonicalProjectedInput(
+    outerAttemptUUID: UUID = capsuleUUID(1)
+) throws -> InvestigationProjectedCohortInput {
     let capsule = try InvestigationCohortCapsule(
-        outerAttemptUUID: capsuleUUID(1),
+        outerAttemptUUID: outerAttemptUUID,
         epochs: try (0..<8).map { value in
             let configuration = Data("configuration-\(value)".utf8)
             return try InvestigationCohortEpoch(

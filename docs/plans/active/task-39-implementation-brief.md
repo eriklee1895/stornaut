@@ -10,6 +10,10 @@
 > checked disposition is `consumedPostArmFailureUnclassified`; the successor
 > source now emits a closed schema-v2 projection of primary failure, exact wait,
 > receipt/terminal EOF and cleanup bits. That repair is non-admitting.
+> The user approved one fresh v12 privileged campaign bound to pushed baseline
+> `4fd9c53`; preflight suspended it before launch because mandatory stale
+> recovery would remove the retained v11 Gate capsule. It remains unconsumed and
+> must be rebound after the preservation repair is pushed.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -206,8 +210,9 @@
 > deadline-budget defect, and v11 exposed a separate post-arm failure-detail
 > projection gap. The v11 bytes do not justify a credential, sudo, Gate,
 > protocol or transport root-cause claim. The successor closed projection and
-> independent verifier compatibility are implemented. A future privileged
-> campaign still requires fresh explicit authorization. Task 39 is
+> independent verifier compatibility are implemented. One fresh v12 privileged
+> campaign approved against `4fd9c53` is suspended/unconsumed/rebind-required
+> pending the preservation repair. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential
@@ -1546,9 +1551,10 @@ complete/non-admitting; ii-c-b2b and resolved-lineage L1/L2 implementation are
 complete/non-admitting; L2 final verifier review returned no finding. The
 historical pre-v8 order was ii-c-c → L3c3d → L3c4. v8–v11 are consumed, failed
 and non-retryable. The AMFI and deadline repairs are historical and complete;
-the post-arm diagnostic repair is complete/non-admitting. No machine campaign
-is currently authorized. Any replacement requires fresh authorization and only
-a green cohort may continue to L3c3d → L3c4. These repairs are
+the post-arm diagnostic repair is complete/non-admitting. The fresh v12 machine
+campaign approved against `4fd9c53` is suspended/unconsumed/rebind-required
+pending the preservation repair; only a green rebound cohort may continue to
+L3c3d → L3c4. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the
 [shared-deadline audit](../../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)
