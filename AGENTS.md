@@ -434,13 +434,19 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   两者只读 disposition 均完成。后续 serial validation 暴露历史 physical
   fixture 错误触发 production stale-recovery，v9 Gate capsule 实体已被移除且
   无精确副本可恢复；原 v2 receipt、九份 campaign evidence、v3 predecessor 与
-  当前 v5 receipt 均保留，不能把后续 v10 residue 解释为 v9 成功清理。fixture 已改为显式
+  before-v11 与当前 v5 receipts 均保留，不能把后续 v10/v11 residue 解释为
+  v9 成功清理。fixture 已改为显式
   opt-in 并在 discovery/entry 双重拒绝历史 attempt。唯一 1,932-test/99-suite
   serial 记录 1 个 missing-attempt issue 且未重跑；v3/fixture exact cases 随后
   通过。v9 的 AMFI `-423` root cause 已 tests-first 修复并以 `05fd0cd`
   推送；fresh v10 privileged campaign 随后在 durable arm 后耗尽 1,200 秒
   outer deadline，已消费、non-admitting 且不可重试。其只读 disposition 与
-  1,400 秒 bounded deadline repair 已完成非提权验收并保持 non-admitting；当前
+  1,400 秒 bounded deadline repair 已完成非提权验收并保持 non-admitting；
+  v11 从 `8a286ea` 执行，在 durable arm 后约 16.259 秒记录
+  `spawnUncertain → terminal` 并以 70 退出。其 legacy generic reason
+  不足以判定 credential/sudo/Gate/protocol/transport 根因，已只读固化为
+  `consumedPostArmFailureUnclassified`、non-admitting/non-retryable；
+  后继 schema-v2 closed diagnostic projection 已完成并通过 focused tests。当前
   machine frontier 为 fresh authorization → replacement campaign → L3c3d → L3c4。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
@@ -505,7 +511,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   self-sealed 只读 verifier 固化为 non-admitting/non-retryable；replacement v9
   后续也在 `armedConsumed` 后因 AMFI `-423` 终止并只读固化，修复已通过
   非提权 gates；v10 又因 outer deadline exhaustion 消费失败且不可重试，
-  1,400 秒 deadline-budget repair 已完成/non-admitting。Task 39 当前
+  1,400 秒 deadline-budget repair 已完成/non-admitting；v11 又以 legacy
+  generic post-arm reason 消费失败，后继 schema-v2 diagnostic repair 已完成/
+  non-admitting。Task 39 当前
   active/incomplete，L3c3d/L3c4 未证明。这些
   repairs 是 machine-campaign
   prerequisite checkpoints，不是递归命名的新 Task；后续
@@ -670,6 +678,9 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
 | Phase D Task 39B2c ii-c-c v9 replacement campaign authorization | [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) |
 | Phase D Task 39B2c ii-c-c v9 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md) |
 | Phase D Task 39B2c ii-c-c v10 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v11 replacement campaign authorization | [docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md) |
+| Phase D Task 39B2c ii-c-c v11 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v11 failure closure review | [docs/reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md](docs/reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md) |
 | Phase D Task 39 blocked/no-go gate audit | [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) |
 | Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
 | Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |

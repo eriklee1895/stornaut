@@ -8,10 +8,11 @@
 >
 > Frozen attempt: `b856e976-e74a-4f6d-9079-0d6859fab67d`
 >
-> Historical status note: the user later authorized one independent v10
-> campaign; this does not alter or permit reuse of any v9 evidence.
-> The current v5 receipt preserves the byte-identical v3 receipt and binds the
-> later v10 Gate residue without treating it as v9 success evidence.
+> Historical status note: the user later authorized independent v10 and v11
+> campaigns; neither alters or permits reuse of any v9 evidence.
+> The before-v11 v5 receipt preserves the byte-identical v3 receipt and binds
+> the later v10 Gate residue. The current v5 receipt binds the current v11 Gate
+> residue without treating either later campaign as v9 success evidence.
 
 ## Result
 
@@ -100,9 +101,11 @@ owner-lock-only: it contains only the owner lock and v10's preserved consumed
 attempt. The byte-identical v3 receipt is retained as
 `task-39-iic-v9-failure-disposition-before-v10.json` at SHA-256
 `f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac`.
-The current v5 receipt binds that predecessor and v10's current attempt/capsule;
-the repository boundary gate separately pins v10's checked disposition. v10
-residue is explicitly not evidence of v9 cleanup or success.
+The byte-identical before-v11 v5 receipt binds that predecessor and v10's
+then-current attempt/capsule. After v11 publication removed the v10 Gate
+attempt, the current v5 receipt binds v11's current attempt/capsule and chains
+through the before-v11 receipt. Neither later residue is evidence of v9 cleanup
+or success.
 
 The physical fixture is now opt-in only and performs a discovery-time check
 plus a second check immediately before `fixture.run(.success)` that the fixed
@@ -132,12 +135,13 @@ where the fixed Gate base did not exist, the v1 observation produced `absent`
 instead of the closed receipt state `ownAttemptAbsent`. The verifier now
 normalizes a missing Gate base only for v1 and rejects that condition for
 residue-bearing profiles. The current v5 receipt preserves the v2/v3 chain and
-binds the later v10 attempt without treating v10 residue as v9 evidence. The
+binds the later v11 attempt without treating v11 residue as v9 evidence. The
 frozen v9-v2 receipt remains byte-identical at SHA-256
 `9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252`.
 
-This source repair is non-admitting. The separately authorized v10 campaign is
-also consumed/non-admitting/non-retryable after deadline exhaustion. Until a
+This source repair is non-admitting. The separately authorized v10 and v11
+campaigns are also consumed/non-admitting/non-retryable. v10 exhausted its
+deadline; v11 retains only a legacy generic post-arm reason. Until a
 newly authorized replacement succeeds, L3c3d/L3c4 remain unproven, the authoritative
 full verifier remains reserved, Task 39 remains incomplete, Task 40 stays
 blocked and production Deep Dive remains unavailable.

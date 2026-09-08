@@ -945,7 +945,9 @@ package enum InvestigationMachineEvidenceJSON {
             base.union(["processID", "processGroupID", "sessionID"])
         }
         try exact(object, keys)
-        guard integer(object, "schemaVersion") == schemaVersion,
+        let payloadSchema = integer(object, "schemaVersion")
+        guard payloadSchema == schemaVersion
+                || kind == .spawnUncertain && payloadSchema == 2,
               string(object, "kind") == eventName(kind),
               uuid(object, "attemptUUID") == attemptUUID,
               digest(object, "evidenceSetSHA256") != nil
@@ -959,7 +961,55 @@ package enum InvestigationMachineEvidenceJSON {
         if kind == .cancelledBeforeArm || kind == .spawnUncertain {
             guard let reason = string(object, "reason"), !reason.isEmpty,
                   reason.utf8.count <= 96 else { throw invalid() }
+            if kind == .spawnUncertain, payloadSchema == 2 {
+                let fields = reason.split(
+                    separator: "/", omittingEmptySubsequences: false
+                ).map(String.init)
+                let primary = Set([
+                    "alreadyConsumed", "bindingInvalid", "deadlineExceeded",
+                    "spawnUncertain", "identityMismatch", "receiptInvalid",
+                    "diagnosticOverflow", "childTerminated",
+                    "exactReapUncertain", "residueUncertain",
+                    "transportUncertain", "cancelled", "unexpectedResponse",
+                ])
+                guard fields.count == 6,
+                      fields[0] == "postArmFailure",
+                      primary.contains(fields[1]),
+                      validWaitReason(fields[2]),
+                      ["receipt-open", "receipt-eof"].contains(fields[3]),
+                      ["terminal-open", "terminal-eof"].contains(fields[4]),
+                      validCleanupReason(fields[5])
+                else { throw invalid() }
+            }
         }
+    }
+
+    private static func validWaitReason(_ value: String) -> Bool {
+        if value == "wait-unavailable" { return true }
+        let variants = [
+            (prefix: "exited-", range: 0...255),
+            (prefix: "signaled-", range: 1...31),
+            (prefix: "stopped-", range: 1...31),
+        ]
+        guard let variant = variants.first(where: { value.hasPrefix($0.prefix) })
+        else { return false }
+        let suffix = value.dropFirst(variant.prefix.count)
+        guard !suffix.isEmpty,
+              suffix.utf8.allSatisfy({ (48...57).contains($0) }),
+              let number = Int(suffix)
+        else { return false }
+        return String(number) == suffix && variant.range.contains(number)
+    }
+
+    private static func validCleanupReason(_ value: String) -> Bool {
+        guard value.utf8.count == 10, value.hasPrefix("cleanup-") else {
+            return false
+        }
+        guard value.dropFirst(8).utf8.allSatisfy({
+            (48...57).contains($0) || (97...102).contains($0)
+        }), let mask = UInt8(value.dropFirst(8), radix: 16)
+        else { return false }
+        return mask & ~0x1f == 0
     }
 
     private static let commonKeys: Set<String> = [

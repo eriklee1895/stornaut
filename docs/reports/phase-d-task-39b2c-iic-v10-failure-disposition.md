@@ -17,6 +17,11 @@ The attempt is classified as `consumedCampaignDeadlineExhaustion`. It is
 non-admitting and non-retryable. It provides no machine admission, no L3c3d
 authenticated model success and no Task 39 readiness claim.
 
+The later independent v11 campaign does not alter or permit reuse of v10. The
+current disposition preserves the byte-identical before-v11 receipt and binds
+the currently preserved v11 Gate residue without treating it as v10 success
+evidence.
+
 ## Root-cause evidence
 
 The durable arm event was recorded at UTC microsecond

@@ -630,18 +630,79 @@ package struct InvestigationMachineCampaignHarnessFailureResult:
     package let verifiedPreArmFailure:
         InvestigationMachineCampaignPreArmFailureFrame?
     package let exactWait: InvestigationMachineCampaignExactWait?
+    package let receiptReachedEOF: Bool
+    package let terminalReachedEOF: Bool
 
     package init(
         primary: InvestigationMachineCampaignHarnessFailure,
         cleanupIssues: [InvestigationMachineCampaignCleanupIssue],
         verifiedPreArmFailure:
             InvestigationMachineCampaignPreArmFailureFrame? = nil,
-        exactWait: InvestigationMachineCampaignExactWait? = nil
+        exactWait: InvestigationMachineCampaignExactWait? = nil,
+        receiptReachedEOF: Bool = false,
+        terminalReachedEOF: Bool = false
     ) {
         self.primary = primary
         self.cleanupIssues = cleanupIssues
         self.verifiedPreArmFailure = verifiedPreArmFailure
         self.exactWait = exactWait
+        self.receiptReachedEOF = receiptReachedEOF
+        self.terminalReachedEOF = terminalReachedEOF
+    }
+
+    package var postArmEvidenceReason: String {
+        Self.postArmEvidenceReason(
+            primary: primary, exactWait: exactWait,
+            receiptReachedEOF: receiptReachedEOF,
+            terminalReachedEOF: terminalReachedEOF,
+            cleanupIssues: cleanupIssues
+        )
+    }
+
+    package static func postArmEvidenceReason(
+        primary: InvestigationMachineCampaignHarnessFailure,
+        exactWait: InvestigationMachineCampaignExactWait?,
+        receiptReachedEOF: Bool, terminalReachedEOF: Bool,
+        cleanupIssues: [InvestigationMachineCampaignCleanupIssue]
+    ) -> String {
+        let primaryName: String = switch primary {
+        case .alreadyConsumed: "alreadyConsumed"
+        case .bindingInvalid: "bindingInvalid"
+        case .deadlineExceeded: "deadlineExceeded"
+        case .spawnUncertain: "spawnUncertain"
+        case .identityMismatch: "identityMismatch"
+        case .receiptInvalid: "receiptInvalid"
+        case .diagnosticOverflow: "diagnosticOverflow"
+        case .childTerminated: "childTerminated"
+        case .exactReapUncertain: "exactReapUncertain"
+        case .residueUncertain: "residueUncertain"
+        case .transportUncertain: "transportUncertain"
+        case .cancelled: "cancelled"
+        case .unexpectedResponse: "unexpectedResponse"
+        }
+        let waitName: String = switch exactWait {
+        case .exited(let status): "exited-\(status)"
+        case .signaled(let signal): "signaled-\(signal)"
+        case .stopped(let signal): "stopped-\(signal)"
+        case nil: "wait-unavailable"
+        }
+        var cleanupMask: UInt8 = 0
+        for issue in cleanupIssues {
+            let bit: UInt8 = switch issue {
+            case .identityObservationFailed: 1 << 0
+            case .terminateFailed: 1 << 1
+            case .waitFailed: 1 << 2
+            case .closeFailed: 1 << 3
+            case .residueObservationFailed: 1 << 4
+            }
+            cleanupMask |= bit
+        }
+        return [
+            "postArmFailure", primaryName, waitName,
+            receiptReachedEOF ? "receipt-eof" : "receipt-open",
+            terminalReachedEOF ? "terminal-eof" : "terminal-open",
+            String(format: "cleanup-%02x", cleanupMask),
+        ].joined(separator: "/")
     }
 }
 
@@ -1136,7 +1197,8 @@ package actor InvestigationMachineCampaignHarness {
         if let primary {
             return .failed(.init(
                 primary: primary, cleanupIssues: cleanupIssues,
-                exactWait: exactWait
+                exactWait: exactWait, receiptReachedEOF: receiptEOF,
+                terminalReachedEOF: terminalEOF
             ))
         }
         if let preArmFailure {

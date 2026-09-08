@@ -340,9 +340,22 @@ package enum InvestigationMachineCampaignExecutable {
                                 observedAt: try nextEvidenceTime())
                             admitting = true
                         } else {
+                            let reason = switch outcome {
+                            case .failed(let failure):
+                                failure.postArmEvidenceReason
+                            case .completed(let result):
+                                InvestigationMachineCampaignHarnessFailureResult
+                                    .postArmEvidenceReason(
+                                        primary: .unexpectedResponse,
+                                        exactWait: result.exactWait,
+                                        receiptReachedEOF: result.receiptReachedEOF,
+                                        terminalReachedEOF: result.terminalReachedEOF,
+                                        cleanupIssues: []
+                                    )
+                            }
                             _ = try writer.appendAttemptEvent(kind: .spawnUncertain,
                                 payload: try event(.spawnUncertain, preArm: preArm,
-                                    reason: "campaign-incomplete"),
+                                    reason: reason),
                                 observedAt: try nextEvidenceTime())
                         }
                         if !transportLoss {
@@ -739,7 +752,9 @@ package enum InvestigationMachineCampaignExecutable {
         private func event(_ kind: InvestigationMachineAttemptEventKind,
             preArm: InvestigationMachineCampaignPreArmFrame,
             reason: String? = nil) throws -> Data {
-            var value: [String: Any] = ["schemaVersion":1,"kind":eventName(kind),
+            var value: [String: Any] = [
+                "schemaVersion": kind == .spawnUncertain ? 2 : 1,
+                "kind":eventName(kind),
                 "attemptUUID":preArm.outerAttemptUUID.uuidString.lowercased(),
                 "evidenceSetSHA256":preArm.frameSHA256.lowercaseHex]
             if kind == .cancelledBeforeArm || kind == .spawnUncertain {

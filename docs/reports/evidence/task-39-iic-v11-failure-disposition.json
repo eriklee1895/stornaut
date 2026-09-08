@@ -1,0 +1,96 @@
+{
+  "admission" : "rejected",
+  "artifactSHA256" : {
+    "01-preflight/source-build.json" : "f242f26f6e99a023d279fa66afc06c5a024246081768447a6499d45ac0fe7e10",
+    "02-install/installed.json" : "7610a694a811155c3452b831ec335c51c1335cb64f48c1b8e5b38cc6b17d9088",
+    "03-authorization/attempt-event-0001.bin" : "744fc894fb17c74b9a59d5efcb5f845900f0eb9ebfbcf6d6c8db3fa1dba4cfc6",
+    "03-authorization/attempt-event-0002.bin" : "c65a0e0158c674f90599b184d69ab9b479edcaa1f9b0553782e8537c0675e65d",
+    "03-authorization/attempt-event-0003.bin" : "47b3609d71478df213d03581453475128e8431449a4556b1abe4598afda842b3",
+    "03-authorization/attempt-event-0004.bin" : "01d8b097bbf3300ea56175aeb4bc2512c6e534ac9d30e916a520e9c0e4acf8f8",
+    "03-authorization/capability-counts.json" : "253c41a6d330dbbdad82b208c321deb8b421c7b8f0a672c57a10da1682b1a496",
+    "03-authorization/human-attestation.json" : "2bac5ad60f92518b432ff04d5fd9f4bc8f4c07e7f1c1c6e9f3745d0e5df958a4",
+    "03-authorization/policy-probe.json" : "8fdc2d3705b520c9bebcc39c22734b1ce95b97dc885d3208dd5d39c75ca7e133"
+  },
+  "attemptUUID" : "18a85048-5e1c-40c5-99e4-3785185070d3",
+  "campaignUUID" : "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
+  "classification" : "consumedPostArmFailureUnclassified",
+  "domain" : "stornaut.task39.iic.failure-disposition.v6",
+  "eventChain" : [
+    "prepared",
+    "armedConsumed",
+    "spawnUncertain",
+    "terminal"
+  ],
+  "evidenceSetSHA256" : "16b7bb9131fd900840ab380c9cab80e14e39283f9c34f2017db08129e7331639",
+  "nonClaims" : [
+    "no manifest or external seal",
+    "no uninstall or global post-teardown artifact",
+    "no machine admission",
+    "no L3c3d authenticated model success",
+    "no Task 39 readiness",
+    "no exact failure classification",
+    "no credential validity conclusion"
+  ],
+  "parentIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "517412359",
+    "size" : "96"
+  },
+  "requiredMissingArtifacts" : [
+    "manifest.bin",
+    "../seal.json",
+    "04-driver-epochs/coordinator-receipt.bin",
+    "04-driver-epochs/diagnostic-output.bin",
+    "05-uninstall/uninstall.json",
+    "06-verifier/global-post-teardown.json",
+    "06-verifier/verification-input.json"
+  ],
+  "retry" : "forbidden",
+  "rootCauseObservation" : {
+    "armedConsumedObservedAtUTCMicroseconds" : "1788835011400828",
+    "campaignExitStatus" : 70,
+    "credentialRetainedByteCount" : 0,
+    "driverEpochArtifactCount" : 0,
+    "elapsedAfterArmMicroseconds" : "16258704",
+    "exactWaitClassification" : "unavailableInLegacyEvidence",
+    "humanActionObserved" : true,
+    "machinePromptObserved" : true,
+    "reason" : "legacyGenericPostArmFailureProjection",
+    "receiptEOFObservation" : "unavailableInLegacyEvidence",
+    "source" : "durableAttemptTimelineAndBoundedArtifacts",
+    "spawnUncertainObservedAtUTCMicroseconds" : "1788835027659532",
+    "terminalEOFObservation" : "unavailableInLegacyEvidence",
+    "terminalObservedAtUTCMicroseconds" : "1788835027662832"
+  },
+  "rootIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "517412360",
+    "size" : "256"
+  },
+  "schemaVersion" : 6,
+  "sourceBinding" : {
+    "attemptUUID" : "18a85048-5e1c-40c5-99e4-3785185070d3",
+    "buildProvenanceSHA256" : "241c8dd0b5c64ca63645abea47d9bf7569c906b33ae448ca2c6db1b939df3665",
+    "campaignUUID" : "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
+    "canonicalSourceManifestSHA256" : "55f2f7041106b241742c6eb8878ba95ec163e9d0391b6c1053afb1a19f821c76",
+    "preArmFrameSHA256" : "16b7bb9131fd900840ab380c9cab80e14e39283f9c34f2017db08129e7331639",
+    "repositoryHEAD" : "8a286ea41d73b0874c6775cc6f79736f972782fe",
+    "repositoryTree" : "e02d172ffcadbd0b0802bce3560e7c97f252df03",
+    "role" : "sourceBuildIdentity",
+    "schemaVersion" : 1,
+    "signedRuntimeBindingSHA256" : "9a4e489e149cc3f4e27d64970fc0055cb701ca37ab98192fa2b81d7fc293a6c3"
+  },
+  "systemObservation" : {
+    "fixedPathsAbsent" : true,
+    "fixedProcessCount" : 0,
+    "fixedServiceAbsent" : true,
+    "gateAttemptName" : "attempt-18a85048-5e1c-40c5-99e4-3785185070d3",
+    "gateBaseState" : "ownConsumedAttemptPresent",
+    "gateCapsuleByteCount" : 28997,
+    "gateCapsuleName" : "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
+    "gateCapsuleSHA256" : "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72"
+  },
+  "verifierExecutableSHA256" : "897a0d7a2498287039cac973a507b06d07f62d007b44aa63bdf50a1593f26cdf"
+}

@@ -30,8 +30,7 @@
     "no Task 39 readiness",
     "no verified recovery of removed Gate capsule",
     "owner-lock-only state is not successful campaign cleanup",
-    "subsequent campaign residue is not prior campaign success",
-    "later campaigns do not restore earlier Gate residue"
+    "subsequent campaign residue is not prior campaign success"
   ],
   "parentIdentity" : {
     "device" : "16777229",
@@ -100,19 +99,19 @@
     "signedRuntimeBindingSHA256" : "9d7844cac8223dfa328c63b7778ac1c66da0ac9867e76a35104b3f522f6fea69"
   },
   "subsequentCampaignObservation" : {
-    "attemptUUID" : "18a85048-5e1c-40c5-99e4-3785185070d3",
-    "campaignUUID" : "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
-    "classification" : "consumedPostArmFailureUnclassified",
+    "attemptUUID" : "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+    "campaignUUID" : "b6ee7781-5298-4732-a312-26eb7e0c37d1",
+    "classification" : "consumedCampaignDeadlineExhaustion",
     "gateCapsuleByteCount" : 28997,
-    "gateCapsuleName" : "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
-    "gateCapsuleSHA256" : "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72",
-    "priorDispositionSHA256" : "5cb77d0962d2de217cba1560e68c230ffc16b88778d3e42281213522fe79aedc"
+    "gateCapsuleName" : "projected-cohort-544d12b656dccc35bc0e5aeedea4a06992c71efa6646fecde622d7604b728d6a.bin",
+    "gateCapsuleSHA256" : "80aa1200fdb6801b8c8ac50383f6231a21a0c1ef4033371561fcfd9c6e6b4f73",
+    "priorDispositionSHA256" : "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac"
   },
   "systemObservation" : {
     "fixedPathsAbsent" : true,
     "fixedProcessCount" : 0,
     "fixedServiceAbsent" : true,
-    "gateBaseChangeTimeNanoseconds" : "1788835011432471095",
+    "gateBaseChangeTimeNanoseconds" : "1788786289606239018",
     "gateBaseDevice" : "16777229",
     "gateBaseGeneration" : "0",
     "gateBaseInode" : "499810932",

@@ -27,8 +27,7 @@
     "no uninstall or global post-teardown artifact",
     "no machine admission",
     "no L3c3d authenticated model success",
-    "no Task 39 readiness",
-    "subsequent campaign residue is not prior campaign success"
+    "no Task 39 readiness"
   ],
   "parentIdentity" : {
     "device" : "16777229",
@@ -78,29 +77,15 @@
     "schemaVersion" : 1,
     "signedRuntimeBindingSHA256" : "a55c10feedf9a3efc3e06b78239b0f745d7bc2bb267514be9762b8c040add1e6"
   },
-  "subsequentCampaignObservation" : {
-    "attemptUUID" : "18a85048-5e1c-40c5-99e4-3785185070d3",
-    "campaignUUID" : "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
-    "classification" : "consumedPostArmFailureUnclassified",
-    "gateCapsuleByteCount" : 28997,
-    "gateCapsuleName" : "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
-    "gateCapsuleSHA256" : "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72",
-    "priorDispositionSHA256" : "877d538feca64846a2bafa167dff48c951a47849661efd2dae83011dd67d673e"
-  },
   "systemObservation" : {
     "fixedPathsAbsent" : true,
     "fixedProcessCount" : 0,
     "fixedServiceAbsent" : true,
-    "gateBaseChangeTimeNanoseconds" : "1788835011432471095",
-    "gateBaseDevice" : "16777229",
-    "gateBaseGeneration" : "0",
-    "gateBaseInode" : "499810932",
-    "gateBaseState" : "ownConsumedAttemptRemovedWithSubsequentAttemptPresent",
-    "ownerLockChangeTimeNanoseconds" : "1787992800592752249",
-    "ownerLockDevice" : "16777229",
-    "ownerLockGeneration" : "0",
-    "ownerLockInode" : "499810933",
-    "ownerLockSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "gateAttemptName" : "attempt-9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+    "gateBaseState" : "ownConsumedAttemptPresent",
+    "gateCapsuleByteCount" : 28997,
+    "gateCapsuleName" : "projected-cohort-544d12b656dccc35bc0e5aeedea4a06992c71efa6646fecde622d7604b728d6a.bin",
+    "gateCapsuleSHA256" : "80aa1200fdb6801b8c8ac50383f6231a21a0c1ef4033371561fcfd9c6e6b4f73"
   },
   "verifierExecutableSHA256" : "512e6005b0cbe0fcbd4b8a42da31ccfcd245868bc62e31fead257222a86c025b"
 }

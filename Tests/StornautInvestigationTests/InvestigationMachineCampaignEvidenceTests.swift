@@ -1240,6 +1240,62 @@ struct InvestigationMachineCampaignEvidenceTests {
     }
 
     @Test
+    func spawnUncertainRequiresClosedPostArmFailureProjection_BitsUT() throws {
+        let attempt = CampaignEvidenceFixture.uuid(0x41)
+        let accepted = [
+            "postArmFailure/transportUncertain/exited-1/receipt-open/terminal-open/cleanup-00",
+            "postArmFailure/receiptInvalid/signaled-15/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/exactReapUncertain/wait-unavailable/receipt-open/terminal-eof/cleanup-04",
+        ]
+        for reason in accepted {
+            let payload = try InvestigationMachineEvidenceJSON.canonicalData([
+                "schemaVersion": 2,
+                "kind": "spawnUncertain",
+                "attemptUUID": attempt.uuidString.lowercased(),
+                "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
+                "reason": reason,
+            ])
+            try InvestigationMachineEvidenceJSON.validateEvent(
+                payload, kind: .spawnUncertain, attemptUUID: attempt
+            )
+        }
+
+        let generic = try InvestigationMachineEvidenceJSON.canonicalData([
+            "schemaVersion": 2,
+            "kind": "spawnUncertain",
+            "attemptUUID": attempt.uuidString.lowercased(),
+            "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
+            "reason": "campaign-incomplete",
+        ])
+        #expect(throws: (any Error).self) {
+            try InvestigationMachineEvidenceJSON.validateEvent(
+                generic, kind: .spawnUncertain, attemptUUID: attempt
+            )
+        }
+        for invalid in [
+            "postArmFailure/receiptInvalid/exited-١/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-eof/cleanup-0A",
+            "postArmFailure/notClosed/exited-1/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/receiptInvalid/exited-256/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/receiptInvalid/exited-01/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/receiptInvalid/signaled-0/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/receiptInvalid/stopped-32/receipt-eof/terminal-eof/cleanup-08",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-eof/cleanup-20",
+        ] {
+            var object = try #require(
+                JSONSerialization.jsonObject(with: generic) as? [String: Any]
+            )
+            object["reason"] = invalid
+            let payload = try InvestigationMachineEvidenceJSON.canonicalData(object)
+            #expect(throws: (any Error).self) {
+                try InvestigationMachineEvidenceJSON.validateEvent(
+                    payload, kind: .spawnUncertain, attemptUUID: attempt
+                )
+            }
+        }
+    }
+
+    @Test
     func eventChainsAcceptOnlyTheTwoFrozenTerminalShapes() throws {
         let attempt = CampaignEvidenceFixture.uuid(0x42)
         let prepared = try Self.event(
@@ -1615,9 +1671,9 @@ struct InvestigationMachineCampaignEvidenceTests {
         let subsequent = try #require(
             disposition["subsequentCampaignObservation"] as? [String: Any])
         #expect(subsequent["attemptUUID"] as? String
-            == "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd")
+            == "18a85048-5e1c-40c5-99e4-3785185070d3")
         #expect(subsequent["classification"] as? String
-            == "consumedCampaignDeadlineExhaustion")
+            == "consumedPostArmFailureUnclassified")
 
         let reportParent = try Self.makeFailureReportParent()
         defer { try? FileManager.default.removeItem(at: reportParent) }
@@ -1676,6 +1732,53 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(cause["elapsedAfterArmMicroseconds"] as? String
             == "1195056190")
         #expect(cause["driverEpochArtifactCount"] as? Int == 0)
+
+        let beforeV11 = repository.appending(path:
+            "docs/reports/evidence/task-39-iic-v10-failure-disposition-before-v11.json")
+        var mixed = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: beforeV11)) as? [String: Any])
+        mixed["subsequentCampaignObservation"] = disposition[
+            "subsequentCampaignObservation"]
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let mixedURL = reportParent.appending(path: "mixed-v10.json")
+        try Self.writeCanonicalReport(mixed, to: mixedURL)
+        let rejected = try Self.runFailureVerifier(
+            URL(filePath: root), mixedURL)
+        #expect(rejected.status != 0)
+        #expect(rejected.stderr.contains("deadline disposition campaign chain"))
+    }
+
+    @Test
+    func checkedV11FailureDispositionBindsFrozenExternalEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v11-failure-disposition.json")
+        guard let root = ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V11_EVIDENCE_ROOT"] else { return }
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+        let disposition = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: report)) as? [String: Any])
+        #expect(disposition["schemaVersion"] as? Int == 6)
+        #expect(disposition["classification"] as? String
+            == "consumedPostArmFailureUnclassified")
+        #expect(disposition["admission"] as? String == "rejected")
+        #expect(disposition["retry"] as? String == "forbidden")
+        let cause = try #require(
+            disposition["rootCauseObservation"] as? [String: Any])
+        #expect(cause["reason"] as? String
+            == "legacyGenericPostArmFailureProjection")
+        #expect(cause["campaignExitStatus"] as? Int == 70)
+        #expect(cause["exactWaitClassification"] as? String
+            == "unavailableInLegacyEvidence")
+        #expect(cause["credentialRetainedByteCount"] as? Int == 0)
     }
 
     @Test
@@ -2195,6 +2298,127 @@ struct InvestigationMachineCampaignEvidenceTests {
         forged["manifestSHA256"] = String(repeating: "0", count: 64)
         try Self.writeCanonicalJSON(forged, to: sealURL)
         #expect(try Self.runVerifier(fixture.evidenceRoot, sealURL).status != 0)
+    }
+
+    @Test
+    func independentVerifierAcceptsOnlyClosedSchemaTwoPostArmReason() throws {
+        let accepted = try schemaTwoFailureVerifierResult(reason:
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c")
+        #expect(accepted.status != 0)
+        #expect(accepted.stderr.contains("consumed failure is non-admitting"))
+        #expect(!accepted.stderr.contains("closed failure projection reason"))
+
+        for reason in [
+            "campaign-incomplete",
+            "postArmFailure/receiptInvalid/exited-256/receipt-eof/terminal-open/cleanup-0c",
+            "postArmFailure/receiptInvalid/exited-01/receipt-eof/terminal-open/cleanup-0c",
+            "postArmFailure/receiptInvalid/signaled-0/receipt-eof/terminal-open/cleanup-0c",
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-20",
+        ] {
+            let rejected = try schemaTwoFailureVerifierResult(reason: reason)
+            #expect(rejected.status != 0)
+            #expect(rejected.stderr.contains("closed failure projection reason"))
+        }
+    }
+
+    private func schemaTwoFailureVerifierResult(
+        reason: String
+    ) throws -> CampaignVerifierResult {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let writer = try fixture.makeWriter(mode: .privileged)
+        let acceptedReason =
+            "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c"
+        for (index, kind) in [
+            InvestigationMachineAttemptEventKind.prepared, .armedConsumed,
+            .spawnUncertain, .terminal,
+        ].enumerated() {
+            let payload = if kind == .spawnUncertain {
+                try InvestigationMachineEvidenceJSON.canonicalData([
+                    "schemaVersion": 2, "kind": "spawnUncertain",
+                    "attemptUUID": fixture.attemptUUID.uuidString.lowercased(),
+                    "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
+                    "reason": acceptedReason,
+                ])
+            } else {
+                try Self.eventPayload(kind: kind, attempt: fixture.attemptUUID)
+            }
+            _ = try writer.appendAttemptEvent(
+                kind: kind, payload: payload,
+                observedAt: .init(rawValue: Int64(index + 1))
+            )
+        }
+        try fixture.populatePrivilegedArtifacts(writer, epochCount: 0)
+        var seal = try writer.finalize()
+        if reason != acceptedReason {
+            let event3URL = fixture.evidenceRoot.appending(
+                path: "03-authorization/attempt-event-0003.bin")
+            let event4URL = fixture.evidenceRoot.appending(
+                path: "03-authorization/attempt-event-0004.bin")
+            var event3 = try CampaignWireTranscript(Data(contentsOf: event3URL))
+            let payload = try InvestigationMachineEvidenceJSON.canonicalData([
+                "schemaVersion": 2, "kind": "spawnUncertain",
+                "attemptUUID": fixture.attemptUUID.uuidString.lowercased(),
+                "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
+                "reason": reason,
+            ])
+            event3.fields[5] = payload
+            event3.fields[6] = InvestigationHandoffSHA256.hashing(payload).rawBytes
+            let event3Bytes = try event3.encoded(maximumByteCount: 4_608)
+            try event3Bytes.write(to: event3URL)
+            try #require(chmod(event3URL.path, 0o600) == 0)
+
+            var event4 = try CampaignWireTranscript(Data(contentsOf: event4URL))
+            event4.fields[3] = InvestigationHandoffSHA256
+                .hashing(event3Bytes).rawBytes
+            let event4Bytes = try event4.encoded(maximumByteCount: 4_608)
+            try event4Bytes.write(to: event4URL)
+            try #require(chmod(event4URL.path, 0o600) == 0)
+
+            let manifestURL = fixture.evidenceRoot.appending(path: "manifest.bin")
+            let old = try InvestigationMachineEvidenceManifestV1.decode(
+                Data(contentsOf: manifestURL))
+            let replacements = [
+                "attempt-event-0003.bin": event3Bytes,
+                "attempt-event-0004.bin": event4Bytes,
+            ]
+            let artifacts = try old.artifacts.map { artifact in
+                guard let bytes = replacements[artifact.path.leafName] else {
+                    return artifact
+                }
+                return try InvestigationMachineEvidenceArtifact(
+                    path: artifact.path, role: artifact.role,
+                    encoding: artifact.encoding, byteCount: UInt64(bytes.count),
+                    sha256: .hashing(bytes)
+                )
+            }
+            let summary = try InvestigationMachineAttemptSummary(
+                attemptUUID: old.attemptUUID, mode: old.attemptSummary.mode,
+                outcome: old.attemptSummary.outcome,
+                consumed: old.attemptSummary.consumed,
+                eventCount: old.attemptSummary.eventCount,
+                finalEventSHA256: .hashing(event4Bytes)
+            )
+            let manifest = try InvestigationMachineEvidenceManifestV1(
+                campaignUUID: old.campaignUUID, attemptUUID: old.attemptUUID,
+                sourceBinding: old.sourceBinding, artifacts: artifacts,
+                attemptSummary: summary
+            )
+            try manifest.encoded().write(to: manifestURL)
+            try #require(chmod(manifestURL.path, 0o600) == 0)
+            seal = .init(
+                campaignUUID: seal.campaignUUID, attemptUUID: seal.attemptUUID,
+                rootIdentity: seal.rootIdentity,
+                manifestSHA256: manifest.manifestSHA256,
+                contentRootSHA256: manifest.contentRootSHA256,
+                artifactCount: manifest.artifacts.count,
+                totalByteCount: manifest.totalByteCount,
+                attemptSummary: summary
+            )
+        }
+        let sealURL = fixture.parent.appending(path: "schema-two-failure-seal.json")
+        try Self.writeSeal(seal, to: sealURL)
+        return try Self.runVerifier(fixture.evidenceRoot, sealURL)
     }
 
     @Test(.serialized, arguments: [0, 1, 3, 7, 8])

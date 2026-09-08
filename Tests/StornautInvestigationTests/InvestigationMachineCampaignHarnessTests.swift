@@ -8,6 +8,26 @@ import Testing
 @Suite("Investigation machine campaign harness", .serialized)
 struct InvestigationMachineCampaignHarnessTests {
     @Test
+    func postArmFailureProjectionIsClosedAndDeterministic() {
+        let failure = InvestigationMachineCampaignHarnessFailureResult(
+            primary: .receiptInvalid,
+            cleanupIssues: [.closeFailed, .waitFailed, .closeFailed],
+            exactWait: .exited(status: 1), receiptReachedEOF: true,
+            terminalReachedEOF: false
+        )
+
+        #expect(failure.postArmEvidenceReason
+            == "postArmFailure/receiptInvalid/exited-1/receipt-eof/terminal-open/cleanup-0c")
+        #expect(!failure.postArmEvidenceReason.contains("credential"))
+        #expect(InvestigationMachineCampaignHarnessFailureResult
+            .postArmEvidenceReason(
+                primary: .unexpectedResponse, exactWait: .exited(status: 0),
+                receiptReachedEOF: true, terminalReachedEOF: true,
+                cleanupIssues: []
+            ) == "postArmFailure/unexpectedResponse/exited-0/receipt-eof/terminal-eof/cleanup-00")
+    }
+
+    @Test
     func physicalExecutableUsesControllingPTYAndExactFD3() async throws {
         let fixture = try CampaignPhysicalFixture.make(mode: .success)
         defer { fixture.remove() }

@@ -3,7 +3,7 @@
 > **Status:** Approved for sequential Tasks 36–44; Tasks 36–38 are complete.
 > Task 38 passed implementation, independent review, an 811-test serialized
 > regression and the 23/23-stage authoritative full verifier. Task 39 is
-> active/incomplete after explicit authorization of replacement campaign v9;
+> active/incomplete after consumed replacement campaigns v9, v10 and v11;
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is
@@ -1025,11 +1025,15 @@ Checkpoint status:
   replay `aa8a7f1`, all non-admitting. ii-c-a, ii-c-b and resolved-lineage
   L1/L2 are complete/non-admitting; L2 final verifier closure is `849e454` /
   tree `f6c36d2`, and final review returned no finding. The historical pre-v8
-  order was `ii-c-c -> L3c3d -> L3c4`; v8, v9 and v10 are consumed, failed
+  order was `ii-c-c -> L3c3d -> L3c4`; v8, v9, v10 and v11 are consumed, failed
   and non-retryable. v10 passed the repaired AMFI boundary but exhausted the
   1,200-second outer deadline after 1,195.056190 seconds from durable arm. Its
   checked disposition and the 1,400-second deadline-budget repair are complete
-  and non-admitting. Any replacement campaign requires fresh authorization.
+  and non-admitting. v11 then failed about 16.259 seconds after durable arm;
+  its legacy generic reason cannot distinguish the exact post-arm failure, so
+  it is sealed as `consumedPostArmFailureUnclassified`. The successor
+  schema-v2 diagnostic projection is complete/non-admitting. Any replacement
+  campaign requires fresh authorization.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

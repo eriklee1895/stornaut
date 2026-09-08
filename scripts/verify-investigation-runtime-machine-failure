@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_failure_self_sha=f496b8a3b027c751c6ed49cd0d657154f10f5ce957127f1c616f512bba55394c # iicc-failure-self-seal
+typeset -r iicc_failure_self_sha=fd8f6c56df35f8077ab7e43244975aeff2d10169b58cafd9fa396e3ea17ee1f6 # iicc-failure-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -477,13 +477,38 @@ def parse_event(data):
     common = {"schemaVersion", "kind", "attemptUUID", "evidenceSetSHA256"}
     exact_object(payload, common | ({"reason"} if kind == 5 else set()),
                  "event payload")
-    require(exact_int(payload["schemaVersion"], "event schema") == 1
+    schema = exact_int(payload["schemaVersion"], "event schema")
+    require((schema == 1 or kind == 5 and schema == 2)
             and payload["kind"] == names[kind]
             and exact_uuid(payload["attemptUUID"], "event attempt") == attempt
             and valid_hex(payload["evidenceSetSHA256"]), "event payload binding")
     if kind == 5:
-        require(payload["reason"] == "campaign-incomplete",
-                "spawn uncertainty reason")
+        if schema == 1:
+            require(payload["reason"] == "campaign-incomplete",
+                    "spawn uncertainty reason")
+        else:
+            primary = ("alreadyConsumed", "bindingInvalid",
+                "deadlineExceeded", "spawnUncertain", "identityMismatch",
+                "receiptInvalid", "diagnosticOverflow", "childTerminated",
+                "exactReapUncertain", "residueUncertain",
+                "transportUncertain", "cancelled", "unexpectedResponse")
+            parts = payload["reason"].split("/")
+            wait = parts[2] if len(parts) == 6 else ""
+            wait_match = re.fullmatch(r"(exited|signaled|stopped)-([0-9]+)", wait)
+            wait_valid = (wait == "wait-unavailable" or wait_match is not None
+                and wait_match.group(2) == str(int(wait_match.group(2)))
+                and (0 <= int(wait_match.group(2)) <= 255
+                    if wait_match.group(1) == "exited"
+                    else 1 <= int(wait_match.group(2)) <= 31))
+            cleanup_match = (re.fullmatch(r"cleanup-([0-9a-f]{2})", parts[5])
+                if len(parts) == 6 else None)
+            require(len(parts) == 6 and parts[0] == "postArmFailure"
+                    and parts[1] in primary and wait_valid
+                    and parts[3] in ("receipt-open", "receipt-eof")
+                    and parts[4] in ("terminal-open", "terminal-eof")
+                    and cleanup_match is not None
+                    and int(cleanup_match.group(1), 16) <= 0x1f,
+                    "closed failure projection reason")
     require(hashlib.sha256(fields[5]).digest() == fields[6],
             "event payload digest")
     return {"sequence": sequence, "attempt": attempt, "kind": kind,
@@ -598,7 +623,7 @@ def validate_report(data):
         "requiredMissingArtifacts", "rootIdentity",
         "parentIdentity", "systemObservation", "nonClaims"}
     profile = exact_int(value.get("schemaVersion"), "disposition schema")
-    require(profile in (1, 2, 3, 4, 5), "disposition schema version")
+    require(profile in (1, 2, 3, 4, 5, 6), "disposition schema version")
     profile_keys = (set() if profile == 1 else {"rootCauseObservation"})
     if profile == 3:
         profile_keys |= {"priorGateResidueObservation",
@@ -607,10 +632,13 @@ def validate_report(data):
         profile_keys |= {"priorGateResidueObservation",
                          "postDispositionMutation",
                          "subsequentCampaignObservation"}
+    elif profile == 4 and "subsequentCampaignObservation" in value:
+        profile_keys |= {"subsequentCampaignObservation"}
     exact_object(value, common_keys | profile_keys, "disposition")
     expected_domain = f"stornaut.task39.iic.failure-disposition.v{profile}"
     expected_classification = ("consumedTransportLoss" if profile == 1
         else "consumedCampaignDeadlineExhaustion" if profile == 4
+        else "consumedPostArmFailureUnclassified" if profile == 6
         else "consumedDriverExecutionPolicyDenial")
     expected_events = (["prepared", "armedConsumed", "spawnUncertain"]
         if profile == 1 else
@@ -639,10 +667,19 @@ def validate_report(data):
                     for key in identity_keys), name + " values")
     system_keys = {"fixedPathsAbsent", "fixedServiceAbsent",
         "fixedProcessCount", "gateBaseState"}
-    if profile in (2, 4):
+    current_consumed = (profile in (2, 6)
+        or profile == 4 and value["systemObservation"]["gateBaseState"]
+            == "ownConsumedAttemptPresent")
+    require((profile != 4 or current_consumed
+            or "subsequentCampaignObservation" in value),
+            "deadline disposition campaign chain")
+    require(profile != 4 or
+            ("subsequentCampaignObservation" in value) != current_consumed,
+            "deadline disposition campaign chain")
+    if current_consumed:
         system_keys |= {"gateAttemptName", "gateCapsuleName",
             "gateCapsuleSHA256", "gateCapsuleByteCount"}
-    elif profile in (3, 5):
+    elif profile in (3, 4, 5):
         system_keys |= {"gateBaseChangeTimeNanoseconds",
             "gateBaseDevice", "gateBaseInode",
             "gateBaseGeneration", "ownerLockDevice", "ownerLockInode",
@@ -654,12 +691,12 @@ def validate_report(data):
             and value["systemObservation"]["fixedProcessCount"] == 0
             and value["systemObservation"]["gateBaseState"]
                 in (("ownAttemptAbsent",) if profile == 1
-                    else ("ownConsumedAttemptPresent",) if profile in (2, 4)
+                    else ("ownConsumedAttemptPresent",) if current_consumed
                     else ("ownConsumedAttemptRemovedByTestFixture",)
                     if profile == 3 else
                     ("ownConsumedAttemptRemovedWithSubsequentAttemptPresent",)),
             "system observation values")
-    if profile in (2, 4):
+    if current_consumed:
         observation = value["systemObservation"]
         require(observation["gateAttemptName"] == "attempt-" + value["attemptUUID"]
                 and re.fullmatch(r"projected-cohort-[0-9a-f]{64}\.bin",
@@ -722,6 +759,51 @@ def validate_report(data):
                 and exact_int(root_cause["driverEpochArtifactCount"],
                               "driver epoch artifact count") == 0,
                 "campaign deadline root-cause observation")
+    elif profile == 6:
+        root_cause = value["rootCauseObservation"]
+        exact_object(root_cause, {"source", "reason",
+            "campaignExitStatus", "armedConsumedObservedAtUTCMicroseconds",
+            "spawnUncertainObservedAtUTCMicroseconds",
+            "terminalObservedAtUTCMicroseconds", "elapsedAfterArmMicroseconds",
+            "driverEpochArtifactCount", "machinePromptObserved",
+            "humanActionObserved", "credentialRetainedByteCount",
+            "exactWaitClassification", "receiptEOFObservation",
+            "terminalEOFObservation"}, "root cause")
+        require(root_cause["source"]
+                    == "durableAttemptTimelineAndBoundedArtifacts"
+                and root_cause["reason"]
+                    == "legacyGenericPostArmFailureProjection"
+                and exact_int(root_cause["campaignExitStatus"],
+                              "campaign exit status") == 70
+                and root_cause["armedConsumedObservedAtUTCMicroseconds"]
+                    == "1788835011400828"
+                and root_cause["spawnUncertainObservedAtUTCMicroseconds"]
+                    == "1788835027659532"
+                and root_cause["terminalObservedAtUTCMicroseconds"]
+                    == "1788835027662832"
+                and root_cause["elapsedAfterArmMicroseconds"] == "16258704"
+                and exact_int(root_cause["driverEpochArtifactCount"],
+                              "driver epoch artifact count") == 0
+                and root_cause["machinePromptObserved"] is True
+                and root_cause["humanActionObserved"] is True
+                and exact_int(root_cause["credentialRetainedByteCount"],
+                              "credential retained bytes") == 0
+                and root_cause["exactWaitClassification"]
+                    == "unavailableInLegacyEvidence"
+                and root_cause["receiptEOFObservation"]
+                    == "unavailableInLegacyEvidence"
+                and root_cause["terminalEOFObservation"]
+                    == "unavailableInLegacyEvidence",
+                "legacy failure projection observation")
+    if profile in (3, 4, 5) and not current_consumed:
+        for name in ("gateBaseChangeTimeNanoseconds", "gateBaseDevice",
+                     "gateBaseInode", "gateBaseGeneration", "ownerLockDevice",
+                     "ownerLockInode", "ownerLockGeneration",
+                     "ownerLockChangeTimeNanoseconds"):
+            require(isinstance(value["systemObservation"][name], str)
+                    and value["systemObservation"][name].isdecimal(),
+                    "post-campaign Gate node identity")
+        digest_text(value["systemObservation"]["ownerLockSHA256"], "owner lock")
     if profile in (3, 5):
         prior = value["priorGateResidueObservation"]
         exact_object(prior, {"gateAttemptName", "gateCapsuleName",
@@ -756,35 +838,40 @@ def validate_report(data):
                 and mutation["recoverySearchResult"]
                     == "exactCapsuleBytesUnavailable",
                 "post-disposition mutation observation")
-        for name in ("gateBaseChangeTimeNanoseconds", "gateBaseDevice",
-                     "gateBaseInode",
-                     "gateBaseGeneration", "ownerLockDevice",
-                     "ownerLockInode", "ownerLockGeneration",
-                     "ownerLockChangeTimeNanoseconds"):
-            require(isinstance(value["systemObservation"][name], str)
-                    and value["systemObservation"][name].isdecimal(),
-                    "post-mutation node identity")
-        digest_text(value["systemObservation"]["ownerLockSHA256"],
-                    "owner lock")
-    if profile == 5:
+    if profile in (4, 5) and not current_consumed:
         subsequent = value["subsequentCampaignObservation"]
         exact_object(subsequent, {"campaignUUID", "attemptUUID",
             "classification", "priorDispositionSHA256",
             "gateCapsuleName", "gateCapsuleSHA256", "gateCapsuleByteCount"},
             "subsequent campaign")
+        expected_subsequent = ({
+            "campaignUUID": "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
+            "attemptUUID": "18a85048-5e1c-40c5-99e4-3785185070d3",
+            "classification": "consumedPostArmFailureUnclassified",
+            "priorDispositionSHA256": "5cb77d0962d2de217cba1560e68c230ffc16b88778d3e42281213522fe79aedc",
+            "gateCapsuleName": "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
+            "gateCapsuleSHA256": "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72",
+        } if profile == 5 else {
+            "campaignUUID": "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
+            "attemptUUID": "18a85048-5e1c-40c5-99e4-3785185070d3",
+            "classification": "consumedPostArmFailureUnclassified",
+            "priorDispositionSHA256": "877d538feca64846a2bafa167dff48c951a47849661efd2dae83011dd67d673e",
+            "gateCapsuleName": "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
+            "gateCapsuleSHA256": "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72",
+        })
         require(exact_uuid(subsequent["campaignUUID"], "subsequent campaign")
-                    == "b6ee7781-5298-4732-a312-26eb7e0c37d1"
+                    == expected_subsequent["campaignUUID"]
                 and exact_uuid(subsequent["attemptUUID"], "subsequent attempt")
-                    == "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd"
+                    == expected_subsequent["attemptUUID"]
                 and subsequent["attemptUUID"] != value["attemptUUID"]
                 and subsequent["classification"]
-                    == "consumedCampaignDeadlineExhaustion"
+                    == expected_subsequent["classification"]
                 and subsequent["priorDispositionSHA256"]
-                    == "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac"
+                    == expected_subsequent["priorDispositionSHA256"]
                 and subsequent["gateCapsuleName"]
-                    == "projected-cohort-544d12b656dccc35bc0e5aeedea4a06992c71efa6646fecde622d7604b728d6a.bin"
+                    == expected_subsequent["gateCapsuleName"]
                 and subsequent["gateCapsuleSHA256"]
-                    == "80aa1200fdb6801b8c8ac50383f6231a21a0c1ef4033371561fcfd9c6e6b4f73"
+                    == expected_subsequent["gateCapsuleSHA256"]
                 and exact_int(subsequent["gateCapsuleByteCount"],
                               "subsequent Gate capsule bytes", 1) == 28_997,
                 "subsequent campaign observation")
@@ -800,9 +887,18 @@ def validate_report(data):
             "no verified recovery of removed Gate capsule",
             "owner-lock-only state is not successful campaign cleanup",
         ]
-    if profile == 5:
+    if profile == 5 or profile == 4 and not current_consumed:
         expected_nonclaims += [
             "subsequent campaign residue is not prior campaign success",
+        ]
+    if profile == 5:
+        expected_nonclaims += [
+            "later campaigns do not restore earlier Gate residue",
+        ]
+    if profile == 6:
+        expected_nonclaims += [
+            "no exact failure classification",
+            "no credential validity conclusion",
         ]
     require(value["nonClaims"] == expected_nonclaims, "non-claims")
     value["_files"] = files
@@ -1038,11 +1134,15 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
     verifier_digest = hashlib.sha256(verifier_bytes).hexdigest()
     historical_verifier_digest = (
         "848955e1ea62e194990163558f8217c47ad28b85bd4a8a6d1de0660b35ef40e1")
+    predecessor_verifier_digest = (
+        "512e6005b0cbe0fcbd4b8a42da31ccfcd245868bc62e31fead257222a86c025b")
     expected_verifier_digests = (
         {verifier_digest, historical_verifier_digest}
         if report["schemaVersion"] == 1 else
         {historical_verifier_digest}
         if report["schemaVersion"] in (2, 3) else
+        {predecessor_verifier_digest}
+        if report["schemaVersion"] in (4, 5) else
         {verifier_digest})
     require(report["verifierExecutableSHA256"] in expected_verifier_digests,
             "verifier executable binding")
@@ -1112,7 +1212,7 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
                     == report["_expectedEventKinds"]
                 and all(event["attempt"] == report["attemptUUID"]
                         for event in events), "consumed transport-loss event chain")
-        if report["schemaVersion"] == 4:
+        if report["schemaVersion"] in (4, 6):
             root_cause = report["rootCauseObservation"]
             require(str(events[1]["observed"])
                         == root_cause["armedConsumedObservedAtUTCMicroseconds"]
@@ -1120,7 +1220,11 @@ def verify(root_path, report_path, expected_self_sha, verifier_fd):
                         == root_cause["spawnUncertainObservedAtUTCMicroseconds"]
                     and str(events[2]["observed"] - events[1]["observed"])
                         == root_cause["elapsedAfterArmMicroseconds"],
-                    "campaign deadline event timing binding")
+                    "campaign event timing binding")
+            if report["schemaVersion"] == 6:
+                require(str(events[3]["observed"])
+                            == root_cause["terminalObservedAtUTCMicroseconds"],
+                        "campaign terminal timing binding")
         for index, event in enumerate(events):
             previous = bytes(32) if index == 0 else hashlib.sha256(
                 events[index - 1]["bytes"]).digest()

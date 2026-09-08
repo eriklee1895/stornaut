@@ -10798,8 +10798,8 @@ if len(mutations) != 51:
 expected = (
     "7d86510b67b92f8dd1e2773faca3f1faeccaeb113a1292fb91a17db5f4386613",
     "2ae5f50fd8d60135caf007096d171315d3fed228da10f6fbfff3bde1187a3dd5",
-    "4cb27c939e8846ae7c05e63258127a19fc40fb934781df41afa29f287131b9f8",
-    "30c1abadb746c70b89c846058da0558368d76285bf5cbfc348b86ed13b41a2a4",
+    "27cc3a6739eef39f8c990031defb2b884fae4494c40e89607ae78e950206e78a",
+    "7c52fc0d80edc6170b9e376aa54143b5c4fd1734f5bd465d76762b74d8980e83",
     "0de2813f9416833b1fd80c6d0a3ee78d0cb365fc3dfd961d031008dcbc7a412b",
 )
 if mutation_mode == "true":
@@ -11814,7 +11814,7 @@ if executable.count(actor_end) != 1:
 actor_block = executable[executable.index(actor_marker):
                          executable.index(actor_end, executable.index(actor_marker)) + len('\n    }')]
 if hashlib.sha256(actor_block.encode()).hexdigest() != \
-        'f88e90dad64c01921d7a7b4bc13a3f0406ab3aa48f28ef74b9885940eee726d4':
+        '94f0fc8a73596dbe6c693f5975d23da5c68df2d6bbb81c3f2924f3d28ff6330a':
     raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
 def require_body_digest(start, end, expected):
     if executable.count(start) != 1 or executable.count(end) != 1:
@@ -11835,7 +11835,7 @@ require_body_digest(
 require_body_digest(
     '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
     '\n\n        private func writePostArm',
-    '55d00e353316486b21b659d46d3dfd30824f3e4e2c263f7d54872db80a626423')
+    '2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd')
 target = '''        .executableTarget(
             name: "StornautInvestigationMachineCampaign",
             dependencies: [
@@ -11914,7 +11914,7 @@ if executable.count(debug_end) != 1:
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 debug_executable = executable[:executable.index(debug_end)]
 if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-        '3e4fc893ac38a0066a3019174bc48165b1b60882b2f8ee0c42f2deec060abbff':
+        '2ab9f885f5e8a1807c1250bf24c2015d71aa65a56797c975e810e1e0bf9d08d4':
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 authority_surface = active_executable
 for marker in allowed_sudo:
@@ -12603,7 +12603,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     actor_block = main[main.index(actor_marker):
                        main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
     if hashlib.sha256(actor_block.encode()).hexdigest() != \
-            'f88e90dad64c01921d7a7b4bc13a3f0406ab3aa48f28ef74b9885940eee726d4':
+            '94f0fc8a73596dbe6c693f5975d23da5c68df2d6bbb81c3f2924f3d28ff6330a':
         raise SystemExit("ii-c-c lifecycle actor drifted")
     def require_body_digest(start, end, expected):
         if main.count(start) != 1 or main.count(end) != 1:
@@ -12624,7 +12624,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     require_body_digest(
         '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
         '\n\n        private func writePostArm',
-        '55d00e353316486b21b659d46d3dfd30824f3e4e2c263f7d54872db80a626423')
+        '2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd')
 if (main.count('Self.runLifecycle(') != 3
         or main.count('runLifecycle(') != 4
         or main.count('Self.runFixed(') != 2
@@ -12638,7 +12638,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '1b78490bc9617c954c5d8eaa77eb5911e1ca892c2f6db1db199923d33b91b34c':
+            '2ab9f885f5e8a1807c1250bf24c2015d71aa65a56797c975e810e1e0bf9d08d4':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -12915,15 +12915,20 @@ function verify_iicc_failure_disposition_contract() {
     local v9_evidence=docs/reports/evidence/task-39-iic-v9-failure-disposition.json
     local v9_prior=docs/reports/evidence/task-39-iic-v9-failure-disposition-before-test-mutation.json
     local v9_before_v10=docs/reports/evidence/task-39-iic-v9-failure-disposition-before-v10.json
+    local v9_before_v11=docs/reports/evidence/task-39-iic-v9-failure-disposition-before-v11.json
     local v10_evidence=docs/reports/evidence/task-39-iic-v10-failure-disposition.json
+    local v10_before_v11=docs/reports/evidence/task-39-iic-v10-failure-disposition-before-v11.json
+    local v11_evidence=docs/reports/evidence/task-39-iic-v11-failure-disposition.json
     local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
     local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
     local v9_report=docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md
     local v10_report=docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md
+    local v11_report=docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md
     local path
     for path in $verifier $evidence $v9_evidence $v9_prior $v9_before_v10 \
-        $v10_evidence $tests $boundary $report $v9_report $v10_report; do
+        $v9_before_v11 $v10_evidence $v10_before_v11 $v11_evidence \
+        $tests $boundary $report $v9_report $v10_report $v11_report; do
         [[ -f $path && ! -L $path ]] || {
             print -u2 "ii-c-c failure disposition source unavailable: $path"
             return 1
@@ -12935,16 +12940,18 @@ function verify_iicc_failure_disposition_contract() {
     }
     /bin/zsh -n $verifier || return $?
     /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior \
-        $v9_before_v10 $v10_evidence $tests $boundary $report $v9_report \
-        $v10_report <<'PY'
+        $v9_before_v10 $v9_before_v11 $v10_evidence $v10_before_v11 \
+        $v11_evidence $tests $boundary $report $v9_report $v10_report \
+        $v11_report <<'PY'
 from pathlib import Path
 import hashlib
 import json
 import re
 import sys
 
-verifier, evidence, v9_evidence, v9_prior, v9_before_v10, v10_evidence, \
-tests, boundary, report, v9_report, v10_report = (
+verifier, evidence, v9_evidence, v9_prior, v9_before_v10, v9_before_v11, \
+v10_evidence, v10_before_v11, v11_evidence, tests, boundary, report, \
+v9_report, v10_report, v11_report = (
     Path(value) for value in sys.argv[1:])
 source = verifier.read_text(encoding="utf-8")
 test_source = tests.read_text(encoding="utf-8")
@@ -12952,6 +12959,7 @@ boundary_source = boundary.read_text(encoding="utf-8")
 report_source = report.read_text(encoding="utf-8")
 v9_report_source = v9_report.read_text(encoding="utf-8")
 v10_report_source = v10_report.read_text(encoding="utf-8")
+v11_report_source = v11_report.read_text(encoding="utf-8")
 match = re.fullmatch(
     r"([0-9a-f]{64})",
     re.search(
@@ -12978,8 +12986,11 @@ required = (
     "admission\"] == \"rejected", "retry\"] == \"forbidden",
     "consumedDriverExecutionPolicyDenial", "ownConsumedAttemptPresent",
     "consumedCampaignDeadlineExhaustion",
+    "consumedPostArmFailureUnclassified",
+    "closed failure projection reason",
+    "predecessor_verifier_digest",
     "ownConsumedAttemptRemovedWithSubsequentAttemptPresent",
-    "campaign deadline event timing binding",
+    "campaign event timing binding",
     "subsequent Gate capsule binding",
     "ownConsumedAttemptRemovedByTestFixture",
     "testFixtureStaleRecoveryRemovedConsumedGateResidue",
@@ -13004,11 +13015,14 @@ checked = (
      ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
     (v10_evidence, "consumedCampaignDeadlineExhaustion",
      ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
+    (v11_evidence, "consumedPostArmFailureUnclassified",
+     ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
 )
 checked_digests = {
     evidence: "7351c8312315b5673c7610a3421a20eb14fdb53fb6bdd181abfde4732d16b072",
-    v9_evidence: "5cb77d0962d2de217cba1560e68c230ffc16b88778d3e42281213522fe79aedc",
-    v10_evidence: "877d538feca64846a2bafa167dff48c951a47849661efd2dae83011dd67d673e",
+    v9_evidence: "931e57d14609bc8bf4a8480aa7aff63e51cfc9e8b7073f02710e125cbad561f9",
+    v10_evidence: "178a87626086f7a4be9e8d80c82f2d5f21f79aa4f847173e6712b02b7a8e097d",
+    v11_evidence: "a8c8aa5393ca25872831fefde4db20fb32325f6c0a1d787d9652d05e47a11b64",
 }
 for checked_path, classification, events in checked:
     if hashlib.sha256(checked_path.read_bytes()).hexdigest() \
@@ -13025,6 +13039,9 @@ if hashlib.sha256(v9_prior.read_bytes()).hexdigest() \
     raise SystemExit("ii-c-c prior v9 disposition digest drifted")
 prior = json.loads(v9_prior.read_bytes())
 before_v10 = json.loads(v9_before_v10.read_bytes())
+before_v11 = json.loads(v9_before_v11.read_bytes())
+v10_prior = json.loads(v10_before_v11.read_bytes())
+v10_current = json.loads(v10_evidence.read_bytes())
 current = json.loads(v9_evidence.read_bytes())
 if (prior.get("schemaVersion") != 2
         or prior.get("systemObservation", {}).get("gateBaseState")
@@ -13032,6 +13049,9 @@ if (prior.get("schemaVersion") != 2
         or hashlib.sha256(v9_before_v10.read_bytes()).hexdigest()
             != "f99206e49db2b9dde0b55e9c1f567875fb39cfb2b5d506c56712bd296a512fac"
         or before_v10.get("schemaVersion") != 3
+        or hashlib.sha256(v9_before_v11.read_bytes()).hexdigest()
+            != "5cb77d0962d2de217cba1560e68c230ffc16b88778d3e42281213522fe79aedc"
+        or before_v11.get("schemaVersion") != 5
         or current.get("schemaVersion") != 5
         or current.get("systemObservation", {}).get("gateBaseState")
             != "ownConsumedAttemptRemovedWithSubsequentAttemptPresent"
@@ -13040,8 +13060,20 @@ if (prior.get("schemaVersion") != 2
             != hashlib.sha256(v9_prior.read_bytes()).hexdigest()
         or current.get("subsequentCampaignObservation", {}).get(
             "priorDispositionSHA256")
-            != hashlib.sha256(v9_before_v10.read_bytes()).hexdigest()):
+            != hashlib.sha256(v9_before_v11.read_bytes()).hexdigest()):
     raise SystemExit("ii-c-c v9 mutation chain drifted")
+if (hashlib.sha256(v10_before_v11.read_bytes()).hexdigest()
+        != "877d538feca64846a2bafa167dff48c951a47849661efd2dae83011dd67d673e"
+        or v10_prior.get("schemaVersion") != 4
+        or v10_prior.get("systemObservation", {}).get("gateBaseState")
+            != "ownConsumedAttemptPresent"
+        or v10_current.get("schemaVersion") != 4
+        or v10_current.get("systemObservation", {}).get("gateBaseState")
+            != "ownConsumedAttemptRemovedWithSubsequentAttemptPresent"
+        or v10_current.get("subsequentCampaignObservation", {}).get(
+            "priorDispositionSHA256")
+            != hashlib.sha256(v10_before_v11.read_bytes()).hexdigest()):
+    raise SystemExit("ii-c-c v10 campaign chain drifted")
 for marker in (
     "failureDispositionVerifierAcceptsOnlyConsumedTransportLoss",
     "failureDispositionVerifierNormalizesMissingGateBaseOnlyForV1",
@@ -13052,6 +13084,7 @@ for marker in (
     "checkedV8FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
     "checkedV9FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
     "checkedV10FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
+    "checkedV11FailureDispositionBindsFrozenExternalEvidenceWhenAvailable",
 ):
     if marker not in test_source:
         raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
@@ -13101,18 +13134,26 @@ for marker in (
 ):
     if marker not in v10_report_source:
         raise SystemExit("ii-c-c v10 failure disposition report drifted: " + marker)
+for marker in (
+    "consumedPostArmFailureUnclassified", "legacyGenericPostArmFailureProjection",
+    "16.258704 seconds", "campaign-incomplete", "non-admitting",
+    "non-retryable", "no credential bytes were retained",
+):
+    if marker not in v11_report_source:
+        raise SystemExit("ii-c-c v11 failure disposition report drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "88faa4e93662c411598a6508a29d652a8c6d474a148e10fbb22b57fe8d6c4fb8"),
-    (Path("README.md"), "4b82bb722bc2e713e43c1f3fc22cbf3cd798e8c1d9c95e4465506954eb2918d4"),
-    (Path("docs/README.md"), "66656f4b91a2504070d9c5971addcdcb389714d02f4223975c5f5b81ced27057"),
-    (Path("docs/agent/coding-agent-handoff.md"), "6e8c7350c15c4e11713fdef7b6d65edfad27aee3d9c5acb866517f6edd7aaee9"),
-    (Path("docs/plans/active/README.md"), "fd88977fe645a3dc1bffbe92de837233ed2e4b55c39f15064c392b9eacfc3e23"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "e11e499abb99271fe12321159c99b106709e85fd27cfc551081df1439e722886"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "4898e4feb205ab1002cd28b2728996f283afb9976e05cd048f6ed57810a63bc8"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "8dfc19e53d3ec14ee8fbf92e00cf57f7466f2747f23eae21d86adc8d012d8d47"),
-    (Path("docs/plans/roadmap.md"), "2fa880935a7fc307de13bdc2bc42a2de2a930b14e291d3b36eec5b93d7bc7235"),
+    (Path("AGENTS.md"), "391f16231fffdc3fbd24b50056a40ddb5f92e7a940a1663b8a82dda14a242a78"),
+    (Path("README.md"), "fb9a8db29580364e24ccfca70e97a2c57f2579ed157a1e84ef2d7a9bada90878"),
+    (Path("docs/README.md"), "4d0b73bdd6d25264fce4f7e1aa74c72e20a2c772a1dce85956dd3be6fea4f105"),
+    (Path("docs/agent/coding-agent-handoff.md"), "6f28b66956d3b2038ff294b20e78f84dcf411ef808dfbb7ddff6ebf1ed5f189c"),
+    (Path("docs/plans/active/README.md"), "f05b125cfe1b4f6ed5e3307ae8fcf09f70a6c98ee92cb372e99ee7181f727e75"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "dfe32774a86f2df53ced850ba5f59d252b5ab20cbb0d6e64c1b1e1f3803953c5"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "9c528244bfe75562af758c27f0cfbaba69fd0f719cb4b1b4fa0afc27c8802e32"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "6152cfe6666410a51e7a00149179f3ca9443c5267be96fe27877752328716cd4"),
+    (Path("docs/plans/roadmap.md"), "3198295f3bdd111cc3006dee8e0981767831e44497d8f0e8e42cd84470cc5e96"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "c927a25ccc09d35d9992f2f11b33829bae616a80ef3fab40b59875c04500c9bd"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13126,9 +13167,10 @@ active_status_expected_paths = {
     Path("docs/plans/roadmap.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"),
 }
 active_status_paths = [path for path, _ in active_status_entries]
-if (len(active_status_entries) != 11
+if (len(active_status_entries) != 12
         or len(set(active_status_paths)) != len(active_status_paths)
         or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
@@ -13915,7 +13957,7 @@ expected_sha256 = (
     "cfeb141ade5849996f3d902118c08737aa1c65ac67f154f1ed58a7fc9674fda4",
     "75983e7eff0f9d53006150aedc93c8add43b0a6335f05b6a9f4c74de5158b0cb",
     "de789fa0be83c56b315e5fc8d051ef7af0ca69d588f63594b2a7fa931170b5d1",
-    "93e6e4f03d7f9cfec3ebe37b2232c030deddfb135cc0d94a14439dfa550d381a",
+    "1f1f40793ea4cbfbd9a4ae875b2dca6604eb2c06f7355948f297b5825b5287e7",
     "1ea71f3842e4e244f6a3c167c9f3d3f00eb8486fcfdb5cc74e1c41ee857857aa",
     "1e493622f3eb3fe60ea88d61ce7fdfc3744db79d4850cfec397d5915739ac7f6",
 )
@@ -19812,6 +19854,7 @@ expected_handoff_sources = {
     "InvestigationHandoffFrameContract.swift",
     "InvestigationCohortCapsuleContract.swift",
     "InvestigationMachineClaimContract.swift",
+    "InvestigationResolvedRootDriverLineageContract.swift",
 }
 if set(handoff.get("sources", [])) != expected_handoff_sources:
     raise SystemExit("handoff contract source allowlist drifted")
@@ -19841,6 +19884,7 @@ expected_imports = {
     "InvestigationHandoffFrameContract.swift": {"Foundation"},
     "InvestigationCohortCapsuleContract.swift": {"Foundation"},
     "InvestigationMachineClaimContract.swift": {"Foundation"},
+    "InvestigationResolvedRootDriverLineageContract.swift": {"Foundation"},
 }
 handoff_forbidden = re.compile(
     r"\b(?:Codable|NSXPC|Process|FileManager|URLSession|posix_spawn|"
@@ -20092,6 +20136,7 @@ expected_driver_support_sources = {
     "InvestigationMachineHelperEpochContinuity.swift",
     "InvestigationMachineInstalledDriverObservation.swift",
     "InvestigationMachineInstalledDriverSystemSource.swift",
+    "InvestigationMachineResolvedRootDriverClaim.swift",
     "InvestigationMachineSingleEpoch.swift",
     "InvestigationMachineSingleEpochComposition.swift",
     "InvestigationMachineSingleEpochInstalledL2Join.swift",
@@ -20172,6 +20217,9 @@ expected_driver_support_imports = {
     },
     "InvestigationMachineInstalledDriverObservation.swift": {"Darwin"},
     "InvestigationMachineInstalledDriverSystemSource.swift": {"Darwin"},
+    "InvestigationMachineResolvedRootDriverClaim.swift": {
+        "Foundation", "StornautInvestigationHandoffContract",
+    },
     "InvestigationMachineSingleEpoch.swift": {
         "Foundation", "StornautInvestigationHandoffContract",
         "StornautInvestigationInstalledL2",
@@ -20194,7 +20242,8 @@ expected_driver_support_imports = {
         "Foundation", "StornautInvestigationHandoffContract",
     },
     "InvestigationMachineZeroArgumentEntry.swift": {
-        "Darwin", "Foundation", "StornautInvestigationHandoffContract",
+        "CInvestigationIdentitySupport", "Darwin", "Foundation", "Security",
+        "StornautInvestigationHandoffContract",
     },
 }
 expected_driver_support_sha256 = {
@@ -20208,6 +20257,8 @@ expected_driver_support_sha256 = {
         "0d6d477336cd99fb7279a74bb0b63d63a362bf36fe6b98fae9a2978e289e4a4f",
     "InvestigationMachineInstalledDriverSystemSource.swift":
         "3166ff4e53d66207194546800d96fb659105fb8307e759b9e37083d575117e18",
+    "InvestigationMachineResolvedRootDriverClaim.swift":
+        "89ad4e3ce66d867d76dd7c528623f0ec787b2dde32fb8ec8637baa6c7c4770ed",
     "InvestigationMachineClaimClient.swift":
         "ee373ff00fce08853fccb4c2087a0a47eed2feae6efc300fbd4c74e01f242a0a",
     "InvestigationMachineDarwinAppIdentityObservation.swift":
@@ -20239,7 +20290,7 @@ expected_driver_support_sha256 = {
     "InvestigationMachineSingleEpochPhysicalBridge.swift":
         "49e161d18c904f19ff79ab46c83cfd59199dc8476ff142c275c51d6d70d3374f",
     "InvestigationMachineZeroArgumentEntry.swift":
-        "d91556741167f3dcb55d692141926361dbbe2aed9755022a74f1f22cfab0abcd",
+        "f2aae6706c85e1f9fde2ee96b0d67c179901e8e2a6aac5405bfac54c95566071",
 }
 for source_name in driver_support_sources:
     source_path = driver_support_source_root / source_name
@@ -21667,14 +21718,14 @@ function require_exact_machine_driver_projection() {
     local iib5biii_b2b1b_swiftpm_release_owned_lines=5997
     # ii-c evidence verification adds only InstalledL2 semantic replay and the
     # typed epoch evidence commit path; authority deny-lists remain unchanged.
-    local iic_evidence_debug_undefined_sha=d074185a004ead52e4a03578d4d5bfcca0acd157b8b5e30d7b92eac431866efd
-    local iic_evidence_debug_undefined_lines=700
-    local iic_evidence_release_undefined_sha=b9a223db4819b6831a1e424d91be1f614ed52ab91413c9b9f0d55de0df09d155
-    local iic_evidence_release_undefined_lines=508
-    local iic_evidence_debug_owned_sha=78c04b12d372f99e532906c448dc99aa7a79f586f31a2e77b6daa66388b69ece
-    local iic_evidence_debug_owned_lines=9079
-    local iic_evidence_release_owned_sha=9698db9e44494baed7c24d98ce1b03f3a9aef97b6f0dae5a45145cc6905430bc
-    local iic_evidence_release_owned_lines=6306
+    local iic_evidence_debug_undefined_sha=0395fd8a82d7d985d32696e020e0af3b83a2b1598a5568908cfd5d48a8406d6e
+    local iic_evidence_debug_undefined_lines=702
+    local iic_evidence_release_undefined_sha=de0f83ffe8bbcd5e29d7c63929a42649be2cb8dbc82fea00215bcaba00fff1a4
+    local iic_evidence_release_undefined_lines=510
+    local iic_evidence_debug_owned_sha=bb45f6957c92a7f168610e04294fad40c751bc13b959ed3da5ee9d0f4cf06b21
+    local iic_evidence_debug_owned_lines=9567
+    local iic_evidence_release_owned_sha=ee94d62d09811c9f1b344b9b6d7ff2fbb3eacd49e3832d2facf87a1bf881a4ab
+    local iic_evidence_release_owned_lines=6708
 
     case "$configuration" in
         debug)
@@ -21876,13 +21927,13 @@ function verify_machine_driver_projection_mutations() {
         _posix_spawnattr_destroy _posix_spawnattr_init
         _posix_spawnattr_setflags _posix_spawnattr_setpgroup
         _recv _send _shutdown _socketpair _strdup
-        _kill _nanosleep _proc_listpids _waitid _waitpid _write
+        _kill _nanosleep _proc_listpids _raise _waitid _waitpid _write
     )
     iib5biii_b2b0_authority_markers=(
         'Darwin.write'
     )
     iib5biii_b2b0_authority_imports=(
-        _write
+        _raise _write
     )
     required_readonly_imports=(
         '_$s6Darwin5fcntlys5Int32VAD_A2DtF'

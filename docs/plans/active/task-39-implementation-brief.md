@@ -1,10 +1,15 @@
 # Task 39 Implementation Brief — Signed-App Production Runtime Admission
 
-> **Status:** Active/incomplete; privileged campaigns v8, v9 and v10 are
+> **Status:** Active/incomplete; privileged campaigns v8, v9, v10 and v11 are
 > consumed, non-admitting and non-retryable. v10 passed the repaired AMFI
 > boundary but exhausted the 1,200-second outer campaign deadline after
 > 1,195.056190 seconds from durable arm. The checked failure disposition is
 > preserved, and the deadline-budget repair is complete/non-admitting.
+> v11 then ran from `8a286ea` and failed about 16.259 seconds after
+> durable arm with the legacy generic `campaign-incomplete` reason. Its
+> checked disposition is `consumedPostArmFailureUnclassified`; the successor
+> source now emits a closed schema-v2 projection of primary failure, exact wait,
+> receipt/terminal EOF and cleanup bits. That repair is non-admitting.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -173,7 +178,8 @@
 > fixture invoked production stale-recovery and removed the preserved v9 Gate
 > capsule. No exact byte copy was recoverable. The original v2 receipt is
 > retained, the v3 predecessor binds the then-current owner-lock-only state and
-> the current v5 receipt binds the later v10 residue. The fixture requires explicit opt-in
+> the before-v11 v5 receipt binds the later v10 residue, while the current v5
+> receipt binds the later v11 residue. The fixture requires explicit opt-in
 > plus discovery/entry rejection of any historical attempt. The checkpoint's
 > sole 1,932-test/99-suite serial recorded one missing-attempt issue and was not
 > repeated; the exact v8/v3 and fixture cases passed after the repair.
@@ -194,13 +200,14 @@
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
 >
-> **Current Task 39 disposition (2026-09-07):** v8, v9 and v10 are conclusive
+> **Current Task 39 disposition (2026-09-08):** v8, v9, v10 and v11 are conclusive
 > machine-gate `no-go` attempts. All are consumed, non-admitting and
-> non-retryable. The v9 AMFI repair passed, and v10 exposed a separate bounded
-> deadline-budget defect. The replacement source derives a 1,400-second
-> machine-only campaign horizon from eight 140-second epochs plus a 280-second
-> orchestration/cleanup reserve; non-privileged validation is complete. A
-> further privileged campaign requires fresh explicit authorization. Task 39 is
+> non-retryable. The v9 AMFI repair passed, v10 exposed a bounded
+> deadline-budget defect, and v11 exposed a separate post-arm failure-detail
+> projection gap. The v11 bytes do not justify a credential, sudo, Gate,
+> protocol or transport root-cause claim. The successor closed projection and
+> independent verifier compatibility are implemented. A future privileged
+> campaign still requires fresh explicit authorization. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential

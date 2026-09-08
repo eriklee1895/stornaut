@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8, v9 and v10 consumed failures disposed / deadline repair complete and non-admitting
+> Status: frozen / v8, v9, v10 and v11 consumed failures disposed / post-arm diagnostic repair complete and non-admitting
 >
 > Date: 2026-08-30
 >
@@ -22,6 +22,12 @@
 > is consumed, non-admitting and non-retryable. Its checked disposition and the
 > 1,400-second bounded deadline repair is complete and non-admitting. Any
 > replacement campaign requires fresh explicit authorization.
+> On 2026-09-08 the user authorized one fresh v11 campaign from pushed baseline
+> `8a286ea41d73b0874c6775cc6f79736f972782fe`. It reached durable arm,
+> recorded `spawnUncertain → terminal` about 16.259 seconds later and exited
+> 70. The legacy generic reason cannot support an exact root-cause claim; v11 is
+> consumed/non-admitting/non-retryable and the successor closed schema-v2
+> post-arm diagnostic projection is complete/non-admitting.
 
 ## 1. Decision
 

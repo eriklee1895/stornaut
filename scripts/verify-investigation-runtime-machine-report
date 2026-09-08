@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_self_sha=31fe83a5f53c1cef7e3439a5ee6bfd4cf8549d4680e41fb4ab099a9d57292bda # iicc-self-seal
+typeset -r iicc_self_sha=111d20eaa50e448b7903356f82930630d5687e9627307c1935ab9287926ed4de # iicc-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -628,7 +628,8 @@ def parse_event(data):
     keys = (base | {"processID", "processGroupID", "sessionID"}
             if kind == 4 else base | {"reason"} if kind in (2, 5) else base)
     exact_object(value, keys, "event payload")
-    require(exact_int(value["schemaVersion"], "event schema") == 1
+    schema = exact_int(value["schemaVersion"], "event schema")
+    require((schema == 1 or kind == 5 and schema == 2)
             and value["kind"] == names[kind]
             and exact_uuid(value["attemptUUID"], "event attempt") == attempt
             and digest_text(value["evidenceSetSHA256"], "event evidence"),
@@ -641,6 +642,29 @@ def parse_event(data):
     if kind in (2, 5):
         require(isinstance(value["reason"], str) and value["reason"]
                 and len(value["reason"].encode()) <= 96, "event reason")
+    if kind == 5 and schema == 2:
+        primary = ("alreadyConsumed", "bindingInvalid",
+            "deadlineExceeded", "spawnUncertain", "identityMismatch",
+            "receiptInvalid", "diagnosticOverflow", "childTerminated",
+            "exactReapUncertain", "residueUncertain",
+            "transportUncertain", "cancelled", "unexpectedResponse")
+        parts = value["reason"].split("/")
+        wait = (parts[2] if len(parts) == 6 else "")
+        wait_match = re.fullmatch(r"(exited|signaled|stopped)-([0-9]+)", wait)
+        wait_valid = (wait == "wait-unavailable" or wait_match is not None
+            and wait_match.group(2) == str(int(wait_match.group(2)))
+            and (0 <= int(wait_match.group(2)) <= 255
+                if wait_match.group(1) == "exited"
+                else 1 <= int(wait_match.group(2)) <= 31))
+        cleanup_match = (re.fullmatch(r"cleanup-([0-9a-f]{2})", parts[5])
+            if len(parts) == 6 else None)
+        require(len(parts) == 6 and parts[0] == "postArmFailure"
+                and parts[1] in primary and wait_valid
+                and parts[3] in ("receipt-open", "receipt-eof")
+                and parts[4] in ("terminal-open", "terminal-eof")
+                and cleanup_match is not None
+                and int(cleanup_match.group(1), 16) <= 0x1f,
+                "closed failure projection reason")
     require(hashlib.sha256(payload).digest() == fields[6], "event payload digest")
     return {"sequence": sequence, "attempt": attempt, "kind": kind,
             "previous": fields[3], "observed": observed, "payload": value,

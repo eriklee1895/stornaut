@@ -341,15 +341,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 lifecycle call-graph drifted",
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
-            "3e4fc893ac38a0066a3019174bc48165b1b60882b2f8ee0c42f2deec060abbff",
+            "2ab9f885f5e8a1807c1250bf24c2015d71aa65a56797c975e810e1e0bf9d08d4",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
-            "f88e90dad64c01921d7a7b4bc13a3f0406ab3aa48f28ef74b9885940eee726d4",
+            "94f0fc8a73596dbe6c693f5975d23da5c68df2d6bbb81c3f2924f3d28ff6330a",
             "require_body_digest(",
             "28abaf3aa77391cc679715a824f3f5df3af44d78d5b66bef458f21416215d615",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
-            "55d00e353316486b21b659d46d3dfd30824f3e4e2c263f7d54872db80a626423",
+            "2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd",
             "active_executable.count('Self.runLifecycle(') != 3",
             "active_executable.count('runFixed(') != 4",
             "active_executable.count('posix_spawn(') != 1",
@@ -523,10 +523,13 @@ struct InvestigationMachineTargetBoundaryTests {
         let v10Evidence = try String(contentsOf: root.appending(
             path: "docs/reports/evidence/task-39-iic-v10-failure-disposition.json"),
             encoding: .utf8)
+        let v11Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v11-failure-disposition.json"),
+            encoding: .utf8)
 
         for marker in [
             "iicc_failure_self_sha=", "/usr/bin/python3 -I",
-            "profile in (1, 2, 3, 4, 5)",
+            "profile in (1, 2, 3, 4, 5, 6)",
             "f\"stornaut.task39.iic.failure-disposition.v{profile}\"",
             "consumedTransportLoss", "admission\"] == \"rejected",
             "retry\"] == \"forbidden",
@@ -541,6 +544,8 @@ struct InvestigationMachineTargetBoundaryTests {
             "pwd.getpwuid(user_id)", "record.pw_dir",
             "consumedDriverExecutionPolicyDenial",
             "consumedCampaignDeadlineExhaustion",
+            "consumedPostArmFailureUnclassified",
+            "closed failure projection reason",
             "ownConsumedAttemptPresent",
             "ownConsumedAttemptRemovedByTestFixture",
             "testFixtureStaleRecoveryRemovedConsumedGateResidue",
@@ -601,18 +606,19 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"88faa4e93662c411598a6508a29d652a8c6d474a148e10fbb22b57fe8d6c4fb8\")",
-            "(Path(\"README.md\"), \"4b82bb722bc2e713e43c1f3fc22cbf3cd798e8c1d9c95e4465506954eb2918d4\")",
-            "(Path(\"docs/README.md\"), \"66656f4b91a2504070d9c5971addcdcb389714d02f4223975c5f5b81ced27057\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"6e8c7350c15c4e11713fdef7b6d65edfad27aee3d9c5acb866517f6edd7aaee9\")",
-            "(Path(\"docs/plans/active/README.md\"), \"fd88977fe645a3dc1bffbe92de837233ed2e4b55c39f15064c392b9eacfc3e23\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"e11e499abb99271fe12321159c99b106709e85fd27cfc551081df1439e722886\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"4898e4feb205ab1002cd28b2728996f283afb9976e05cd048f6ed57810a63bc8\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"8dfc19e53d3ec14ee8fbf92e00cf57f7466f2747f23eae21d86adc8d012d8d47\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"2fa880935a7fc307de13bdc2bc42a2de2a930b14e291d3b36eec5b93d7bc7235\")",
+            "(Path(\"AGENTS.md\"), \"391f16231fffdc3fbd24b50056a40ddb5f92e7a940a1663b8a82dda14a242a78\")",
+            "(Path(\"README.md\"), \"fb9a8db29580364e24ccfca70e97a2c57f2579ed157a1e84ef2d7a9bada90878\")",
+            "(Path(\"docs/README.md\"), \"4d0b73bdd6d25264fce4f7e1aa74c72e20a2c772a1dce85956dd3be6fea4f105\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"6f28b66956d3b2038ff294b20e78f84dcf411ef808dfbb7ddff6ebf1ed5f189c\")",
+            "(Path(\"docs/plans/active/README.md\"), \"f05b125cfe1b4f6ed5e3307ae8fcf09f70a6c98ee92cb372e99ee7181f727e75\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"dfe32774a86f2df53ced850ba5f59d252b5ab20cbb0d6e64c1b1e1f3803953c5\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"9c528244bfe75562af758c27f0cfbaba69fd0f719cb4b1b4fa0afc27c8802e32\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"6152cfe6666410a51e7a00149179f3ca9443c5267be96fe27877752328716cd4\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"3198295f3bdd111cc3006dee8e0981767831e44497d8f0e8e42cd84470cc5e96\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
-            "len(active_status_entries) != 11",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"c927a25ccc09d35d9992f2f11b33829bae616a80ef3fab40b59875c04500c9bd\")",
+            "len(active_status_entries) != 12",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
             "ii-c-c blocked status docs inventory drifted",
@@ -637,7 +643,9 @@ struct InvestigationMachineTargetBoundaryTests {
         let subsequentObservation = try #require(
             v9Object["subsequentCampaignObservation"] as? [String: Any])
         #expect(subsequentObservation["classification"] as? String
-            == "consumedCampaignDeadlineExhaustion")
+            == "consumedPostArmFailureUnclassified")
+        #expect(subsequentObservation["attemptUUID"] as? String
+            == "18a85048-5e1c-40c5-99e4-3785185070d3")
         #expect(!v9Evidence.contains("signedInvestigationRuntimeReady"))
         let v10Object = try #require(JSONSerialization.jsonObject(
             with: Data(v10Evidence.utf8)) as? [String: Any])
@@ -647,7 +655,21 @@ struct InvestigationMachineTargetBoundaryTests {
             == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
         #expect(v10Object["admission"] as? String == "rejected")
         #expect(v10Object["retry"] as? String == "forbidden")
+        let v10Observation = try #require(
+            v10Object["systemObservation"] as? [String: Any])
+        #expect(v10Observation["gateBaseState"] as? String
+            == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent")
         #expect(!v10Evidence.contains("signedInvestigationRuntimeReady"))
+        let v11Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v11Evidence.utf8)) as? [String: Any])
+        #expect(v11Object["classification"] as? String
+            == "consumedPostArmFailureUnclassified")
+        #expect(v11Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v11Object["schemaVersion"] as? Int == 6)
+        #expect(v11Object["admission"] as? String == "rejected")
+        #expect(v11Object["retry"] as? String == "forbidden")
+        #expect(!v11Evidence.contains("signedInvestigationRuntimeReady"))
     }
 
     private func boundarySource(_ root: URL) -> String {
