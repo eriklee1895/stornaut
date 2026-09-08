@@ -33,7 +33,7 @@ still use legacy schema-v1 teardown and bypass the live preservation proof. The
 final verifier now requires schema v2 for every admitting cohort, while schema
 v1 remains readable only for historical/non-admitting evidence. A dedicated
 negative regression proves schema-v1 admission is rejected. Post-fix runtime
-review found no remaining P0-P2.
+and verifier reviews found no remaining P0-P2.
 
 ## Validation
 
