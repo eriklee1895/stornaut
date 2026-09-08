@@ -688,7 +688,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"27362f9b0e2e3288cb72f7c3146fce212ecc77d5b9856e3f2a92e68fdfb0208c\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"7e0128f41f14fb45f57ef7792faafca21d8b59b2420d348867b60b91590e177a\")",
             "len(active_status_entries) != 13",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",

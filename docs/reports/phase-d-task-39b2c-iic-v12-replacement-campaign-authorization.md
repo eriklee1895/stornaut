@@ -66,8 +66,10 @@ production Deep Dive availability is authorized by this amendment.
 ## Preflight order
 
 Before any root/install/sudo action, the source tree must be clean and pushed as
-the exact authorization-only descendant of `4fd9c53`; v8-v11 dispositions must
-still verify read-only; the fixed runtime must be absent; preserved historical
+the exact authorization-only descendant of `4fd9c53`; the checked v8 receipt
+must retain its documented historical tree-loss non-claim, and the still-present
+v9-v11 evidence trees must verify read-only; the fixed runtime must be absent;
+preserved historical
 Gate residue must remain unchanged; structural, focused, component/final-Mach-O
 and independent-review gates required by the frozen ii-c plan must be green.
 The campaign is then launched exactly once from an interactive Terminal.
