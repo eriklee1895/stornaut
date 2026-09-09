@@ -15,7 +15,7 @@ struct InvestigationMachineGateOwnershipTests {
 
         #expect(system.identityBufferByteCounts == [1_024])
         #expect(system.createCalls == [
-            ModeCall(role: .caches, name: fixedBaseName, mode: 0o700),
+            ModeCall(role: .applicationSupport, name: fixedBaseName, mode: 0o700),
         ])
         #expect(system.openCalls == expectedFreshOpenCalls)
         #expect(system.permissionCalls == [
@@ -38,10 +38,12 @@ struct InvestigationMachineGateOwnershipTests {
                 flags: lockNamedFlags),
         ])
         #expect(system.roles(for: system.metadataDescriptors) == [
-            .root, .users, .home, .library, .caches, .base, .lock, .base, .lock,
+            .root, .users, .home, .library, .applicationSupport, .base, .lock,
+            .base, .lock,
         ])
         let descriptorStateRoles: [GateRole] = [
-            .root, .users, .home, .library, .caches, .base, .lock, .base, .lock,
+            .root, .users, .home, .library, .applicationSupport, .base, .lock,
+            .base, .lock,
         ]
         #expect(system.roles(for: system.descriptorFlagDescriptors)
             == descriptorStateRoles)
@@ -54,7 +56,7 @@ struct InvestigationMachineGateOwnershipTests {
             .base, .lock, .base, .lock,
         ])
         #expect(system.closeRoles == [
-            .caches, .library, .home, .users, .root,
+            .applicationSupport, .library, .home, .users, .root,
         ])
         let baseDescriptor = try #require(system.baseDescriptors.last)
         let lockDescriptor = try #require(system.lockDescriptors.last)
@@ -83,11 +85,11 @@ struct InvestigationMachineGateOwnershipTests {
         let baseCalls = system.openCalls.filter { $0.name == fixedBaseName }
         let lockCalls = system.openCalls.filter { $0.name == fixedLockName }
         #expect(system.createCalls == [
-            ModeCall(role: .caches, name: fixedBaseName, mode: 0o700),
+            ModeCall(role: .applicationSupport, name: fixedBaseName, mode: 0o700),
         ])
         #expect(baseCalls == [
             OpenCall(
-                parentRole: .caches,
+                parentRole: .applicationSupport,
                 name: fixedBaseName,
                 flags: directoryChildFlags,
                 mode: nil
@@ -301,7 +303,7 @@ struct InvestigationMachineGateOwnershipTests {
         #expect(system.everySuccessfullyOpenedDescriptorWasClosedOnce)
         if failure.operation == .openComponent, failure.occurrence == 6 {
             #expect(system.createCalls == [ModeCall(
-                role: .caches, name: fixedBaseName, mode: 0o700)])
+                role: .applicationSupport, name: fixedBaseName, mode: 0o700)])
             #expect(system.permissionCalls.isEmpty)
         }
         if failure.operation == .setPermissions {
@@ -643,7 +645,8 @@ struct InvestigationMachineGateOwnershipTests {
 private let identityBufferCapacities =
     [1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536]
 private let fixedBaseName = "com.eriklee.stornaut.task39-machine-gate"
-private let fixedBaseRelativePath = "Users/eriklee/Library/Caches/\(fixedBaseName)"
+private let fixedBaseRelativePath =
+    "Users/eriklee/Library/Application Support/\(fixedBaseName)"
 private let fixedLockName = ".owner-lock-v1"
 private let directoryRootFlags = O_RDONLY | O_DIRECTORY | O_CLOEXEC
     | O_NONBLOCK | O_NOFOLLOW_ANY
@@ -677,10 +680,10 @@ private let expectedFreshOpenCalls: [OpenCall] = [
         parentRole: .home, name: "Library",
         flags: directoryChildFlags, mode: nil),
     OpenCall(
-        parentRole: .library, name: "Caches",
+        parentRole: .library, name: "Application Support",
         flags: directoryChildFlags, mode: nil),
     OpenCall(
-        parentRole: .caches, name: fixedBaseName,
+        parentRole: .applicationSupport, name: fixedBaseName,
         flags: directoryChildFlags, mode: nil),
     OpenCall(
         parentRole: .base, name: fixedLockName,
@@ -688,7 +691,7 @@ private let expectedFreshOpenCalls: [OpenCall] = [
 ]
 
 private enum GateRole: String, Hashable, Sendable {
-    case root, users, home, library, caches, base, lock
+    case root, users, home, library, applicationSupport, base, lock
 }
 
 private struct OpenCall: Equatable, Sendable {
@@ -810,7 +813,7 @@ private enum DescriptorDrift: CaseIterable, Sendable {
     case usersType
     case homeType
     case libraryType
-    case cachesType
+    case applicationSupportType
     case missingRootCloseOnExec
     case missingParentCloseOnExec
     case missingBaseCloseOnExec
@@ -829,8 +832,9 @@ private enum DescriptorDrift: CaseIterable, Sendable {
         case .homeType: system.metadataByRole[.home] = otherMetadata(.home)
         case .libraryType:
             system.metadataByRole[.library] = otherMetadata(.library)
-        case .cachesType:
-            system.metadataByRole[.caches] = otherMetadata(.caches)
+        case .applicationSupportType:
+            system.metadataByRole[.applicationSupport] =
+                otherMetadata(.applicationSupport)
         case .missingRootCloseOnExec:
             system.descriptorFlagsByRole[.root] = 0
         case .missingParentCloseOnExec:
@@ -848,7 +852,7 @@ private enum DescriptorDrift: CaseIterable, Sendable {
         case .missingLockNonblocking:
             system.statusFlagsByRole[.lock] = O_RDWR
         case .directoryWriteAccess:
-            system.statusFlagsByRole[.caches] = O_NONBLOCK | O_RDWR
+            system.statusFlagsByRole[.applicationSupport] = O_NONBLOCK | O_RDWR
         case .lockReadOnlyAccess:
             system.statusFlagsByRole[.lock] = O_NONBLOCK | O_RDONLY
         }
@@ -1544,8 +1548,8 @@ private func roleForOpen(
     case (.root, "Users"): .users
     case (.users, "eriklee"): .home
     case (.home, "Library"): .library
-    case (.library, "Caches"): .caches
-    case (.caches, fixedBaseName): .base
+    case (.library, "Application Support"): .applicationSupport
+    case (.applicationSupport, fixedBaseName): .base
     case (.base, fixedLockName): .lock
     default: throw InvestigationMachineGateSystemError.errno(EINVAL)
     }
@@ -1625,7 +1629,7 @@ private extension GateRole {
         case .users: 1
         case .home: 2
         case .library: 3
-        case .caches: 4
+        case .applicationSupport: 4
         case .base: 5
         case .lock: 6
         }

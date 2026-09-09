@@ -84,7 +84,7 @@ struct InvestigationFixedGateHandoffPhysicalTests {
 private let physicalFixedMachineGateRoot = FileManager.default
     .homeDirectoryForCurrentUser
     .appending(
-        path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate",
+        path: "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
         directoryHint: .isDirectory
     )
 private let physicalFixedGateFixtureOptIn = ProcessInfo.processInfo.environment[
@@ -434,7 +434,8 @@ private final class HandoffPhysicalFixture {
     }
     func machineGateAttemptNames() throws -> [String] {
         let root = FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+            .appending(path:
+                "Library/Application Support/com.eriklee.stornaut.task39-machine-gate")
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(atPath: root.path)
             .filter { $0.hasPrefix("attempt-") }

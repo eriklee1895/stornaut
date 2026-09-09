@@ -358,6 +358,12 @@ iicc_suspended_sudo_sources=()
 iicc_failure_disposition_contract_only=false
 iicc_v12_external_evidence_only=false
 iicc_v12_external_evidence_root=
+iicc_persistent_gate_contract_only=false
+iicc_persistent_gate_mutation_contract_only=false
+iicc_persistent_gate_mutation_name=
+iicc_persistent_gate_mutation_slot=
+iicc_persistent_gate_mutation_sha=
+iicc_persistent_gate_sources=()
 iicc_credential_deadline_contract_only=false
 iicc_credential_deadline_mutation_contract_only=false
 iicc_credential_deadline_mutation_name=
@@ -1007,6 +1013,17 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-v12-external-evidence-only ]]; then
         iicc_v12_external_evidence_only=true
         iicc_v12_external_evidence_root=$2
+    elif (( $# == 1 || $# == 6 )) \
+        && [[ $1 == --iic-c-persistent-gate-contract-only ]]; then
+        iicc_persistent_gate_contract_only=true
+        iicc_persistent_gate_sources=("${@:2}")
+    elif (( $# == 9 )) \
+        && [[ $1 == --iic-c-persistent-gate-mutation-contract-only ]]; then
+        iicc_persistent_gate_mutation_contract_only=true
+        iicc_persistent_gate_mutation_name=$2
+        iicc_persistent_gate_mutation_slot=$3
+        iicc_persistent_gate_mutation_sha=$4
+        iicc_persistent_gate_sources=("${@:5}")
     elif (( $# == 1 || $# == 8 )) \
         && [[ $1 == --iic-c-credential-deadline-contract-only ]]; then
         iicc_credential_deadline_contract_only=true
@@ -8480,7 +8497,7 @@ for marker in (
     if marker not in ownership:
         fail(f"ii-c0b-ii-a ownership API drifted: {marker}")
 for marker in (
-    "Library", "Caches",
+    "Library", "Application Support",
     "com.eriklee.stornaut.task39-machine-gate", ".owner-lock-v1",
 ):
     if marker not in ownership:
@@ -13342,6 +13359,114 @@ function verify_iicc_v12_external_evidence() {
         return 1
     }
     "$verifier" "$iicc_v12_external_evidence_root" "$PWD/$disposition"
+}
+
+function verify_iicc_persistent_gate_contract() {
+    local -a p=("${iicc_persistent_gate_sources[@]}")
+    if (( ${#p} == 0 )); then p=(
+        Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift
+        Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift
+        Tests/Fixtures/InvestigationFixedGateHandoff/main.swift
+        Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+    ); fi
+    (( ${#p} == 5 )) || {
+        print -u2 "ii-c-c persistent Gate source cardinality drifted"
+        return 1
+    }
+    local path
+    for path in "${p[@]}"; do [[ -f $path && ! -L $path ]] || {
+        print -u2 "ii-c-c persistent Gate source unavailable: $path"
+        return 1
+    }; done
+    /usr/bin/xcrun swiftc -frontend -parse "${p[@]}" || return $?
+    /usr/bin/python3 -I - \
+        "$iicc_persistent_gate_mutation_contract_only" \
+        "$iicc_persistent_gate_mutation_name" \
+        "$iicc_persistent_gate_mutation_slot" \
+        "$iicc_persistent_gate_mutation_sha" "${p[@]}" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+if len(sys.argv) != 10:
+    raise SystemExit("ii-c-c persistent Gate source cardinality drifted")
+mutation_mode, mutation_name, mutation_slot, mutation_sha = sys.argv[1:5]
+names = ("ownership", "ownership_tests", "capsule_tests", "fixture", "physical")
+paths = tuple(map(Path, sys.argv[5:]))
+sources = dict(zip(names, (path.read_text(encoding="utf-8") for path in paths)))
+canonical_paths = tuple(map(Path, (
+    "Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift",
+    "Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift",
+    "Tests/Fixtures/InvestigationFixedGateHandoff/main.swift",
+    "Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift",
+)))
+canonical = dict(zip(names, (path.read_text(encoding="utf-8")
+                             for path in canonical_paths)))
+mutations = {
+    "cache-regression": ("ownership",
+        '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "base-mode": ("ownership", "name: Self.baseName, mode: 0o700",
+                  "name: Self.baseName, mode: 0o755"),
+    "ownership-test-vacuity": ("ownership_tests",
+        '"Users/eriklee/Library/Application Support/\(fixedBaseName)"',
+        '"Users/eriklee/Library/Caches/\(fixedBaseName)"'),
+    "capsule-test-vacuity": ("capsule_tests",
+        '"Users/fixture/Library/Application Support/"',
+        '"Users/fixture/Library/Caches/"'),
+    "fixture-path": ("fixture",
+        '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "physical-path": ("physical",
+        'path: "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        'path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+}
+if mutation_mode == "true":
+    if mutation_name not in mutations:
+        raise SystemExit("ii-c-c persistent Gate mutation unknown")
+    expected_slot, old, new = mutations[mutation_name]
+    if mutation_slot != expected_slot or not re.fullmatch(r"[0-9a-f]{64}", mutation_sha):
+        raise SystemExit("ii-c-c persistent Gate mutation contract drifted")
+    if hashlib.sha256(paths[names.index(mutation_slot)].read_bytes()).hexdigest() != mutation_sha:
+        raise SystemExit("ii-c-c persistent Gate mutation SHA drifted")
+    if canonical[mutation_slot].count(old) != 1 \
+            or sources[mutation_slot] != canonical[mutation_slot].replace(old, new, 1):
+        raise SystemExit("ii-c-c persistent Gate mutation unrecognized")
+    for name in names:
+        if name != mutation_slot and sources[name] != canonical[name]:
+            raise SystemExit("ii-c-c persistent Gate mutation changed another source")
+elif mutation_mode != "false" or mutation_name or mutation_slot or mutation_sha:
+    raise SystemExit("ii-c-c persistent Gate mutation mode drifted")
+
+ownership, ownership_tests, capsule_tests, fixture, physical = \
+    (sources[name] for name in names)
+fixed = "com.eriklee.stornaut.task39-machine-gate"
+new_path = "Library/Application Support/" + fixed
+old_path = "Library/Caches/" + fixed
+if ownership.count('"Application Support"') != 1 \
+        or ownership.count(new_path) != 1 \
+        or '"Caches"' in ownership or old_path in ownership:
+    raise SystemExit("ii-c-c persistent Gate ownership path drifted")
+for source, label in ((fixture, "fixture"), (physical, "physical")):
+    if new_path not in source or old_path in source:
+        raise SystemExit("ii-c-c persistent Gate " + label + " path drifted")
+for source, marker in (
+    (ownership_tests, "Users/eriklee/Library/Application Support/"),
+    (capsule_tests, "Users/fixture/Library/Application Support/"),
+):
+    if marker not in source or "Library/Caches/" in source:
+        raise SystemExit("ii-c-c persistent Gate test topology drifted")
+for marker in (
+    "O_NOFOLLOW_ANY", "O_RESOLVE_BENEATH", "AT_SYMLINK_NOFOLLOW_ANY",
+    "mode: 0o700", "mode: 0o600", "extendedACLIsEmpty",
+    "extendedAttributeNames", "acquireExclusiveNonblockingLock",
+):
+    if marker not in ownership:
+        raise SystemExit("ii-c-c persistent Gate security boundary drifted: " + marker)
+PY
 }
 
 function verify_iicc_credential_deadline_contract() {
@@ -18653,6 +18778,12 @@ fi
 if $iicc_v12_external_evidence_only; then
     verify_iicc_v12_external_evidence
     print "ii-c-c frozen v12 external evidence verification passed."
+    exit 0
+fi
+if $iicc_persistent_gate_contract_only \
+    || $iicc_persistent_gate_mutation_contract_only; then
+    verify_iicc_persistent_gate_contract
+    print "ii-c-c persistent Gate contract verification passed."
     exit 0
 fi
 if $iicc_credential_deadline_contract_only \

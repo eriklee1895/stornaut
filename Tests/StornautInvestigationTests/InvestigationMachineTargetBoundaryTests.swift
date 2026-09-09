@@ -507,6 +507,33 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func iiCCPersistentGatePathIsOwnerPrivateAndNonPurgeable() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = boundarySource(root)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let aggregate = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-c-persistent-gate-contract-only",
+            "--iic-c-persistent-gate-mutation-contract-only",
+            "function verify_iicc_persistent_gate_contract()",
+            "cache-regression", "base-mode", "ownership-test-vacuity",
+            "capsule-test-vacuity", "fixture-path", "physical-path",
+        ] { #expect(boundary.contains(marker), "missing: \(marker)") }
+        #expect(release.contains(
+            "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"))
+        #expect(release.contains(
+            "--iic-c-persistent-gate-component-boundary-only"))
+        #expect(release.contains(
+            "function verify_iicc_persistent_gate_component_boundary()"))
+        for marker in [
+            "component-function", "component-call-edge",
+        ] { #expect(aggregate.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
     func iiCB2A2IndependentVerifierPinsScopeAndBoundaries() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

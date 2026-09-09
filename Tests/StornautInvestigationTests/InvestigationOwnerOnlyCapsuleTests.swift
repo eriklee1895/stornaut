@@ -2389,8 +2389,8 @@ private final class CapsuleOwnershipSystem:
             else if parent == .root { .users }
             else if parent == .users { .home }
             else if parent == .home { .library }
-            else if parent == .library { .caches }
-            else if parent == .caches { .base }
+            else if parent == .library { .applicationSupport }
+            else if parent == .applicationSupport { .base }
             else { .lock }
         let fd = nextFD; nextFD += 1; roleByFD[fd] = role; return fd
     }
@@ -2497,6 +2497,8 @@ private final class CapsuleOutcomeBorrower:
     }
 }
 
-private enum GateRole: String { case root, users, home, library, caches, base, lock }
-private let fixedBaseRelativePath = "Users/fixture/Library/Caches/"
+private enum GateRole: String {
+    case root, users, home, library, applicationSupport, base, lock
+}
+private let fixedBaseRelativePath = "Users/fixture/Library/Application Support/"
     + InvestigationMachineGateOwnershipAcquirer.baseName

@@ -389,7 +389,8 @@ private func recordedGatePID() throws -> pid_t {
 }
 private func attemptDirectoryURL(_ uuid: UUID) -> URL {
     FileManager.default.homeDirectoryForCurrentUser
-        .appending(path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+        .appending(path:
+            "Library/Application Support/com.eriklee.stornaut.task39-machine-gate")
         .appending(path: "attempt-" + uuid.uuidString.lowercased())
 }
 private func handoffErrorName(_ error: Error) -> String {

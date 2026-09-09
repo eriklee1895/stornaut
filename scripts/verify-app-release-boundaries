@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# iicb1_app_self_sha=a8035922c7ce6abbbc7754b282df107aa66977fa93f78af86abe780e957e800e
-if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-c-suspended-sudo-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
+# iicb1_app_self_sha=a50c051aed51bb6286f9d1ed169b69bde79c366ddb4548eaeaa285b269961e06
+if [[ $# == 0 || ${1:-} == --iic-b1-root-owned-gate-component-* || ${1:-} == --iic-b2a2-component-* || ${1:-} == --iic-b2b2-component-* || ${1:-} == --iic-c-suspended-sudo-component-* || ${1:-} == --iic-c-persistent-gate-component-* || ${1:-} == --iic-evidence-verification-component-* || ${1:-} == --iic-root-driver-lineage-l1-component-* ]]; then iicb1_app_self_sha=$(/usr/bin/sed -nE 's/^# iicb1_app_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}"); [[ ${#iicb1_app_self_sha} == 64 && "$(/usr/bin/sed -E 's/^# iicb1_app_self_sha=[0-9a-f]{64}$/# iicb1_app_self_sha=SELF/' "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')" == "$iicb1_app_self_sha" ]] || { print -u2 "ii-c-b1 App release verifier self-seal drifted"; exit 1; }; fi
 repo_root=${0:A:h:h}
 cd "$repo_root"
 
@@ -97,6 +97,7 @@ iicb2a2_component_boundary_internal=false
 iic_evidence_verification_component_boundary_only=false
 iicb2b2_component_boundary_only=false
 iicc_suspended_sudo_component_boundary_only=false
+iicc_persistent_gate_component_boundary_only=false
 iic_lineage_l1_component_boundary_only=false
 iic0bivb2_component_boundary_only=false
 iica_existing_product_derived_data=
@@ -236,6 +237,9 @@ elif [[ $# == 1 && $1 == --iic-b2b2-component-boundary-only ]]; then
 elif [[ $# == 1 \
     && $1 == --iic-c-suspended-sudo-component-boundary-only ]]; then
     iicc_suspended_sudo_component_boundary_only=true
+elif [[ $# == 1 \
+    && $1 == --iic-c-persistent-gate-component-boundary-only ]]; then
+    iicc_persistent_gate_component_boundary_only=true
 elif [[ $# == 1 \
     && $1 == --iic-root-driver-lineage-l1-component-boundary-only ]]; then
     iic_lineage_l1_component_boundary_only=true
@@ -1775,7 +1779,7 @@ function verify_iic0biia3_component_boundary() {
         done
         for marker in \
             '.owner-lock-v1' \
-            'com.eriklee.stornaut.task39-machine-gate'
+            'com.eriklee.stornaut.task39-machine-gate' 'Application Support'
         do
             [[ "$debug_strings" == *"$marker"* \
                 && "$release_strings" != *"$marker"* ]] || {
@@ -5593,6 +5597,46 @@ PY
     done
 )
 
+function verify_iicc_persistent_gate_component_boundary() (
+    local PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    export PATH
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+    local scratch
+    scratch=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-iicc-persistent-gate-component.XXXXXX")
+    trap 'rm -rf "$scratch"' EXIT
+    local configuration binary strings
+    for configuration in debug release; do
+        /usr/bin/swift build --scratch-path "$scratch/$configuration" \
+            --configuration "$configuration" \
+            --product StornautInvestigationMachineGateCoordinator \
+            --disable-sandbox || exit $?
+        binary=$(/usr/bin/swift build --scratch-path "$scratch/$configuration" \
+            --configuration "$configuration" \
+            --show-bin-path)/StornautInvestigationMachineGateCoordinator
+        [[ -x $binary && ! -L $binary ]] || return 1
+        strings=$(xcrun strings -a "$binary") || return $?
+        local persistent_suffix=
+        persistent_suffix='Library/Application Support/com.eriklee.stornaut.task39-machine-gate'
+        local purgeable_suffix=
+        purgeable_suffix='Library/Caches/com.eriklee.stornaut.task39-machine-gate'
+        if [[ $configuration == debug ]]; then
+            [[ $strings == *$persistent_suffix* \
+                && $strings != *$purgeable_suffix* ]] || {
+                print -u2 "ii-c-c persistent Gate Debug path drifted"
+                return 1
+            }
+        else
+            [[ $strings != *$persistent_suffix* \
+                && $strings != *$purgeable_suffix* \
+                && $strings != *'com.eriklee.stornaut.task39-machine-gate'* ]] || {
+                print -u2 "ii-c-c persistent Gate path leaked into Release"
+                return 1
+            }
+        fi
+    done
+)
+
 function verify_iic_root_driver_lineage_l1_component_boundary() (
     local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin; local require_staged=${1:-true}
     [[ $require_staged == false ]] || [[ ${STORNAUT_VALIDATION_SOURCE:-} == staged \
@@ -5805,6 +5849,11 @@ fi
 if $iicc_suspended_sudo_component_boundary_only; then
     verify_iicc_suspended_sudo_component_boundary || exit $?
     print "ii-c-c suspended-sudo component boundary verification passed."
+    exit 0
+fi
+if $iicc_persistent_gate_component_boundary_only; then
+    verify_iicc_persistent_gate_component_boundary || exit $?
+    print "ii-c-c persistent Gate component boundary verification passed."
     exit 0
 fi
 if $iic_lineage_l1_component_boundary_only; then

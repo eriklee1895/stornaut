@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=7ecfa4116a3082b428d0f5370fe3d4be3cf8aa3f529d0f23473b53439c57c8f0
+# ib2_self_sha=77d265387eb7a049b5dbf82d14b993daf31346d589eca9c12fb4d281ea4d4cc0
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3871,6 +3871,131 @@ PY
     "$gate" --iic-c-deadline-budget-contract-only >"$out/deadline-budget.log"
     "$gate" --iic-c-credential-deadline-contract-only \
         >"$out/credential-deadline.log"
+    "$gate" --iic-c-persistent-gate-contract-only \
+        >"$out/persistent-gate.log"
+    local persistent_manifest="$out/persistent-gate-mutations"
+    /usr/bin/python3 -I - "$persistent_manifest" <<'PY'
+from pathlib import Path
+import hashlib
+
+paths = {
+    "ownership": Path("Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift"),
+    "ownership_tests": Path("Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift"),
+    "capsule_tests": Path("Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift"),
+    "fixture": Path("Tests/Fixtures/InvestigationFixedGateHandoff/main.swift"),
+    "physical": Path("Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift"),
+}
+mutations = {
+    "cache-regression": ("ownership",
+        '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "base-mode": ("ownership", "name: Self.baseName, mode: 0o700",
+                  "name: Self.baseName, mode: 0o755"),
+    "ownership-test-vacuity": ("ownership_tests",
+        '"Users/eriklee/Library/Application Support/\\(fixedBaseName)"',
+        '"Users/eriklee/Library/Caches/\\(fixedBaseName)"'),
+    "capsule-test-vacuity": ("capsule_tests",
+        '"Users/fixture/Library/Application Support/"',
+        '"Users/fixture/Library/Caches/"'),
+    "fixture-path": ("fixture",
+        '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "physical-path": ("physical",
+        'path: "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        'path: "Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+}
+with Path(__import__("sys").argv[1]).open("w", encoding="utf-8") as output:
+    for name, (slot, old, new) in mutations.items():
+        source = paths[slot].read_text(encoding="utf-8")
+        if source.count(old) != 1:
+            raise SystemExit("cannot construct persistent Gate mutation: " + name)
+        target = Path(__import__("sys").argv[1]).parent / ("persistent-" + name + ".source")
+        target.write_text(source.replace(old, new, 1), encoding="utf-8")
+        print(name, slot, hashlib.sha256(target.read_bytes()).hexdigest(), target,
+              sep="\t", file=output)
+PY
+    local persistent_name persistent_slot persistent_sha persistent_target
+    while IFS=$'\t' read -r persistent_name persistent_slot persistent_sha \
+        persistent_target; do
+        local -a persistent_paths=(
+            Sources/StornautInvestigationMachineLaunchSupport/InvestigationMachineGateOwnership.swift
+            Tests/StornautInvestigationTests/InvestigationMachineGateOwnershipTests.swift
+            Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift
+            Tests/Fixtures/InvestigationFixedGateHandoff/main.swift
+            Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift
+        )
+        case $persistent_slot in
+            ownership) persistent_paths[1]=$persistent_target;;
+            ownership_tests) persistent_paths[2]=$persistent_target;;
+            capsule_tests) persistent_paths[3]=$persistent_target;;
+            fixture) persistent_paths[4]=$persistent_target;;
+            physical) persistent_paths[5]=$persistent_target;;
+        esac
+        local persistent_status=0
+        "$gate" --iic-c-persistent-gate-mutation-contract-only \
+            "$persistent_name" "$persistent_slot" "$persistent_sha" \
+            "${persistent_paths[@]}" >"$out/persistent-$persistent_name.log" \
+            2>&1 || persistent_status=$?
+        (( persistent_status != 0 )) || fail_contract \
+            "ii-c-c persistent Gate mutation accepted: $persistent_name"
+    done <"$persistent_manifest"
+    local persistent_component_manifest=
+    persistent_component_manifest="$out/persistent-component-mutations"
+    /usr/bin/python3 -I - "$release" "$persistent_component_manifest" <<'PY'
+from pathlib import Path
+import sys
+
+source_path, manifest_path = map(Path, sys.argv[1:])
+source = source_path.read_text(encoding="utf-8")
+# The component selector is protected by the subordinate self-seal itself.
+# These external mutations prove that a bypassed body or public dispatch edge
+# cannot turn the independently executable gate into a false green.
+required = {
+    "component-function":
+        "function verify_iicc_persistent_gate_component_boundary() (\n"
+        "    local PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+    "component-call-edge":
+        "verify_iicc_persistent_gate_component_boundary || exit $?",
+}
+replacements = {
+    "component-function":
+        "function verify_iicc_persistent_gate_component_boundary() (\n"
+        "    return 0\n    local PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+    "component-call-edge": "true || exit $?",
+}
+for name, marker in required.items():
+    if source.count(marker) != 1:
+        raise SystemExit(
+            "ii-c-c persistent component verifier drifted: " + name
+        )
+with manifest_path.open("w", encoding="utf-8") as output:
+    for name, marker in required.items():
+        target = manifest_path.parent / ("persistent-" + name + ".zsh")
+        mutated = source.replace(marker, replacements[name], 1)
+        target.write_text(mutated, encoding="utf-8")
+        target.chmod(0o755)
+        print(name, target, sep="\t", file=output)
+PY
+    [[ "$(wc -l <"$persistent_component_manifest" | tr -d ' ')" == 2 ]] \
+        || fail_contract "ii-c-c persistent component mutation inventory drifted"
+    local persistent_component_name persistent_component_target
+    local persistent_component_status
+    while IFS=$'\t' read -r persistent_component_name \
+        persistent_component_target; do
+        /bin/zsh -n "$persistent_component_target" || fail_contract \
+            "ii-c-c persistent component mutation syntax drifted: $persistent_component_name"
+        persistent_component_status=0
+        "$persistent_component_target" \
+            --iic-c-persistent-gate-component-boundary-only \
+            >"$out/persistent-$persistent_component_name.log" 2>&1 \
+            || persistent_component_status=$?
+        (( persistent_component_status != 0 )) || fail_contract \
+            "ii-c-c persistent component mutation accepted: $persistent_component_name"
+        [[ "$(<"$out/persistent-$persistent_component_name.log")" == \
+            "ii-c-b1 App release verifier self-seal drifted" ]] \
+            || fail_contract \
+                "ii-c-c persistent component mutation diagnostic drifted: $persistent_component_name"
+    done <"$persistent_component_manifest"
     local credential_manifest="$out/credential-deadline-mutations"
     /usr/bin/python3 -I - "$credential_manifest" <<'PY'
 from pathlib import Path

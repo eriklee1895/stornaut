@@ -80,6 +80,8 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
     static let targetUID: uid_t = 501
     static let targetGID: gid_t = 20
     static let baseName = "com.eriklee.stornaut.task39-machine-gate"
+    static let persistentBaseRelativeSuffix =
+        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
     static let lockName = ".owner-lock-v1"
     private static let identityBufferByteCounts = [
         1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536,
@@ -135,7 +137,7 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
             )
             try requireDirectory(try system.metadata(descriptor: root))
             var parent = root
-            for component in homeComponents + ["Library", "Caches"] {
+            for component in homeComponents + ["Library", "Application Support"] {
                 parent = try opened(
                     parent: parent, name: component,
                     flags: Self.relativeDirectoryFlags, mode: nil,
@@ -143,11 +145,11 @@ struct InvestigationMachineGateOwnershipAcquirer: Sendable {
                 )
                 try requireDirectory(try system.metadata(descriptor: parent))
             }
-            let caches = parent
+            let applicationSupport = parent
             let baseRelativePath = (
-                homeComponents + ["Library", "Caches", Self.baseName]
+                homeComponents + [Self.persistentBaseRelativeSuffix]
             ).joined(separator: "/")
-            let base = try openBase(parent: caches, ledger: &ledger)
+            let base = try openBase(parent: applicationSupport, ledger: &ledger)
             let initialBase = try baseSnapshot(
                 base, root: root, relativePath: baseRelativePath
             )
