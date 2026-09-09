@@ -34,9 +34,10 @@ Trash, Registered Actions or a second Policy/Executor path.
 
 Task 40 starts after Tasks 36–39 are independently committed and pushed. The
 Task 39 blocked/no-go disposition does not satisfy that sequential prerequisite;
-the consumed/non-admitting v8, v9, v10 and v11 campaigns also do not satisfy it.
-The v12 authorization is rebound to `0a17726` and remains pending/unconsumed;
-Task 40 remains blocked until the campaign
+the consumed/non-admitting v8 through v12 campaigns also do not satisfy it.
+v12 is consumed/non-admitting/non-retryable after post-arm authorization-path deadline
+exhaustion; its bounded credential repair is non-admitting and the persistent
+Gate prerequisite remains open. Task 40 remains blocked until a newly authorized campaign
 and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
 Inputs are:
 

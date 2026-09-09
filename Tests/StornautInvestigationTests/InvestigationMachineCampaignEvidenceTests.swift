@@ -202,8 +202,12 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(validated.epochs.map(\.claimEvidenceSHA256) == transport.epochs.map(\.claimEvidenceSHA256))
         #expect(validated.epochs.map(\.helperIdentitySHA256) == transport.epochs.map(\.helperIdentitySHA256))
         #expect(validated.epochs.map(\.completionBindingSHA256) == transport.epochs.map(\.completionBindingSHA256))
-        let verifier = try privilegedVerifierResult(fixture: fixture, transport: transport)
-        #expect(verifier.status == 0, Comment(rawValue: verifier.stderr))
+        if Self.hasExplicitPreservedGateFixture {
+            let verifier = try privilegedVerifierResult(
+                fixture: fixture, transport: transport,
+                preservedGlobal: true)
+            #expect(verifier.status == 0, Comment(rawValue: verifier.stderr))
+        }
     }
 
     @Test(arguments: CampaignEpochSemanticMutation.allCases)
@@ -1470,7 +1474,7 @@ struct InvestigationMachineCampaignEvidenceTests {
     }
 
     @Test
-    func failureDispositionVerifierNormalizesMissingGateBaseOnlyForV1() throws {
+    func failureDispositionVerifierNormalizesOnlyExplicitMissingGateStates() throws {
         let repository = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let verifier = repository.appending(
@@ -1528,6 +1532,7 @@ struct InvestigationMachineCampaignEvidenceTests {
 
         for (state, outcome) in [
             ("ownAttemptAbsent", "accept"),
+            ("gateBaseAbsentAfterObservedResidueLoss", "accept"),
             ("ownConsumedAttemptPresent", "reject"),
             ("ownConsumedAttemptRemovedByTestFixture", "reject"),
         ] {
@@ -1881,6 +1886,97 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(cause["exactWaitClassification"] as? String
             == "unavailableInLegacyEvidence")
         #expect(cause["credentialRetainedByteCount"] as? Int == 0)
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V12_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v12 failure-evidence verification"
+    ))
+    func checkedV12FailureDispositionBindsFrozenExternalEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v12-failure-disposition.json")
+        let root = try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V12_EVIDENCE_ROOT"])
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+        let disposition = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: report)) as? [String: Any])
+        #expect(disposition["schemaVersion"] as? Int == 7)
+        #expect(disposition["classification"] as? String
+            == "consumedPostArmAuthorizationDeadlineExhaustion")
+        #expect(disposition["admission"] as? String == "rejected")
+        #expect(disposition["retry"] as? String == "forbidden")
+        let cause = try #require(
+            disposition["rootCauseObservation"] as? [String: Any])
+        #expect(cause["reason"] as? String
+            == "unboundedPostArmAuthorizationPathExceededCampaignDeadline")
+        #expect(cause["elapsedAfterArmMicroseconds"] as? String
+            == "3591465481")
+        #expect(cause["cleanupIssueMask"] as? String == "1e")
+        #expect(cause["credentialRetainedByteCount"] as? Int == 0)
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V12_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v12 forgery-rejection verification"
+    ))
+    func checkedV12FailureDispositionRejectsClaimAndLossForgeryWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v12-failure-disposition.json")
+        let root = try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V12_EVIDENCE_ROOT"])
+        let original = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: source)) as? [String: Any])
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+
+        func reject(_ name: String, _ mutation: ([String: Any]) -> [String: Any])
+            throws
+        {
+            let report = reportParent.appending(path: name + ".json")
+            try Self.writeCanonicalReport(mutation(original), to: report)
+            let result = try Self.runFailureVerifier(URL(filePath: root), report)
+            #expect(result.status != 0, Comment(rawValue: name))
+        }
+
+        try reject("admission") { value in
+            var value = value; value["admission"] = "accepted"; return value
+        }
+        try reject("current-gate-presence") { value in
+            var value = value
+            var observation = value["systemObservation"] as! [String: Any]
+            observation["gateBaseState"] =
+                "ownConsumedAttemptPresentWithHistoricalPreservedAttempt"
+            value["systemObservation"] = observation
+            return value
+        }
+        try reject("attributed-removal") { value in
+            var value = value
+            var mutation = value["postDispositionMutation"] as! [String: Any]
+            mutation["cause"] = "credentialDeadlineTest"
+            value["postDispositionMutation"] = mutation
+            return value
+        }
+        try reject("elapsed") { value in
+            var value = value
+            var cause = value["rootCauseObservation"] as! [String: Any]
+            cause["elapsedAfterArmMicroseconds"] = "3591465480"
+            value["rootCauseObservation"] = cause
+            return value
+        }
     }
 
     @Test
@@ -2549,10 +2645,16 @@ struct InvestigationMachineCampaignEvidenceTests {
         _ epochCount: Int
     ) throws {
         let result = try privilegedVerifierResult(
-            epochCount: epochCount, preservedGlobal: epochCount == 8
+            epochCount: epochCount,
+            preservedGlobal: epochCount == 8 && Self.hasExplicitPreservedGateFixture
         )
         if epochCount == 8 {
-            #expect(result.status == 0, Comment(rawValue: result.stderr))
+            if Self.hasExplicitPreservedGateFixture {
+                #expect(result.status == 0, Comment(rawValue: result.stderr))
+            } else {
+                #expect(result.status != 0)
+                #expect(result.stderr.contains("admitting preservation schema"))
+            }
         } else {
             #expect(result.status != 0)
             #expect(result.stderr.contains("non-admitting"))
@@ -2588,6 +2690,10 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(result.status == 0, Comment(rawValue: result.stderr))
         #expect(result.stdout == "stornaut ii-c machine evidence verified\n")
         #expect(try Self.treeSnapshot(base) == before)
+    }
+
+    private static var hasExplicitPreservedGateFixture: Bool {
+        ProcessInfo.processInfo.environment["STORNAUT_TASK39_V11_GATE_BASE"] != nil
     }
 
     @Test

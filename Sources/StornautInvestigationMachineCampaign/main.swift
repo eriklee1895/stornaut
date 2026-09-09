@@ -167,6 +167,12 @@ package enum InvestigationMachineCampaignExecutable {
     }
 
     package static func run() async -> Int32 {
+        if CommandLine.argc == 2,
+           CommandLine.arguments[1] == "--stornaut-credential-reader-v1" {
+            return Int32(
+                stornaut_investigation_campaign_credential_reader_child()
+            )
+        }
         let system = CampaignDarwinSystem()
         if system.isBootstrapInvocation { return system.runBootstrap() }
         guard CommandLine.argc == 1 else {
@@ -571,23 +577,53 @@ package enum InvestigationMachineCampaignExecutable {
                 fd: terminalDescriptor, events: Int16(POLLIN), revents: 0
             )
             guard poll(&duplicate, 1, 0) == 0 else { throw Failure.invalid }
-            try writeAll(STDERR_FILENO, bytes: prompt)
             var credential = [CChar](repeating: 0, count: 1_025)
             defer {
                 credential.withUnsafeMutableBytes { raw in
                     _ = memset_s(raw.baseAddress, raw.count, 0, raw.count)
                 }
             }
-            guard readpassphrase(
-                "", &credential, credential.count, RPP_REQUIRE_TTY
-            ) != nil, let end = credential.firstIndex(of: 0), end > 0,
-                end < credential.count - 1
-            else { throw Failure.invalid }
+            let credentialDeadline = try operationDeadline(
+                absoluteDeadlineNanoseconds
+            )
+            var credentialClockNow: UInt64 = 0
+            guard stornaut_investigation_campaign_monotonic_nanoseconds(
+                &credentialClockNow
+            ) == 0 else { throw Failure.invalid }
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < credentialDeadline,
+                  credentialClockNow <= UInt64.max - (credentialDeadline - now)
+            else { throw Failure.deadline }
+            let credentialAbsoluteDeadline = credentialClockNow
+                + (credentialDeadline - now)
+            var length = 0
+            var credentialError: Int32 = 0
+            let credentialStatus =
+                stornaut_investigation_campaign_readpassphrase_bounded(
+                    &credential, credential.count, credentialAbsoluteDeadline,
+                    &length, &credentialError
+                )
+            guard credentialStatus
+                    == STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_SUCCESS,
+                  credentialError == 0, length > 0,
+                  length <= Int(
+                    STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES),
+                  length < credential.count,
+                  credential[length] == 0
+            else {
+                if credentialStatus
+                    == STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_DEADLINE
+                    || credentialError == ETIMEDOUT
+                { throw Failure.deadline }
+                throw Failure.invalid
+            }
+            guard DispatchTime.now().uptimeNanoseconds < credentialDeadline
+            else { throw Failure.deadline }
             humanActionObserved = true
             try credential.withUnsafeBytes { raw in
                 try writeRaw(
                     terminalDescriptor,
-                    bytes: UnsafeRawBufferPointer(rebasing: raw.prefix(end))
+                    bytes: UnsafeRawBufferPointer(rebasing: raw.prefix(length))
                 )
             }
             try writeAll(terminalDescriptor, bytes: [UInt8(ascii: "\n")])

@@ -10,9 +10,13 @@
 > checked disposition is `consumedPostArmFailureUnclassified`; the successor
 > source now emits a closed schema-v2 projection of primary failure, exact wait,
 > receipt/terminal EOF and cleanup bits. That repair is non-admitting.
-> The preserved-capsule repair is complete and independently reviewed. The user
-> explicitly rebound one fresh v12 privileged campaign to pushed baseline
-> `0a17726`; it is authorized/pending/unconsumed.
+> The preserved-capsule repair is complete and independently reviewed. The
+> rebound v12 campaign ran once from `212320f`, exceeded the 1,400-second
+> horizon in the post-arm authorization path and is consumed/non-admitting/
+> non-retryable. Its eight durable artifacts are intact; the v11/v12 Gate cache
+> residue was later externally removed with no attributable remover. The bounded
+> credential repair is complete/non-admitting; persistent Gate relocation remains
+> a prerequisite before any newly authorized campaign.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -203,15 +207,17 @@
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
 >
-> **Current Task 39 disposition (2026-09-08):** v8, v9, v10 and v11 are conclusive
+> **Current Task 39 disposition (2026-09-09):** v8 through v12 are conclusive
 > machine-gate `no-go` attempts. All are consumed, non-admitting and
 > non-retryable. The v9 AMFI repair passed, v10 exposed a bounded
 > deadline-budget defect, and v11 exposed a separate post-arm failure-detail
 > projection gap. The v11 bytes do not justify a credential, sudo, Gate,
 > protocol or transport root-cause claim. The successor closed projection and
 > independent verifier compatibility and preserved-capsule repair are complete.
-> One fresh v12 privileged campaign is explicitly rebound to `0a17726` and
-> is authorized/pending/unconsumed. Task 39 is
+> v12 is classified `consumedPostArmAuthorizationDeadlineExhaustion`; the no-signal
+> bounded credential reader is complete/non-admitting. The later loss of the
+> purgeable Gate cache requires a persistent-path prerequisite before any v13
+> authorization. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential
@@ -1551,8 +1557,9 @@ complete/non-admitting; L2 final verifier review returned no finding. The
 historical pre-v8 order was ii-c-c → L3c3d → L3c4. v8–v11 are consumed, failed
 and non-retryable. The AMFI and deadline repairs are historical and complete;
 the post-arm diagnostic and preserved-capsule repairs are complete/non-admitting.
-The fresh v12 machine campaign is explicitly rebound to `0a17726` and is
-authorized/pending/unconsumed; only a green cohort may continue to
+The v12 machine campaign ran once from `212320f`, is consumed/non-admitting/
+non-retryable, and exposed the post-arm authorization-path deadline defect plus the later
+Gate cache persistence defect. Only a newly authorized green cohort may continue to
 L3c3d → L3c4. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the

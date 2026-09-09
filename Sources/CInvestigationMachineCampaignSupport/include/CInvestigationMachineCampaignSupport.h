@@ -2,13 +2,22 @@
 #define STORNAUT_C_INVESTIGATION_MACHINE_CAMPAIGN_SUPPORT_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <sys/types.h>
 
 #define STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD 3
 #define STORNAUT_INVESTIGATION_CAMPAIGN_TERMINAL_FD 4
 #define STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_FD 5
+#define STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_FD 6
 #define STORNAUT_INVESTIGATION_CAMPAIGN_INVALID_FD (-1)
 #define STORNAUT_INVESTIGATION_CAMPAIGN_BOOTSTRAP_READY 0xA5
+#define STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES 1023
+
+typedef enum {
+    STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_SUCCESS = 0,
+    STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_DEADLINE = 1,
+    STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_FAILURE = 2
+} stornaut_investigation_campaign_credential_status;
 
 typedef enum {
     STORNAUT_INVESTIGATION_CAMPAIGN_CHILD_STAGE_SESSION = 1,
@@ -50,5 +59,29 @@ int stornaut_investigation_campaign_spawn_fixed(
 int stornaut_investigation_campaign_bootstrap_fixed(
     const char *absolute_coordinator_path
 );
+
+stornaut_investigation_campaign_credential_status
+stornaut_investigation_campaign_readpassphrase_bounded(
+    char *credential, size_t credential_capacity,
+    uint64_t absolute_deadline_nanoseconds, size_t *credential_length,
+    int32_t *error_number
+);
+
+int stornaut_investigation_campaign_monotonic_nanoseconds(uint64_t *value);
+
+typedef enum {
+    STORNAUT_INVESTIGATION_CAMPAIGN_TEST_NO_FAULT = 0,
+    STORNAUT_INVESTIGATION_CAMPAIGN_TEST_TERMINATE_SIGNAL_FAILURE = 1,
+    STORNAUT_INVESTIGATION_CAMPAIGN_TEST_TERMINATE_CLOCK_FAILURE = 2,
+    STORNAUT_INVESTIGATION_CAMPAIGN_TEST_TERMINATE_WAIT_FAILURE = 3
+} stornaut_investigation_campaign_test_fault;
+
+#if defined(STORNAUT_INVESTIGATION_CAMPAIGN_TESTING)
+void stornaut_investigation_campaign_test_set_fault(
+    stornaut_investigation_campaign_test_fault fault
+);
+#endif
+
+int stornaut_investigation_campaign_credential_reader_child(void);
 
 #endif

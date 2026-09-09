@@ -341,13 +341,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 lifecycle call-graph drifted",
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
-            "3deb098918bebe1410f4fb96f90db9b0d6a84cf09fdaabe0cb16398151bdab57",
+            "01395e6a03e0da8f9cb76837b24950cfa2451c181cebaa9e7e1738768206a886",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
-            "16654f4917423c11d334fec6aa1e5cbd386571332386232966b9d688383b5831",
+            "ad4ff57f503cc600ef24f6b5bceda5ce28d6b925725be9e5bbf5a57a41b9d56d",
             "require_body_digest(",
-            "28abaf3aa77391cc679715a824f3f5df3af44d78d5b66bef458f21416215d615",
+            "fea0c249566d0f57babb384980713873ed4a303e7943e5490d25d01e1357215c",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
             "2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd",
             "active_executable.count('Self.runLifecycle(') != 3",
@@ -450,6 +450,60 @@ struct InvestigationMachineTargetBoundaryTests {
             "c-bootstrap-cloexec", "harness-outer-stability",
             "boundary-vacuity",
         ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
+    func iiCCCredentialDeadlineContractIsClosed() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let header = try String(contentsOf: root.appending(path:
+            "Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h"), encoding: .utf8)
+        let c = try String(contentsOf: root.appending(path:
+            "Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c"), encoding: .utf8)
+        let campaign = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineCampaign/main.swift"), encoding: .utf8)
+        let fixture = try String(contentsOf: root.appending(path:
+            "Tests/Fixtures/InvestigationMachineCampaignCredential/main.c"), encoding: .utf8)
+        let tests = try String(contentsOf: root.appending(path:
+            "Tests/StornautInvestigationTests/InvestigationMachineCampaignCredentialDeadlineTests.swift"), encoding: .utf8)
+        let boundary = boundarySource(root)
+        let aggregate = try String(contentsOf: root.appending(path:
+            "scripts/verify-contract"), encoding: .utf8)
+
+        #expect(header.contains(
+            "STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES 1023"))
+        for marker in [
+            "CLOCK_UPTIME_RAW", "/dev/tty", "proc_pidpath(",
+            "POSIX_SPAWN_START_SUSPENDED", "POSIX_SPAWN_SETPGROUP",
+            "STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_FD",
+            "tcsetpgrp(terminal_descriptor, child)",
+            "tcsetpgrp(terminal_descriptor, parent_group)",
+            "stornaut_campaign_terminate_and_reap",
+            "kill(child, SIGTERM)", "kill(child, SIGKILL)", "memset_s",
+        ] { #expect(c.contains(marker), "missing: \(marker)") }
+        #expect(c.components(separatedBy: "readpassphrase(").count == 2)
+        for forbidden in ["SIGALRM", "alarm(", "setitimer(",
+                          "pthread_create(", "pthread_cancel(", "pthread_join("] {
+            #expect(!(c + campaign).contains(forbidden), "forbidden: \(forbidden)")
+        }
+        #expect(campaign.contains(
+            "stornaut_investigation_campaign_readpassphrase_bounded"))
+        #expect(campaign.contains("--stornaut-credential-reader-v1"))
+        #expect(fixture.contains("forkpty(&master"))
+        #expect(tests.contains(
+            "controllingTTYReadIsBoundedRestoresEchoAndNeverEchoesCredential"))
+        for marker in [
+            "--iic-c-credential-deadline-contract-only",
+            "--iic-c-credential-deadline-mutation-contract-only",
+            "function verify_iicc_credential_deadline_contract()",
+        ] { #expect(boundary.contains(marker), "missing: \(marker)") }
+        for marker in [
+            "credential-deadline-mutations",
+            "deadline-classification", "foreground-handoff", "exact-wait",
+            "child-mode", "credential-cap", "test-vacuity", "absolute-deadline",
+            "deadline-recheck", "reap-ownership", "reap-test-vacuity",
+            "bounded-prompt-owner",
+        ] { #expect(aggregate.contains(marker), "missing: \(marker)") }
     }
 
     @Test
@@ -596,10 +650,13 @@ struct InvestigationMachineTargetBoundaryTests {
         let v11Evidence = try String(contentsOf: root.appending(
             path: "docs/reports/evidence/task-39-iic-v11-failure-disposition.json"),
             encoding: .utf8)
+        let v12Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v12-failure-disposition.json"),
+            encoding: .utf8)
 
         for marker in [
             "iicc_failure_self_sha=", "/usr/bin/python3 -I",
-            "profile in (1, 2, 3, 4, 5, 6)",
+            "profile in (1, 2, 3, 4, 5, 6, 7)",
             "f\"stornaut.task39.iic.failure-disposition.v{profile}\"",
             "consumedTransportLoss", "admission\"] == \"rejected",
             "retry\"] == \"forbidden",
@@ -615,6 +672,10 @@ struct InvestigationMachineTargetBoundaryTests {
             "consumedDriverExecutionPolicyDenial",
             "consumedCampaignDeadlineExhaustion",
             "consumedPostArmFailureUnclassified",
+            "consumedPostArmAuthorizationDeadlineExhaustion",
+            "gateBaseAbsentAfterObservedResidueLoss",
+            "externalGateCacheResidueLost",
+            "unattributedExternalRemoval",
             "closed failure projection reason",
             "ownConsumedAttemptPresent",
             "ownConsumedAttemptRemovedByTestFixture",
@@ -646,7 +707,11 @@ struct InvestigationMachineTargetBoundaryTests {
             path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
             encoding: .utf8)
         for marker in [
-            "failureDispositionVerifierNormalizesMissingGateBaseOnlyForV1",
+            "failureDispositionVerifierNormalizesOnlyExplicitMissingGateStates",
+            "checkedV12FailureDispositionRejectsClaimAndLossForgeryWhenAvailable",
+            "STORNAUT_TASK39_V12_EVIDENCE_ROOT",
+            "Opt in to the read-only frozen v12 failure-evidence verification",
+            "Opt in to the read-only frozen v12 forgery-rejection verification",
             "let churnCountBeforeVerification = await state.successCount",
             "#expect(successfulChurns > churnCountBeforeVerification)",
             "#expect(churnFailure == nil)",
@@ -673,22 +738,28 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(boundarySource(root).contains(
             "ii-c-c checked failure disposition digest drifted"))
         #expect(boundarySource(root).contains(
+            "--iic-c-v12-external-evidence-only"))
+        #expect(boundarySource(root).contains(
+            "function verify_iicc_v12_external_evidence() {"))
+        #expect(boundarySource(root).contains(
+            "ii-c-c frozen v12 evidence root unavailable or noncanonical"))
+        #expect(boundarySource(root).contains(
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"88569d2335213ad8665e0505c7559b9f98ecd2df7e744822476afc761af8c252\")",
-            "(Path(\"README.md\"), \"c2d845fc8f7c7dee379715951d9a6df130eb73a9b5c058193db29eb5a1984f1a\")",
-            "(Path(\"docs/README.md\"), \"268acc6714f6c442b6beb20e0b774b873cb0fa509fbb679d0f8d99d45c243492\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"f359bc7b85061983854a4766638d36b55e05320a14cd128bad4742c6c57e2941\")",
-            "(Path(\"docs/plans/active/README.md\"), \"ed644b4780c960418f83537a2572fb64382cd297aa1bd08e4e2fd75fc19b60f3\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"b67ec63d75d963dde0d31f106c8167a72778e2fe6f3da07529e529ee82a5d58d\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"bdecdcb3b95af8b94286555f6ae32d393a63ba82f4572a44d6112c112ad187b3\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"2699b8d408785409d3ec77799703f647394ee9d9fe0a90c166450ca59d12a447\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"0fea273a0bb9e856395a18a8da748d88ff5bbb67c5f756924e2d33b690f565ec\")",
+            "(Path(\"AGENTS.md\"), \"bc8b5f331c7aa7a2aa776c01dc849cd741ad4549369e4061a91695f6605f51fd\")",
+            "(Path(\"README.md\"), \"70a4acbeb1fd8f7f09c68c4c90e4488a78de5b430725b5a1dc4eaa9d63d6ddb5\")",
+            "(Path(\"docs/README.md\"), \"8d9edb61797f6de28c163c5e685716b20522e00dd32790cff65ac9c6257873e5\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"b6d82851dcc2917afd0302dbc1ec5ccb0d271beee9915a19c875e649016763ff\")",
+            "(Path(\"docs/plans/active/README.md\"), \"a0bee5cc4b07560de4bb229a44b0b11384078689a4058d0bce3eb5993c5afe8e\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"89458b3a718c7ec413f66bf1eddcf97a30047d045a89b324dd586b33372a353d\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"24c1b9379f8ca1dc1454402aaab5d0ad6f6d7a6717014ec850176d4966167ba7\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"a5cb04d4d47846cf8acdb2b3ca7339e7bc27323ac039c062329b38508da9aefd\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"2fe92acb323bb5fec7db202e2ccc3565dabfca89d170b1716af6eb7336be63c4\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"a463309b7f6c20b2a1383e9d560ad777b092aa32dffb668e1e20cd091e5511b2\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433\")",
             "len(active_status_entries) != 13",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
@@ -697,8 +768,8 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c stale active frontier text admitted",
             "That v9-era status is historical",
             "were subsequently authorized and consumed",
-            "authorized/pending/unconsumed",
-            "Status: authorized / pending / unconsumed",
+            "consumedPostArmAuthorizationDeadlineExhaustion",
+            "Status: consumed / non-admitting / non-retryable",
             "Task 40 start condition remains blocked",
         ]
         for marker in pinnedStatusDocs {
@@ -748,6 +819,20 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(v11Object["admission"] as? String == "rejected")
         #expect(v11Object["retry"] as? String == "forbidden")
         #expect(!v11Evidence.contains("signedInvestigationRuntimeReady"))
+        let v12Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v12Evidence.utf8)) as? [String: Any])
+        #expect(v12Object["classification"] as? String
+            == "consumedPostArmAuthorizationDeadlineExhaustion")
+        #expect(v12Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain"])
+        #expect(v12Object["schemaVersion"] as? Int == 7)
+        #expect(v12Object["admission"] as? String == "rejected")
+        #expect(v12Object["retry"] as? String == "forbidden")
+        let v12Observation = try #require(
+            v12Object["systemObservation"] as? [String: Any])
+        #expect(v12Observation["gateBaseState"] as? String
+            == "gateBaseAbsentAfterObservedResidueLoss")
+        #expect(!v12Evidence.contains("signedInvestigationRuntimeReady"))
     }
 
     private func boundarySource(_ root: URL) -> String {

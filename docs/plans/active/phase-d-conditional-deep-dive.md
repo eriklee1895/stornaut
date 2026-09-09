@@ -3,9 +3,11 @@
 > **Status:** Approved for sequential Tasks 36–44; Tasks 36–38 are complete.
 > Task 38 passed implementation, independent review, an 811-test serialized
 > regression and the 23/23-stage authoritative full verifier. Task 39 is
-> active/incomplete after consumed replacement campaigns v9, v10 and v11; one
-> preserved-capsule repair is complete and one fresh v12 privileged campaign is
-> explicitly rebound to `0a17726`; it is authorized/pending/unconsumed;
+> active/incomplete after consumed replacement campaigns v9 through v12. The
+> preserved-capsule repair is complete; v12 exceeded the 1,400-second horizon
+> during post-arm credential entry and is non-admitting/non-retryable. Its
+> bounded credential repair is complete/non-admitting, while persistent Gate
+> relocation remains open after the purgeable cache residue was externally lost;
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is
@@ -129,7 +131,7 @@
 > tests-first repair was green. That v9-era status is historical: v10 and v11
 > were subsequently authorized and consumed; both failed, are non-admitting and
 > non-retryable, and at that checkpoint no campaign remained authorized. The
-> current v12 authorized/pending status is recorded above. A later serial
+> current v12 consumed/no-go status is recorded above. A later serial
 > validation exposed a historical physical fixture that invoked
 > production stale-recovery and removed the preserved v9 Gate capsule. Its exact
 > bytes were not recoverable; the original v2 receipt, v3 predecessor and current
@@ -1038,8 +1040,9 @@ Checkpoint status:
   its legacy generic reason cannot distinguish the exact post-arm failure, so
   it is sealed as `consumedPostArmFailureUnclassified`. The successor
   schema-v2 diagnostic projection and preserved-capsule repair are
-  complete/non-admitting. The fresh v12 replacement campaign is explicitly
-  rebound to `0a17726` and is authorized/pending/unconsumed.
+  complete/non-admitting. The v12 replacement campaign ran once from `212320f`
+  and is consumed/non-admitting/non-retryable; credential and persistent-Gate
+  prerequisites must close before any newly authorized cohort.
   See the
   [ii-b2 ASID prerequisite review](../../reports/phase-d-task-39b2c-l3c3c-ii-b2-asid-prerequisite-review.md),
   the

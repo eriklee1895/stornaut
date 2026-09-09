@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8-v11 consumed failures disposed / v12 authorized, pending and unconsumed at `0a17726`
+> Status: frozen / v8-v12 consumed failures disposed / credential repair candidate / persistent Gate prerequisite open
 >
 > Date: 2026-08-30
 >
@@ -29,8 +29,10 @@
 > post-arm diagnostic projection is complete/non-admitting.
 > The preserved-capsule repair is complete and independently reviewed. The user
 > explicitly rebound one fresh v12 campaign to pushed baseline
-> `0a17726176b0cae0839f398da5fae2f09e6ccef5`; it is
-> authorized/pending/unconsumed.
+> `0a17726176b0cae0839f398da5fae2f09e6ccef5`. That campaign ran once from
+> authorization-only descendant `212320f` and is consumed/non-admitting/
+> non-retryable after post-arm authorization-path deadline exhaustion. Its bounded credential
+> repair is complete/non-admitting; persistent Gate relocation remains open.
 
 ## 1. Decision
 

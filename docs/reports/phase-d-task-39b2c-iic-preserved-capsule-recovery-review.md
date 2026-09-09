@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c preserved-capsule recovery review
 
-> Status: complete / non-admitting / v12 rebound to `0a17726`
+> Status: complete / non-admitting / historical prerequisite for consumed v12
 >
 > Date: 2026-09-09
 >
@@ -51,6 +51,6 @@ and verifier reviews found no remaining P0-P2.
 ## Remaining gate
 
 The user explicitly rebound the one-shot v12 authorization to pushed repair
-commit `0a17726176b0cae0839f398da5fae2f09e6ccef5`. It is authorized, pending and
-unconsumed. The authorization-only descendant must be pushed before one fresh
-campaign generates its UUIDs and evidence root.
+commit `0a17726176b0cae0839f398da5fae2f09e6ccef5`. This was the state at this
+checkpoint. v12 later ran once from descendant `212320f` and is now consumed,
+non-admitting and non-retryable; see the v12 failure disposition.

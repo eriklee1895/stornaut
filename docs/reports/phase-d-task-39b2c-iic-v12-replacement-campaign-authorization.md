@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c-c v12 replacement campaign authorization
 
-> Status: authorized / pending / unconsumed
+> Status: consumed / non-admitting / non-retryable
 >
 > Authorized source baseline: `0a17726176b0cae0839f398da5fae2f09e6ccef5`
 >
@@ -79,6 +79,16 @@ No campaign UUID, attempt UUID or evidence root exists at authorization time.
 The sealed executable generates all three at the unique launch and the retained
 evidence binds their exact values.
 
+## Consumed result
+
+The rebound authorization was used exactly once from authorization-only
+descendant `212320fa9f05cad52a40fb9ce02ed7bf73543b04`. It produced campaign
+`2aca496d-83c7-4ab3-8ef4-f433ce9ea493` and attempt
+`9d713dd7-30b4-49a5-96b1-9afdf482f1c2`, then durably reached
+`prepared → armedConsumed → spawnUncertain`. It is consumed and cannot be
+reused. The checked v12 disposition records post-arm authorization-path deadline exhaustion,
+rejected admission and the later unattributed loss of the purgeable Gate cache.
+
 ## Superseded pre-launch suspension
 
 Independent authorization review found that baseline `4fd9c53` would invoke
@@ -87,8 +97,7 @@ publication, conflicting with this authorization's explicit historical-evidence
 boundary. No v12 executable was launched, no identifier/evidence root was
 created, and the authorization remained unconsumed. The campaign was suspended
 until the preserved-capsule prerequisite was implemented, reviewed and pushed.
-That prerequisite is now complete, both post-fix reviews have no unresolved
-P0-P2, and the user explicitly rebound the one-shot authorization to
-`0a17726176b0cae0839f398da5fae2f09e6ccef5` on 2026-09-09. This descendant
-still performs no campaign launch; the UUIDs and evidence root remain uncreated
-until the single executable invocation.
+That prerequisite completed, both post-fix reviews had no unresolved P0-P2,
+and the user explicitly rebound the one-shot authorization to
+`0a17726176b0cae0839f398da5fae2f09e6ccef5` on 2026-09-09. The later unique
+invocation and its identifiers are recorded in the consumed result above.

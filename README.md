@@ -127,9 +127,13 @@ artifacts 未绑定该值；旧 schema-v1 reason 只保留
 `campaign-incomplete`，无法严谨区分 sudo/wait/receipt/protocol/transport，
 因此 v11 被只读固化为 `consumedPostArmFailureUnclassified`、
 non-admitting、non-retryable。后续源码已改为闭合 schema-v2 post-arm
-failure projection；retained v11 Gate capsule preservation prerequisite 已完成，
-fresh v12 privileged campaign 已重新绑定至 `0a17726`，当前 authorized /
-pending / unconsumed。L3c3d/L3c4
+failure projection；retained v11 Gate capsule preservation prerequisite 已完成。
+v12 已从 `212320f` 唯一执行并在 durable arm 后因无界 post-arm
+authorization path 超过
+1,400 秒 campaign horizon 而消费失败；checked disposition 为
+`consumedPostArmAuthorizationDeadlineExhaustion`，不可重试。bounded credential repair
+已实现并保持 non-admitting；v11/v12 Gate cache residue 随后外部丢失，删除者
+未知，持久路径迁移仍为新的 machine prerequisite。L3c3d/L3c4
 仍未证明，最终 authoritative full 未运行；Task 40 仍受批准计划的顺序前置
 条件阻塞，production Deep Dive 仍 unavailable。
 见文档：
@@ -146,7 +150,7 @@ pending / unconsumed。L3c3d/L3c4
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete；Task 39 active after consumed v8/v9/v10/v11 no-go；v12 authorized/pending/unconsumed at `0a17726`；Task 40 remains blocked |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete；Task 39 active after consumed v8–v12 no-go；credential deadline repair complete/non-admitting；persistent Gate repair pending；Task 40 remains blocked |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) | c0b-i semantic producer completion audit；exact 7 paths / 1,900 lines、95 tests / 5 suites；complete/non-admitting |
@@ -157,7 +161,7 @@ pending / unconsumed。L3c3d/L3c4
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) | iv-b1b-i injected Darwin lifecycle；implementation `41d34f26` / tree `8ab58932`、3 paths / 1,173 production lines、806/806 affected、Release target 与两组终审；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) | iv-b1b-ii dedicated physical/verifier closure；implementation `373431d4` / tree `b08342e5`、5 paths / 2,193 lines、七场景 physical、808/808 serial、三项 gates 与无 unresolved P0–P2 review；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md) | iv-b2 zero-argument coordinator/verifier closure；implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree `e02a515283225b0b19443a47fad0b90fe3d0ddfd`；complete/non-admitting |
-| [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) | ii-c-b complete/non-admitting；v8/v9/v10/v11 consumed/no-go；v12 authorized/pending/unconsumed at `0a17726` |
+| [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) | ii-c-b complete/non-admitting；v8–v12 consumed/no-go；credential and persistent-Gate prerequisites remain |
 | [docs/reports/phase-d-task-39b2c-iic-deadline-budget-repair-review.md](docs/reports/phase-d-task-39b2c-iic-deadline-budget-repair-review.md) | 1,400-second bounded campaign horizon、v10 evidence closure、246-test affected selection、review P2 closure；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) | v8 read-only failure disposition；consumed/non-admitting/non-retryable；current fixed runtime absent |
 | [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) | 用户批准的 v9 replacement campaign 单次权限边界、preflight 与 stop rules；授权已消费，禁止重试/v10 |
@@ -165,7 +169,9 @@ pending / unconsumed。L3c3d/L3c4
 | [docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md) | 用户批准的一次 fresh v10 campaign；已消费并按 failure-stop 禁止重试 |
 | [docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md) | v10 consumed deadline exhaustion；1,195.056190 秒 durable timeline；non-admitting/non-retryable |
 | [docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md) | 用户批准并已消费的一次 fresh v11 campaign；绑定 `8a286ea`；禁止重试 |
-| [docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md) | 用户重新绑定至 `0a17726` 的一次 fresh v12 campaign；authorized/pending/unconsumed |
+| [docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md) | 用户重新绑定至 `0a17726` 的一次 fresh v12 campaign；consumed/non-admitting/non-retryable |
+| [docs/reports/phase-d-task-39b2c-iic-v12-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v12-failure-disposition.md) | v12 post-arm authorization-path deadline exhaustion 与后续 Gate cache residue loss；consumed/non-admitting/non-retryable |
+| [docs/reports/phase-d-task-39b2c-iic-v12-credential-deadline-repair-review.md](docs/reports/phase-d-task-39b2c-iic-v12-credential-deadline-repair-review.md) | bounded no-signal credential reader；complete/non-admitting |
 | [docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md) | v11 consumed post-arm unclassified failure；闭合 schema-v2 后继修复；non-admitting/non-retryable |
 | [docs/reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md](docs/reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md) | v11 failure closure、schema-v2 strict grammar、v9-v11 evidence chain、post-fix review 与分层验证 |
 | [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) | Historical v8 blocked/no-go gate audit；v9 later consumed/no-go；Task 39 incomplete，Task 40 remains blocked |

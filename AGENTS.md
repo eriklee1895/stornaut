@@ -448,9 +448,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   不足以判定 credential/sudo/Gate/protocol/transport 根因，已只读固化为
   `consumedPostArmFailureUnclassified`、non-admitting/non-retryable；
   后继 schema-v2 closed diagnostic projection 已完成并通过 focused tests。用户
-  已完成 retained v11 Gate capsule preservation repair；用户现已将一次 fresh
-  v12 machine campaign 授权明确重绑至 `0a17726`，状态为 authorized /
-  pending / unconsumed；授权状态 descendant 推送后才可启动。
+  已完成 retained v11 Gate capsule preservation repair；v12 machine campaign
+  已从 `212320f` 唯一执行并因 post-arm authorization path 超过 1,400 秒 horizon
+  而 consumed/non-admitting/non-retryable。bounded credential repair 已完成并
+  通过独立复审，保持 non-admitting；Gate cache residue 外部丢失且 persistent relocation
+  pending。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -954,8 +956,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   structural、真实 Debug build 与 Debug/Release component gate。后续 v10
   已消费并因 1,200 秒 outer deadline exhaustion 失败；1,400 秒 deadline-budget
   repair 随后已完成。v11 也已消费失败，post-arm diagnostic repair 已完成且
-  non-admitting；preservation prerequisite 已完成，fresh v12 privileged campaign
-  已重新绑定至 `0a17726`，当前 authorized/pending/unconsumed，
+  non-admitting；preservation prerequisite 已完成，v12 privileged campaign
+  已从 `212320f` 唯一执行并 consumed/no-go；credential repair 为 complete
+  candidate，persistent Gate relocation pending，
   L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
