@@ -36,8 +36,8 @@ Task 40 starts after Tasks 36–39 are independently committed and pushed. The
 Task 39 blocked/no-go disposition does not satisfy that sequential prerequisite;
 the consumed/non-admitting v8 through v12 campaigns also do not satisfy it.
 v12 is consumed/non-admitting/non-retryable after post-arm authorization-path deadline
-exhaustion; its bounded credential repair is non-admitting and the persistent
-Gate prerequisite remains open. Task 40 remains blocked until a newly authorized campaign
+exhaustion; its bounded credential repair and persistent Gate P2 are complete/
+non-admitting. Fresh v13 is authorized/pending/unconsumed. Task 40 remains blocked until that campaign
 and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
 Inputs are:
 

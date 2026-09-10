@@ -15,8 +15,9 @@
 > horizon in the post-arm authorization path and is consumed/non-admitting/
 > non-retryable. Its eight durable artifacts are intact; the v11/v12 Gate cache
 > residue was later externally removed with no attributable remover. The bounded
-> credential repair is complete/non-admitting; persistent Gate relocation remains
-> a prerequisite before any newly authorized campaign.
+> credential repair and persistent Gate P1/P2 are complete/non-admitting. The
+> user authorized one fresh v13 campaign based on `46e1f94`; authorization-only
+> descendant `c7c94eb` is pushed and v13 is pending/unconsumed.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -207,7 +208,7 @@
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
 >
-> **Current Task 39 disposition (2026-09-09):** v8 through v12 are conclusive
+> **Current Task 39 disposition (2026-09-10):** v8 through v12 are conclusive
 > machine-gate `no-go` attempts. All are consumed, non-admitting and
 > non-retryable. The v9 AMFI repair passed, v10 exposed a bounded
 > deadline-budget defect, and v11 exposed a separate post-arm failure-detail
@@ -216,8 +217,9 @@
 > independent verifier compatibility and preserved-capsule repair are complete.
 > v12 is classified `consumedPostArmAuthorizationDeadlineExhaustion`; the no-signal
 > bounded credential reader is complete/non-admitting. The later loss of the
-> purgeable Gate cache requires a persistent-path prerequisite before any v13
-> authorization. Task 39 is
+> purgeable Gate cache triggered the now-complete persistent-path P1/P2
+> prerequisite. One fresh v13 is authorized from `46e1f94`, with pushed
+> authorization-only descendant `c7c94eb`; it is pending/unconsumed. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential

@@ -271,7 +271,8 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    后继 schema-v2 post-arm diagnostic 与 preserved-capsule repair 已完成/
    non-admitting；v12 已从 `212320f` 唯一执行并因 post-arm authorization path
    超过 1,400 秒 horizon 而 consumed/no-go。bounded credential repair 已完成/
-   non-admitting，persistent Gate relocation pending。Task 39
+   non-admitting；persistent Gate P1/P2 已完成。fresh v13 已基于 `46e1f94`
+   授权，authorization-only descendant `c7c94eb` 已推送，pending/unconsumed。Task 39
    后续 serial validation 暴露历史 physical fixture 会触发 production
    stale-recovery 并误删 v9 Gate capsule；精确副本不可恢复，原 v2 receipt 与
    v3 predecessor 与当前 v5 receipt 已保留，fixture 已改为显式 opt-in + 双重保护。
@@ -561,7 +562,8 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    `consumedPostArmFailureUnclassified`。闭合 schema-v2 diagnostic repair
    已完成/non-admitting；preserved-capsule repair 已完成，v12 campaign 已从
    `212320f` 唯一执行并 consumed/non-admitting/non-retryable。credential repair
-   已完成/non-admitting，persistent Gate relocation pending。Task 39 当前
+   已完成/non-admitting；persistent Gate P1/P2 已完成，fresh v13 已授权并以
+   `c7c94eb` 固化，pending/unconsumed。Task 39 当前
    active/incomplete，L3c3d/L3c4 未证明，
    L3c4 的 final admission/full
    不运行。Task 40 仍受批准计划的 Task 39 前置条件阻塞。

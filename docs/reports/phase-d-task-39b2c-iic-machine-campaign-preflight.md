@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8-v12 consumed failures disposed / credential repair candidate / persistent Gate prerequisite open
+> Status: frozen / v8-v12 consumed failures disposed / persistent Gate P2 complete / v13 authorized pending unconsumed
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: authorization-only descendant -> one-shot v12 campaign -> L3c3d -> L3c4
+> Remaining order: pushed authorization-only descendant `c7c94eb` -> one-shot v13 campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -32,7 +32,9 @@
 > `0a17726176b0cae0839f398da5fae2f09e6ccef5`. That campaign ran once from
 > authorization-only descendant `212320f` and is consumed/non-admitting/
 > non-retryable after post-arm authorization-path deadline exhaustion. Its bounded credential
-> repair is complete/non-admitting; persistent Gate relocation remains open.
+> repair and persistent Gate P1/P2 are complete/non-admitting. The user
+> authorized one fresh v13 from `46e1f94`; descendant `c7c94eb` is pushed and
+> v13 is pending/unconsumed.
 
 ## 1. Decision
 

@@ -451,8 +451,11 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   已完成 retained v11 Gate capsule preservation repair；v12 machine campaign
   已从 `212320f` 唯一执行并因 post-arm authorization path 超过 1,400 秒 horizon
   而 consumed/non-admitting/non-retryable。bounded credential repair 已完成并
-  通过独立复审，保持 non-admitting；Gate cache residue 外部丢失且 persistent relocation
-  pending。
+  通过独立复审，保持 non-admitting；persistent Gate P1/P2 已完成并以
+  `7837705` 推送，schema-v3 lock-only evidence、atomic first-create 与最终
+  1,964-test serial 均通过。用户已批准基于 `46e1f94` 的一次 fresh v13
+  machine campaign；authorization-only descendant 已以 `c7c94eb` 推送，当前
+  authorized/pending/unconsumed。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -957,8 +960,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   已消费并因 1,200 秒 outer deadline exhaustion 失败；1,400 秒 deadline-budget
   repair 随后已完成。v11 也已消费失败，post-arm diagnostic repair 已完成且
   non-admitting；preservation prerequisite 已完成，v12 privileged campaign
-  已从 `212320f` 唯一执行并 consumed/no-go；credential repair 为 complete
-  candidate，persistent Gate relocation pending，
+  已从 `212320f` 唯一执行并 consumed/no-go；credential repair 与 persistent
+  Gate P1/P2 均 complete/non-admitting；用户已批准基于 `46e1f94` 的 fresh
+  v13，authorization-only descendant `c7c94eb` 已推送，当前
+  authorized/pending/unconsumed，
   L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
