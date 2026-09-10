@@ -16,8 +16,11 @@
 > non-retryable. Its eight durable artifacts are intact; the v11/v12 Gate cache
 > residue was later externally removed with no attributable remover. The bounded
 > credential repair and persistent Gate P1/P2 are complete/non-admitting. The
-> user authorized one fresh v13 campaign based on `46e1f94`; authorization-only
-> descendant `c7c94eb` is pushed and v13 is pending/unconsumed.
+> authorized v13 campaign ran once from descendant `8885161`, recorded a closed
+> post-arm failure near the shared deadline and is consumed/
+> non-admitting/non-retryable. Its persistent Gate residue remains intact; the
+> checked disposition and authorization-window/one-attempt EOF repair are
+> complete/non-admitting.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -208,7 +211,7 @@
 > SwiftPM/Xcode projections, complete contract replay and final no-unresolved-
 > P0–P2 review.
 >
-> **Current Task 39 disposition (2026-09-10):** v8 through v12 are conclusive
+> **Current Task 39 disposition (2026-09-10):** v8 through v13 are conclusive
 > machine-gate `no-go` attempts. All are consumed, non-admitting and
 > non-retryable. The v9 AMFI repair passed, v10 exposed a bounded
 > deadline-budget defect, and v11 exposed a separate post-arm failure-detail
@@ -218,8 +221,11 @@
 > v12 is classified `consumedPostArmAuthorizationDeadlineExhaustion`; the no-signal
 > bounded credential reader is complete/non-admitting. The later loss of the
 > purgeable Gate cache triggered the now-complete persistent-path P1/P2
-> prerequisite. One fresh v13 is authorized from `46e1f94`, with pushed
-> authorization-only descendant `c7c94eb`; it is pending/unconsumed. Task 39 is
+> prerequisite. The fresh v13 authorized from `46e1f94` ran once from pushed
+> descendant `8885161`; it is consumed/non-admitting/non-retryable after a
+> closed post-arm failure. The checked classification is
+> `consumedClosedPostArmFailure`; its failure disposition and authorization
+> hardening repair are complete/non-admitting. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential
@@ -1561,7 +1567,9 @@ and non-retryable. The AMFI and deadline repairs are historical and complete;
 the post-arm diagnostic and preserved-capsule repairs are complete/non-admitting.
 The v12 machine campaign ran once from `212320f`, is consumed/non-admitting/
 non-retryable, and exposed the post-arm authorization-path deadline defect plus the later
-Gate cache persistence defect. Only a newly authorized green cohort may continue to
+Gate cache persistence defect. v13 also ran once from `8885161` and is consumed/
+non-admitting/non-retryable after a closed post-arm failure. Only
+a separately authorized green cohort may continue to
 L3c3d → L3c4. These repairs are
 machine-campaign prerequisite checkpoints, not new Tasks. Completion evidence
 is in the

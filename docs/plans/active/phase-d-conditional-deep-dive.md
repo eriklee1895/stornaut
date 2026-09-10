@@ -7,8 +7,11 @@
 > preserved-capsule repair is complete; v12 exceeded the 1,400-second horizon
 > during post-arm credential entry and is non-admitting/non-retryable. Its
 > bounded credential repair and persistent Gate P1/P2 are complete/non-admitting.
-> The user authorized one fresh v13 campaign based on `46e1f94`; authorization-
-> only descendant `c7c94eb` is pushed and v13 is pending/unconsumed;
+> The authorized v13 campaign ran once from descendant `8885161`, recorded a
+> closed post-arm `receiptInvalid/exited-82` failure near the shared deadline and
+> is consumed/non-admitting/non-retryable. Its persistent Gate residue is intact;
+> the v13 disposition plus authorization-window/one-attempt EOF repair are
+> complete/non-admitting.
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is

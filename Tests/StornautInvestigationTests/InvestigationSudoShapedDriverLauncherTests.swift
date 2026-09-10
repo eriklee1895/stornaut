@@ -670,6 +670,24 @@ struct InvestigationSudoShapedDriverLauncherTests {
                 absoluteDeadlineNanoseconds: 5_000_000_000
             )
         }
+        #expect(
+            try InvestigationMachineGateDeadlinePolicy.authorizationDeadline(
+                nowNanoseconds: 100,
+                absoluteDeadlineNanoseconds:
+                    InvestigationMachineFixedGateContract.deadlineNanoseconds + 100
+            ) == InvestigationCohortCapsule
+                .maximumAuthorizationWallClockNanoseconds + 100
+        )
+        #expect(
+            try InvestigationMachineGateDeadlinePolicy.authorizationDeadline(
+                nowNanoseconds:
+                    InvestigationMachineFixedGateContract.deadlineNanoseconds
+                        - 10_000_000_000,
+                absoluteDeadlineNanoseconds:
+                    InvestigationMachineFixedGateContract.deadlineNanoseconds
+            ) == InvestigationMachineFixedGateContract.deadlineNanoseconds
+                - 5_000_000_000
+        )
     }
 
     @Test

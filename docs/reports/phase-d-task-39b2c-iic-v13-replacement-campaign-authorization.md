@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c-c v13 replacement campaign authorization
 
-> Status: authorized / pending / unconsumed
+> Status: consumed / non-admitting / non-retryable
 >
 > Authorized source baseline: `46e1f94a2e78b7f132a182c00c510a228a5d140f`
 >
@@ -74,3 +74,12 @@ launched exactly once from an interactive controlling Terminal.
 
 No campaign UUID, attempt UUID or evidence root exists at authorization time.
 All are generated and durably bound only by the unique executable launch.
+
+## Consumed result
+
+The one authorized v13 invocation ran from authorization-only descendant
+`88851614b090d6d6b9da6a6d7208743b85689cda`, durably recorded
+`prepared → armedConsumed → spawnUncertain → terminal`, and is consumed. The
+checked result is `consumedClosedPostArmFailure`; see the
+[v13 failure disposition](phase-d-task-39b2c-iic-v13-failure-disposition.md).
+No retry or v14 is authorized. L3c3d/L3c4 and Task 40 remain blocked.

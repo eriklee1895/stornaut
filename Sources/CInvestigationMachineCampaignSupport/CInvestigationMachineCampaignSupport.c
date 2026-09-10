@@ -720,6 +720,88 @@ cleanup:
 }
 
 int
+stornaut_investigation_campaign_relay_single_credential(
+    int terminal_descriptor, const char *credential, size_t credential_length,
+    uint64_t absolute_deadline_nanoseconds
+)
+{
+    unsigned char frame[
+        STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES + 2
+    ];
+    stornaut_campaign_zero_credential((char *)frame, sizeof(frame));
+    if (terminal_descriptor < 0 || credential == NULL || credential_length == 0
+        || credential_length > STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES
+        || absolute_deadline_nanoseconds == 0
+        || memchr(credential, '\0', credential_length) != NULL
+        || memchr(credential, '\n', credential_length) != NULL
+        || memchr(credential, '\r', credential_length) != NULL) {
+        return EINVAL;
+    }
+
+    struct termios attributes;
+    if (tcgetattr(terminal_descriptor, &attributes) != 0) {
+        return errno != 0 ? errno : EIO;
+    }
+    unsigned char end_of_input = attributes.c_cc[VEOF];
+    if ((attributes.c_lflag & ICANON) == 0
+        || (attributes.c_lflag & (ECHO | ECHONL)) != 0
+        || (attributes.c_iflag & INLCR) != 0
+        || end_of_input == _POSIX_VDISABLE
+        || memchr(credential, end_of_input, credential_length) != NULL) {
+        return EINVAL;
+    }
+    for (size_t index = 0; index < credential_length; index += 1) {
+        unsigned char byte = (unsigned char)credential[index];
+        if (byte < 0x20 || byte == 0x7f) { return EINVAL; }
+        for (size_t control = 0; control < NCCS; control += 1) {
+            unsigned char special = attributes.c_cc[control];
+            if (special != _POSIX_VDISABLE && byte == special) { return EINVAL; }
+        }
+    }
+
+    memcpy(frame, credential, credential_length);
+    frame[credential_length] = '\n';
+    frame[credential_length + 1] = end_of_input;
+    size_t count = credential_length + 2;
+    size_t offset = 0;
+    int result = 0;
+    while (offset < count) {
+        uint64_t now = 0;
+        result = stornaut_investigation_campaign_monotonic_nanoseconds(&now);
+        if (result != 0 || now >= absolute_deadline_nanoseconds) {
+            result = result != 0 ? result : ETIMEDOUT;
+            break;
+        }
+        uint64_t remaining = absolute_deadline_nanoseconds - now;
+        uint64_t milliseconds = (remaining + 999999ULL) / 1000000ULL;
+        int timeout = milliseconds > (uint64_t)INT_MAX
+            ? INT_MAX : (int)milliseconds;
+        struct pollfd event = {
+            .fd = terminal_descriptor, .events = POLLOUT, .revents = 0,
+        };
+        int ready = poll(&event, 1, timeout);
+        if (ready == 0 || (ready < 0 && errno == EINTR)) { continue; }
+        if (ready < 0 || (event.revents & POLLOUT) == 0
+            || (event.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+            result = ready < 0 && errno != 0 ? errno : EIO;
+            break;
+        }
+        ssize_t written = write(
+            terminal_descriptor, frame + offset, count - offset
+        );
+        if (written > 0) { offset += (size_t)written; continue; }
+        if (written < 0 && (errno == EINTR || errno == EAGAIN
+                            || errno == EWOULDBLOCK)) {
+            continue;
+        }
+        result = errno != 0 ? errno : EIO;
+        break;
+    }
+    stornaut_campaign_zero_credential((char *)frame, sizeof(frame));
+    return offset == count ? 0 : (result != 0 ? result : EIO);
+}
+
+int
 stornaut_investigation_campaign_credential_reader_child(void)
 {
     char credential[
@@ -747,15 +829,31 @@ stornaut_investigation_campaign_credential_reader_child(void)
         && pipe_flags >= 0 && (pipe_flags & O_ACCMODE) == O_WRONLY;
     (void)stornaut_campaign_close(terminal_descriptor);
     if (!valid) { return 64; }
+    memset(credential, 0xa5, sizeof(credential));
     char *result = readpassphrase(
         "Stornaut Task 39 ii-c administrator authorization: ",
         credential, sizeof(credential), RPP_REQUIRE_TTY
     );
     size_t length = result == NULL ? 0 : strnlen(credential, sizeof(credential));
+    int untouched_suffix = 1;
+    for (size_t index = length + 1; index < sizeof(credential); index += 1) {
+        if ((unsigned char)credential[index] != 0xa5) {
+            untouched_suffix = 0;
+            break;
+        }
+    }
     if (length == 0
-        || length > STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES) {
+        || length > STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES
+        || credential[length] != '\0' || !untouched_suffix) {
         stornaut_campaign_zero_credential(credential, sizeof(credential));
         return 65;
+    }
+    for (size_t index = 0; index < length; index += 1) {
+        unsigned char byte = (unsigned char)credential[index];
+        if (byte < 0x20 || byte == 0x7f) {
+            stornaut_campaign_zero_credential(credential, sizeof(credential));
+            return 65;
+        }
     }
     unsigned char header[4] = {
         (unsigned char)(length >> 24), (unsigned char)(length >> 16),

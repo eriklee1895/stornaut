@@ -34,11 +34,13 @@ Trash, Registered Actions or a second Policy/Executor path.
 
 Task 40 starts after Tasks 36–39 are independently committed and pushed. The
 Task 39 blocked/no-go disposition does not satisfy that sequential prerequisite;
-the consumed/non-admitting v8 through v12 campaigns also do not satisfy it.
+the consumed/non-admitting v8 through v13 campaigns also do not satisfy it.
 v12 is consumed/non-admitting/non-retryable after post-arm authorization-path deadline
 exhaustion; its bounded credential repair and persistent Gate P2 are complete/
-non-admitting. Fresh v13 is authorized/pending/unconsumed. Task 40 remains blocked until that campaign
-and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
+non-admitting. v13 is consumed/non-admitting/non-retryable after the closed
+post-arm `receiptInvalid/exited-82` failure; a supplemental sudo/PAM observation
+is not campaign-bound. Task 40 remains blocked until a separately
+authorized green campaign and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
 Inputs are:
 
 - one persisted Task 37 immutable partial/final Investigation report;

@@ -32,6 +32,58 @@ struct InvestigationMachineCampaignCredentialDeadlineTests {
         ), Comment(rawValue: success))
         #expect(!success.contains(credential))
 
+        let singleAttempt = try fixture.run(
+            mode: "single-attempt-relay", deadlineNanoseconds: 3_000_000_000,
+            credential: credential
+        )
+        #expect(singleAttempt.contains(
+            "relayStatus=0 childExit=0 childResidue=0"
+        ), Comment(rawValue: singleAttempt))
+        #expect(singleAttempt.contains(
+            "firstMatch=1 secondEOF=1 afterEcho=1"
+        ), Comment(rawValue: singleAttempt))
+        #expect(!singleAttempt.contains(credential))
+
+        let inlcrRejected = try fixture.run(
+            mode: "single-attempt-inlcr",
+            deadlineNanoseconds: 3_000_000_000,
+            credential: credential
+        )
+        #expect(inlcrRejected.contains("relayStatus=22"),
+            Comment(rawValue: inlcrRejected))
+        #expect(inlcrRejected.contains("childResidue=0"),
+            Comment(rawValue: inlcrRejected))
+        #expect(!inlcrRejected.contains(credential))
+
+        for controlCredential in ["prefix\u{03}suffix", "prefix\u{7f}suffix"] {
+            let rejected = try fixture.run(
+                mode: "single-attempt-relay",
+                deadlineNanoseconds: 3_000_000_000,
+                credential: controlCredential
+            )
+            #expect(rejected.contains("relayStatus=22"),
+                Comment(rawValue: rejected))
+            #expect(rejected.contains("childResidue=0"),
+                Comment(rawValue: rejected))
+            #expect(!rejected.contains(controlCredential))
+        }
+        let nulRejected = try fixture.run(
+            mode: "single-attempt-nul", deadlineNanoseconds: 3_000_000_000,
+            credential: "unused"
+        )
+        #expect(nulRejected.contains("relayStatus=22"),
+            Comment(rawValue: nulRejected))
+        #expect(nulRejected.contains("childResidue=0"),
+            Comment(rawValue: nulRejected))
+
+        let readerNulRejected = try fixture.run(
+            mode: "reader-nul", deadlineNanoseconds: 3_000_000_000,
+            credential: "unused"
+        )
+        #expect(readerNulRejected.contains(
+            "status=2 error=22 length=0 beforeEcho=1 afterEcho=1 zeroed=1 childResidue=0"
+        ), Comment(rawValue: readerNulRejected))
+
         let maximumCredential = String(repeating: "m", count: 1_023)
         let maximum = try fixture.run(
             mode: "success", deadlineNanoseconds: 3_000_000_000,

@@ -138,6 +138,9 @@ package struct InvestigationCohortCapsule:
     package static let maximumByteCount = 1_048_576
     package static let epochCount = 8
     package static let maximumEpochWallClockSeconds: UInt64 = 140
+    package static let maximumAuthorizationWallClockSeconds: UInt64 = 120
+    package static let maximumAuthorizationWallClockNanoseconds =
+        maximumAuthorizationWallClockSeconds * 1_000_000_000
     package static let campaignOrchestrationAndCleanupReserveSeconds: UInt64 = 280
     package static let maximumCampaignWallClockSeconds =
         UInt64(epochCount) * maximumEpochWallClockSeconds

@@ -12,8 +12,9 @@
 > repair completed and the user rebound one fresh v12 campaign to `0a17726`.
 > v12 subsequently ran once from `212320f` and is consumed/non-admitting/
 > non-retryable after post-arm authorization-path deadline exhaustion; its bounded repair is
-> complete/non-admitting；persistent Gate P1/P2 later completed, and fresh v13
-> is now authorized/pending/unconsumed from pushed descendant `c7c94eb`.
+> complete/non-admitting；persistent Gate P1/P2 later completed. Fresh v13 ran
+> once from pushed descendant `8885161` and is consumed/non-admitting/
+> non-retryable after a closed post-arm failure.
 > Task 39 remains incomplete
 > and Task 40 remains blocked.
 

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=4828e06ef15b83d48e8b15d2bd820d7d2f3fbaa8e56d337a9ce1bd90466ae614
+# ib2_self_sha=2290f8c4e2d930ec53308f6d54724903c4da6bd4e2c66842e62fa3255b48f4f9
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -4055,10 +4055,37 @@ PY
         if [[ ! -e $persistent_base && ! -L $persistent_base ]]; then
             create_persistent_gate "$persistent_base" "$physical_out" || exit $?
         fi
-        STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
-            /usr/bin/swift test --no-parallel \
-            --filter InvestigationMachineCampaignEvidenceTests.independentVerifierBindsExactPersistentLockOnlyGateWhenOptedIn \
-            >"$out/persistent-gate-positive.log" || exit $?
+        local persistent_inventory
+        persistent_inventory=$(/usr/bin/python3 -I - "$persistent_base" <<'PY'
+import os
+import sys
+print("\n".join(sorted(os.listdir(sys.argv[1]))))
+PY
+        ) || exit $?
+        if [[ $persistent_inventory == .owner-lock-v1 ]]; then
+            STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
+                /usr/bin/swift test --no-parallel \
+                --filter InvestigationMachineCampaignEvidenceTests.independentVerifierBindsExactPersistentLockOnlyGateWhenOptedIn \
+                >"$out/persistent-gate-positive.log" || exit $?
+        elif [[ $persistent_inventory == $'.owner-lock-v1\nattempt-a77c4d21-9bba-46f6-b694-3d1d1e55209d' ]]; then
+            local v13_root
+            v13_root=$(/usr/bin/python3 -I - <<'PY'
+import os
+import tempfile
+campaign = "864065f6-8c9e-48e1-bedf-b0f6becd7b21"
+temporary = os.path.realpath(tempfile.gettempdir())
+print(os.path.join(temporary, "stornaut-iic-evidence-" + campaign,
+                   "stornaut-task39-iic-" + campaign))
+PY
+            ) || exit $?
+            scripts/verify-investigation-runtime-machine-failure \
+                "$v13_root" \
+                "$PWD/docs/reports/evidence/task-39-iic-v13-failure-disposition.json" \
+                >"$out/persistent-gate-positive.log" || exit $?
+        else
+            print -u2 "ii-c-c persistent Gate current-state verification unavailable"
+            exit 1
+        fi
         true
     ) || fail_contract "ii-c-c persistent Gate positive verification failed"
     "$gate" --iic-c-source-contract-only "${paths[@]}" >"$out/source.log"
@@ -4199,8 +4226,11 @@ paths = {
     "header": Path("Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h"),
     "c": Path("Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c"),
     "campaign": Path("Sources/StornautInvestigationMachineCampaign/main.swift"),
+    "handoff": Path("Sources/StornautInvestigationHandoffContract/InvestigationCohortCapsuleContract.swift"),
+    "gate": Path("Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift"),
     "fixture": Path("Tests/Fixtures/InvestigationMachineCampaignCredential/main.c"),
     "tests": Path("Tests/StornautInvestigationTests/InvestigationMachineCampaignCredentialDeadlineTests.swift"),
+    "gate_tests": Path("Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift"),
 }
 mutations = {
     "deadline-classification": ("campaign",
@@ -4235,6 +4265,27 @@ mutations = {
     "bounded-prompt-owner": ("c",
         '"Stornaut Task 39 ii-c administrator authorization: ",',
         '"",'),
+    "single-attempt-eof": ("c",
+        "frame[credential_length + 1] = end_of_input;",
+        "frame[credential_length + 1] = '\\n';"),
+    "authorization-window": ("handoff",
+        "maximumAuthorizationWallClockSeconds: UInt64 = 120",
+        "maximumAuthorizationWallClockSeconds: UInt64 = 1400"),
+    "gate-authorization-bound": ("gate",
+        "nowNanoseconds: continuousNanoseconds(),",
+        "nowNanoseconds: 1,"),
+    "control-byte-rejection": ("c",
+        "if (byte < 0x20 || byte == 0x7f) { return EINVAL; }",
+        "if (false) { return EINVAL; }"),
+    "inlcr-rejection": ("c",
+        "|| (attributes.c_iflag & INLCR) != 0",
+        "|| false"),
+    "reader-nul-sentinel": ("c",
+        "|| !untouched_suffix) {",
+        "|| false) {"),
+    "control-test-vacuity": ("tests",
+        'for controlCredential in ["prefix\\u{03}suffix", "prefix\\u{7f}suffix"] {',
+        "for controlCredential in [String]() {"),
 }
 with Path(__import__("sys").argv[1]).open("w", encoding="utf-8") as output:
     for name, (slot, old, new) in mutations.items():
@@ -4253,8 +4304,11 @@ PY
             Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h
             Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c
             Sources/StornautInvestigationMachineCampaign/main.swift
+            Sources/StornautInvestigationHandoffContract/InvestigationCohortCapsuleContract.swift
+            Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
             Tests/Fixtures/InvestigationMachineCampaignCredential/main.c
             Tests/StornautInvestigationTests/InvestigationMachineCampaignCredentialDeadlineTests.swift
+            Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
             Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
             scripts/verify-contract
         )
@@ -4262,8 +4316,11 @@ PY
             header) credential_paths[1]=$credential_target;;
             c) credential_paths[2]=$credential_target;;
             campaign) credential_paths[3]=$credential_target;;
-            fixture) credential_paths[4]=$credential_target;;
-            tests) credential_paths[5]=$credential_target;;
+            handoff) credential_paths[4]=$credential_target;;
+            gate) credential_paths[5]=$credential_target;;
+            fixture) credential_paths[6]=$credential_target;;
+            tests) credential_paths[7]=$credential_target;;
+            gate_tests) credential_paths[8]=$credential_target;;
         esac
         local credential_status=0
         "$gate" --iic-c-credential-deadline-mutation-contract-only \

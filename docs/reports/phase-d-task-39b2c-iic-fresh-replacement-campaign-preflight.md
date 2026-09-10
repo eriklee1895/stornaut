@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c fresh replacement campaign preflight
 
-> Status: preflight complete / authorized as v13 / pending / unconsumed
+> Status: historical preflight / v13 consumed / non-admitting / non-retryable
 >
 > Date: 2026-09-10
 >
@@ -16,6 +16,10 @@ Persistent Gate P2 is complete/non-admitting and pushed. Historical campaigns
 v8 through v12 are consumed, non-admitting and non-retryable. This preflight
 freezes the next legal machine step without authorizing or launching it. No new
 campaign UUID, attempt UUID or evidence root exists yet.
+
+Historical update: the user later authorized v13, which ran once from
+`8885161` and is now consumed/non-admitting/non-retryable after one
+closed post-arm failure. See the v13 failure disposition.
 
 ## Read-only machine state
 

@@ -83,6 +83,21 @@ enum InvestigationMachineGateDeadlinePolicy {
         }
         return absoluteDeadlineNanoseconds - cleanupReserveNanoseconds
     }
+
+    static func authorizationDeadline(
+        nowNanoseconds: UInt64, absoluteDeadlineNanoseconds: UInt64
+    ) throws -> UInt64 {
+        let operation = try operationDeadline(
+            absoluteDeadlineNanoseconds: absoluteDeadlineNanoseconds
+        )
+        let local = nowNanoseconds.addingReportingOverflow(
+            InvestigationCohortCapsule.maximumAuthorizationWallClockNanoseconds
+        )
+        guard nowNanoseconds > 0, !local.overflow else {
+            throw InvestigationMachineGateError.containmentUncertain
+        }
+        return min(local.partialValue, operation)
+    }
 }
 
 enum InvestigationMachineGateEnvironmentValidator {
@@ -1250,7 +1265,14 @@ private extension DarwinInvestigationMachineFixedGateSystem {
     func readResolvedRootDriverClaim(descriptor: Int32) throws
         -> ResolvedRootDriverClaimV1
     {
-        let deadline = try operationDeadline()
+        guard let absoluteDeadline = state.deadlineNanoseconds else {
+            throw unexpected()
+        }
+        let deadline = try InvestigationMachineGateDeadlinePolicy
+            .authorizationDeadline(
+                nowNanoseconds: continuousNanoseconds(),
+                absoluteDeadlineNanoseconds: absoluteDeadline
+            )
         let prefix = try readOutputExact(
             descriptor: descriptor, count: 4, deadline: deadline
         )

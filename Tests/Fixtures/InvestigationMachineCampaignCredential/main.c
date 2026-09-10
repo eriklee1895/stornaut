@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,6 +85,45 @@ run_child(uint64_t deadline_nanoseconds, uint64_t pre_entry_delay_microseconds)
 }
 
 static int
+run_single_attempt_child(const char *expected, int enable_inlcr)
+{
+    struct termios original;
+    if (expected == NULL || tcgetattr(STDIN_FILENO, &original) != 0) {
+        return 70;
+    }
+    struct termios hidden = original;
+    hidden.c_lflag |= ICANON;
+    hidden.c_lflag &= (tcflag_t)~(ECHO | ECHONL);
+    if (enable_inlcr) { hidden.c_iflag |= INLCR; }
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &hidden) != 0) { return 71; }
+    printf("single-attempt-ready\n");
+    fflush(stdout);
+
+    char first[2048];
+    memset(first, 0, sizeof(first));
+    ssize_t first_count;
+    do { first_count = read(STDIN_FILENO, first, sizeof(first)); }
+    while (first_count < 0 && errno == EINTR);
+    char second = 0;
+    ssize_t second_count;
+    do { second_count = read(STDIN_FILENO, &second, 1); }
+    while (second_count < 0 && errno == EINTR);
+    int first_match = first_count == (ssize_t)(strlen(expected) + 1)
+        && memcmp(first, expected, strlen(expected)) == 0
+        && first[first_count - 1] == '\n';
+    int second_eof = second_count == 0;
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH | TCSASOFT, &original) != 0) {
+        return 72;
+    }
+    printf(
+        "firstMatch=%d secondEOF=%d afterEcho=%d\n",
+        first_match, second_eof, echo_enabled(STDIN_FILENO)
+    );
+    fflush(stdout);
+    return first_match && second_eof ? 0 : 73;
+}
+
+static int
 output_contains(const char *output, size_t count, const char *needle)
 {
     size_t needle_count = strlen(needle);
@@ -114,7 +154,11 @@ main(int argc, char **argv)
             && strcmp(argv[1], "expired") != 0
             && strcmp(argv[1], "reap-signal") != 0
             && strcmp(argv[1], "reap-clock") != 0
-            && strcmp(argv[1], "reap-wait") != 0)) {
+            && strcmp(argv[1], "reap-wait") != 0
+            && strcmp(argv[1], "single-attempt-relay") != 0
+            && strcmp(argv[1], "single-attempt-inlcr") != 0
+            && strcmp(argv[1], "single-attempt-nul") != 0
+            && strcmp(argv[1], "reader-nul") != 0)) {
         return 64;
     }
     char *end = NULL;
@@ -143,6 +187,13 @@ main(int argc, char **argv)
         return 66;
     }
     if (child == 0) {
+        if (strcmp(argv[1], "single-attempt-relay") == 0
+            || strcmp(argv[1], "single-attempt-inlcr") == 0
+            || strcmp(argv[1], "single-attempt-nul") == 0) {
+            return run_single_attempt_child(
+                argv[3], strcmp(argv[1], "single-attempt-inlcr") == 0
+            );
+        }
         return run_child(
             (uint64_t)parsed,
             strcmp(argv[1], "expired") == 0 ? 200000
@@ -161,6 +212,7 @@ main(int argc, char **argv)
         || strcmp(argv[1], "reap-wait") == 0;
     int child_status = 0;
     int child_reaped = 0;
+    int relay_status = -1;
     for (int iteration = 0; iteration < 200 && used < sizeof(output); iteration += 1) {
         struct pollfd event = {.fd = master, .events = POLLIN | POLLHUP, .revents = 0};
         int ready = poll(&event, 1, 50);
@@ -180,22 +232,59 @@ main(int argc, char **argv)
                 break;
             }
         }
-        if (!sent && output_contains(output, used, "fixture-ready\r\n")) {
+        int single_attempt = strcmp(argv[1], "single-attempt-relay") == 0
+            || strcmp(argv[1], "single-attempt-inlcr") == 0
+            || strcmp(argv[1], "single-attempt-nul") == 0;
+        const char *ready_line = single_attempt
+            ? "single-attempt-ready\r\n" : "fixture-ready\r\n";
+        if (!sent && output_contains(output, used, ready_line)) {
             struct termios attributes;
             pid_t foreground = tcgetpgrp(master);
-            if (foreground > 1 && foreground != child
+            int foreground_matches = single_attempt
+                ? foreground == child : foreground > 1 && foreground != child;
+            if (foreground_matches
                 && tcgetattr(master, &attributes) == 0
                 && (attributes.c_lflag & (ECHO | ECHONL)) == 0) {
-                const char *input = strcmp(argv[1], "empty") == 0
-                    ? "" : strcmp(argv[1], "interrupt") == 0
-                    ? "\003" : argv[3];
-                size_t input_count = strlen(input);
-                if ((input_count > 0
-                        && write(master, input, input_count)
-                            != (ssize_t)input_count)
-                    || (strcmp(argv[1], "interrupt") != 0
-                        && write(master, "\n", 1) != 1)) {
-                    break;
+                if (single_attempt) {
+                    uint64_t now = 0;
+                    if (stornaut_investigation_campaign_monotonic_nanoseconds(
+                            &now) != 0 || now > UINT64_MAX - parsed) {
+                        break;
+                    }
+                    if (strcmp(argv[1], "single-attempt-nul") == 0) {
+                        const char embedded_nul[] = {'a', '\0', (char)0xa5, 'b'};
+                        relay_status =
+                            stornaut_investigation_campaign_relay_single_credential(
+                                master, embedded_nul, sizeof(embedded_nul),
+                                now + parsed
+                            );
+                    } else {
+                        relay_status =
+                            stornaut_investigation_campaign_relay_single_credential(
+                                master, argv[3], strlen(argv[3]), now + parsed
+                            );
+                    }
+                    if (relay_status != 0) {
+                        if (kill(child, SIGKILL) != 0) {
+                            break;
+                        }
+                    }
+                } else {
+                    const unsigned char reader_nul[] = {'a', 0, 0xa5, 'b'};
+                    const char *input = strcmp(argv[1], "empty") == 0
+                        ? "" : strcmp(argv[1], "interrupt") == 0
+                        ? "\003" : argv[3];
+                    size_t input_count = strcmp(argv[1], "reader-nul") == 0
+                        ? sizeof(reader_nul) : strlen(input);
+                    const void *input_bytes = strcmp(argv[1], "reader-nul") == 0
+                        ? reader_nul : (const void *)input;
+                    if ((input_count > 0
+                            && write(master, input_bytes, input_count)
+                                != (ssize_t)input_count)
+                        || (strcmp(argv[1], "interrupt") != 0
+                            && write(master, "\n", 1) != 1)) {
+                        break;
+                    }
                 }
                 sent = 1;
             }
@@ -215,8 +304,23 @@ main(int argc, char **argv)
         return 67;
     }
     (void)close(master);
+    if (strcmp(argv[1], "single-attempt-relay") == 0
+        || strcmp(argv[1], "single-attempt-inlcr") == 0
+        || strcmp(argv[1], "single-attempt-nul") == 0) {
+        errno = 0;
+        int child_residue = waitpid(-1, NULL, WNOHANG) != -1 || errno != ECHILD;
+        int child_exit = WIFEXITED(child_status) ? WEXITSTATUS(child_status)
+            : WIFSIGNALED(child_status) ? 128 + WTERMSIG(child_status) : -1;
+        printf(
+            "relayStatus=%d childExit=%d childResidue=%d ",
+            relay_status, child_exit, child_residue
+        );
+    }
     if (write(STDOUT_FILENO, output, used) != (ssize_t)used) {
         return 68;
     }
+    if (strcmp(argv[1], "single-attempt-relay") == 0
+        || strcmp(argv[1], "single-attempt-inlcr") == 0
+        || strcmp(argv[1], "single-attempt-nul") == 0) { return 0; }
     return WIFEXITED(child_status) ? WEXITSTATUS(child_status) : 69;
 }

@@ -909,19 +909,25 @@ package enum InvestigationMachineCampaignExecutable {
                     _ = memset_s(raw.baseAddress, raw.count, 0, raw.count)
                 }
             }
-            let credentialDeadline = try operationDeadline(
-                absoluteDeadlineNanoseconds
+            let authorizationStart = DispatchTime.now().uptimeNanoseconds
+            let authorizationEnd = authorizationStart.addingReportingOverflow(
+                InvestigationCohortCapsule.maximumAuthorizationWallClockNanoseconds
+            )
+            guard !authorizationEnd.overflow else { throw Failure.deadline }
+            let credentialDeadline = min(
+                try operationDeadline(absoluteDeadlineNanoseconds),
+                authorizationEnd.partialValue
             )
             var credentialClockNow: UInt64 = 0
             guard stornaut_investigation_campaign_monotonic_nanoseconds(
                 &credentialClockNow
             ) == 0 else { throw Failure.invalid }
-            let now = DispatchTime.now().uptimeNanoseconds
-            guard now < credentialDeadline,
-                  credentialClockNow <= UInt64.max - (credentialDeadline - now)
+            let relayStart = DispatchTime.now().uptimeNanoseconds
+            guard relayStart < credentialDeadline,
+                  credentialClockNow <= UInt64.max - (credentialDeadline - relayStart)
             else { throw Failure.deadline }
             let credentialAbsoluteDeadline = credentialClockNow
-                + (credentialDeadline - now)
+                + (credentialDeadline - relayStart)
             var length = 0
             var credentialError: Int32 = 0
             let credentialStatus =
@@ -946,13 +952,16 @@ package enum InvestigationMachineCampaignExecutable {
             guard DispatchTime.now().uptimeNanoseconds < credentialDeadline
             else { throw Failure.deadline }
             humanActionObserved = true
-            try credential.withUnsafeBytes { raw in
-                try writeRaw(
-                    terminalDescriptor,
-                    bytes: UnsafeRawBufferPointer(rebasing: raw.prefix(length))
+            let relayStatus = credential.withUnsafeBufferPointer { bytes in
+                stornaut_investigation_campaign_relay_single_credential(
+                    terminalDescriptor, bytes.baseAddress, length,
+                    credentialAbsoluteDeadline
                 )
             }
-            try writeAll(terminalDescriptor, bytes: [UInt8(ascii: "\n")])
+            guard relayStatus == 0 else {
+                if relayStatus == ETIMEDOUT { throw Failure.deadline }
+                throw Failure.posix(relayStatus)
+            }
             try publishAttestation(preArm)
         }
 

@@ -67,6 +67,17 @@ stornaut_investigation_campaign_readpassphrase_bounded(
     int32_t *error_number
 );
 
+/*
+ * Relays exactly one credential line to a canonical, no-echo terminal and
+ * follows it with that terminal's VEOF character. The VEOF makes a rejected
+ * first sudo authentication attempt fail closed instead of waiting for an
+ * unowned retry until the whole campaign deadline.
+ */
+int stornaut_investigation_campaign_relay_single_credential(
+    int terminal_descriptor, const char *credential, size_t credential_length,
+    uint64_t absolute_deadline_nanoseconds
+);
+
 int stornaut_investigation_campaign_monotonic_nanoseconds(uint64_t *value);
 
 typedef enum {

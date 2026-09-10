@@ -1773,7 +1773,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             "FIXED_PATHS": (), "FIXED_EXECUTABLES": (),
             "SERVICE": "system/com.eriklee.stornaut.lifecycle",
             "process_paths": lambda: [],
-            "account_gate_base": lambda: sys.argv[2],
+            "account_gate_base": lambda persistent=False: sys.argv[2],
         }
         def require(condition, message):
             if not condition:
@@ -1794,7 +1794,9 @@ struct InvestigationMachineCampaignEvidenceTests {
             "fixedProcessCount": 0, "gateBaseState": expected_state,
         }
         try:
-            namespace["observe_system"](expected, {"attemptUUID": "unused"})
+            namespace["observe_system"](
+                expected, {"attemptUUID": "unused", "schemaVersion": 1}
+            )
         except RuntimeError as error:
             if should_accept or str(error) != "required Gate base absent":
                 raise
@@ -1829,6 +1831,88 @@ struct InvestigationMachineCampaignEvidenceTests {
                 Comment(rawValue: "\(state): \(stderr)"))
         }
         #expect(!FileManager.default.fileExists(atPath: missingGateBase.path))
+    }
+
+    @Test
+    func failureDispositionVerifierRetriesTransientProcessIdentityChurn() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure")
+        let harness = #"""
+        import ast
+        import ctypes
+        import subprocess
+        import sys
+
+        source = open(sys.argv[1], "r", encoding="utf-8").read()
+        python_source = source.split("<<'PY'\n", 1)[1].rsplit("\nPY\n", 1)[0]
+        tree = ast.parse(python_source)
+        rejected = next(
+            node for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "Rejected")
+        function = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "process_paths")
+
+        class FakeLibC:
+            def __init__(self, recover):
+                self.recover = recover
+                self.snapshots = 0
+            def proc_listallpids(self, values, size):
+                self.snapshots += 1
+                values[0] = 41001
+                return 1
+            def proc_pidpath(self, process_id, buffer, size):
+                if self.recover and self.snapshots >= 2:
+                    value = b"/usr/bin/true"
+                    buffer.value = value
+                    return len(value)
+                return 0
+            def proc_name(self, process_id, buffer, size):
+                return 0
+
+        class ProcessState:
+            returncode = 0
+            stdout = b"S\n"
+
+        namespace = {
+            "ctypes": ctypes, "subprocess": subprocess,
+            "FIXED_PROCESS_NAMES": (),
+        }
+        def require(condition, message):
+            if not condition:
+                raise RuntimeError(message)
+        namespace["require"] = require
+        exec(compile(ast.Module(body=[rejected, function], type_ignores=[]),
+                     "<process-paths>", "exec"), namespace)
+        namespace["subprocess"].run = lambda *args, **kwargs: ProcessState()
+        namespace["libc"] = FakeLibC(True)
+        paths = namespace["process_paths"]()
+        if paths != ["/usr/bin/true"] or namespace["libc"].snapshots != 2:
+            raise RuntimeError("transient identity churn was not retried")
+        namespace["libc"] = FakeLibC(False)
+        try:
+            namespace["process_paths"]()
+        except namespace["Rejected"] as error:
+            if str(error) != "live process identity unavailable after bounded retries":
+                raise
+            if namespace["libc"].snapshots != 3:
+                raise RuntimeError("persistent identity failure was not bounded")
+        else:
+            raise RuntimeError("persistent live identity failure was accepted")
+        """#
+        let process = Process(), output = Pipe()
+        process.executableURL = URL(filePath: "/usr/bin/python3")
+        process.arguments = ["-I", "-c", harness, verifier.path]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        let bytes = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0,
+            Comment(rawValue: String(decoding: bytes, as: UTF8.self)))
     }
 
     @Test
@@ -2252,6 +2336,110 @@ struct InvestigationMachineCampaignEvidenceTests {
             cause["elapsedAfterArmMicroseconds"] = "3591465480"
             value["rootCauseObservation"] = cause
             return value
+        }
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V13_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v13 failure-evidence verification"
+    ))
+    func checkedV13FailureDispositionBindsPersistentEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v13-failure-disposition.json")
+        let root = try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V13_EVIDENCE_ROOT"])
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+        let disposition = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: report)) as? [String: Any])
+        #expect(disposition["schemaVersion"] as? Int == 8)
+        #expect(disposition["classification"] as? String
+            == "consumedClosedPostArmFailure")
+        #expect(disposition["admission"] as? String == "rejected")
+        #expect(disposition["retry"] as? String == "forbidden")
+        let cause = try #require(
+            disposition["rootCauseObservation"] as? [String: Any])
+        #expect(cause["reason"] as? String
+            == "closedPostArmReceiptInvalidExit82")
+        #expect(cause["exactWaitClassification"] as? String == "exited-82")
+        #expect(cause["cleanupIssueMask"] as? String == "02")
+        let system = try #require(
+            disposition["systemObservation"] as? [String: Any])
+        #expect(system["gateBaseState"] as? String
+            == "persistentOwnConsumedAttemptPresent")
+        let supplemental = try #require(
+            disposition["supplementalSystemObservation"] as? [String: Any])
+        #expect(supplemental["binding"] as? String
+            == "notCampaignArtifactBound")
+        #expect(supplemental["nonClaim"] as? String
+            == "notUsedForDispositionClassificationOrAdmission")
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V13_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v13 forgery-rejection verification"
+    ))
+    func checkedV13FailureDispositionRejectsSchemaEightForgeryWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v13-failure-disposition.json")
+        let root = try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V13_EVIDENCE_ROOT"])
+        let original = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: source)) as? [String: Any])
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+
+        func reject(_ name: String, _ mutation: ([String: Any]) -> [String: Any])
+            throws
+        {
+            let report = reportParent.appending(path: name + ".json")
+            try Self.writeCanonicalReport(mutation(original), to: report)
+            let result = try Self.runFailureVerifier(URL(filePath: root), report)
+            #expect(result.status != 0, Comment(rawValue: name))
+        }
+        try reject("artifact") { value in
+            var value = value
+            var artifacts = value["artifactSHA256"] as! [String: Any]
+            artifacts["03-authorization/attempt-event-0004.bin"] = String(
+                repeating: "a", count: 64)
+            value["artifactSHA256"] = artifacts; return value
+        }
+        try reject("timeline") { value in
+            var value = value
+            var cause = value["rootCauseObservation"] as! [String: Any]
+            cause["terminalObservedAtUTCMicroseconds"] = "1789015142393486"
+            value["rootCauseObservation"] = cause; return value
+        }
+        try reject("gate") { value in
+            var value = value
+            var system = value["systemObservation"] as! [String: Any]
+            system["gateCapsuleSHA256"] = String(repeating: "b", count: 64)
+            value["systemObservation"] = system; return value
+        }
+        try reject("nonclaim") { value in
+            var value = value
+            var claims = value["nonClaims"] as! [String]
+            claims.removeLast(); value["nonClaims"] = claims; return value
+        }
+        try reject("supplemental-binding") { value in
+            var value = value
+            var supplemental = value["supplementalSystemObservation"]
+                as! [String: Any]
+            supplemental["binding"] = "campaignArtifactBound"
+            value["supplementalSystemObservation"] = supplemental; return value
         }
     }
 

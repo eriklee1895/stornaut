@@ -358,6 +358,8 @@ iicc_suspended_sudo_sources=()
 iicc_failure_disposition_contract_only=false
 iicc_v12_external_evidence_only=false
 iicc_v12_external_evidence_root=
+iicc_v13_external_evidence_only=false
+iicc_v13_external_evidence_root=
 iicc_persistent_gate_contract_only=false
 iicc_persistent_gate_mutation_contract_only=false
 iicc_persistent_gate_mutation_name=
@@ -1013,6 +1015,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-v12-external-evidence-only ]]; then
         iicc_v12_external_evidence_only=true
         iicc_v12_external_evidence_root=$2
+    elif (( $# == 2 )) \
+        && [[ $1 == --iic-c-v13-external-evidence-only ]]; then
+        iicc_v13_external_evidence_only=true
+        iicc_v13_external_evidence_root=$2
     elif (( $# == 1 || $# == 6 )) \
         && [[ $1 == --iic-c-persistent-gate-contract-only ]]; then
         iicc_persistent_gate_contract_only=true
@@ -1024,11 +1030,11 @@ if (( $# > 0 )); then
         iicc_persistent_gate_mutation_slot=$3
         iicc_persistent_gate_mutation_sha=$4
         iicc_persistent_gate_sources=("${@:5}")
-    elif (( $# == 1 || $# == 8 )) \
+    elif (( $# == 1 || $# == 11 )) \
         && [[ $1 == --iic-c-credential-deadline-contract-only ]]; then
         iicc_credential_deadline_contract_only=true
         iicc_credential_deadline_sources=("${@:2}")
-    elif (( $# == 11 )) \
+    elif (( $# == 14 )) \
         && [[ $1 == --iic-c-credential-deadline-mutation-contract-only ]]; then
         iicc_credential_deadline_mutation_contract_only=true
         iicc_credential_deadline_mutation_name=$2
@@ -11877,7 +11883,7 @@ if executable.count(actor_end) != 1:
 actor_block = executable[executable.index(actor_marker):
                          executable.index(actor_end, executable.index(actor_marker)) + len('\n    }')]
 if hashlib.sha256(actor_block.encode()).hexdigest() != \
-        'f270aedd9039210386d0d4c65731c4edb9f1f12fb997ab0f6f959191b19fd74d':
+        'fccd0d7ca2cf0202b9bb9351fa58701e614461a62bd90f282973d20dd5ad8d2e':
     raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
 def require_body_digest(start, end, expected):
     if executable.count(start) != 1 or executable.count(end) != 1:
@@ -11977,7 +11983,7 @@ if executable.count(debug_end) != 1:
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 debug_executable = executable[:executable.index(debug_end)]
 if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-        '894672e6445776c9d76f69799358a1be423fc99344678ddb5b36d0aeb27a1510':
+        '36dc7c69822a26458443d1964074931fb4ad5c4dc2febaef7b74725413559f29':
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 authority_surface = active_executable
 for marker in allowed_sudo:
@@ -12666,7 +12672,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     actor_block = main[main.index(actor_marker):
                        main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
     if hashlib.sha256(actor_block.encode()).hexdigest() != \
-            'f270aedd9039210386d0d4c65731c4edb9f1f12fb997ab0f6f959191b19fd74d':
+            'fccd0d7ca2cf0202b9bb9351fa58701e614461a62bd90f282973d20dd5ad8d2e':
         raise SystemExit("ii-c-c lifecycle actor drifted")
     def require_body_digest(start, end, expected):
         if main.count(start) != 1 or main.count(end) != 1:
@@ -12701,7 +12707,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '894672e6445776c9d76f69799358a1be423fc99344678ddb5b36d0aeb27a1510':
+            '36dc7c69822a26458443d1964074931fb4ad5c4dc2febaef7b74725413559f29':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -12765,7 +12771,7 @@ transport, darwin, fixture, tests = (
 )
 expected_sha256 = (
     "7c52fc0d80edc6170b9e376aa54143b5c4fd1734f5bd465d76762b74d8980e83",
-    "7835888badd696951da85d82e3cb79f5736ea6fe4028a0b433a6ed8605d0a406",
+    "4eb70b3b103cd6a457bdec865640b3a88c46eab4e7821e5edfc143c802944687",
     "d0bc9bc33f24f3eaa30440fafa4cda530568de9d754478c279014f41ec9b43fd",
     "b9128269b2298733ce156241376051da6fdf05ee4e66bd4a7f37fc619a6e79f5",
 )
@@ -12983,6 +12989,7 @@ function verify_iicc_failure_disposition_contract() {
     local v10_before_v11=docs/reports/evidence/task-39-iic-v10-failure-disposition-before-v11.json
     local v11_evidence=docs/reports/evidence/task-39-iic-v11-failure-disposition.json
     local v12_evidence=docs/reports/evidence/task-39-iic-v12-failure-disposition.json
+    local v13_evidence=docs/reports/evidence/task-39-iic-v13-failure-disposition.json
     local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
     local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
@@ -12990,11 +12997,12 @@ function verify_iicc_failure_disposition_contract() {
     local v10_report=docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md
     local v11_report=docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md
     local v12_report=docs/reports/phase-d-task-39b2c-iic-v12-failure-disposition.md
+    local v13_report=docs/reports/phase-d-task-39b2c-iic-v13-failure-disposition.md
     local path
     for path in $verifier $evidence $v9_evidence $v9_prior $v9_before_v10 \
         $v9_before_v11 $v10_evidence $v10_before_v11 $v11_evidence \
-        $v12_evidence $tests $boundary $report $v9_report $v10_report \
-        $v11_report $v12_report; do
+        $v12_evidence $v13_evidence $tests $boundary $report $v9_report \
+        $v10_report $v11_report $v12_report $v13_report; do
         [[ -f $path && ! -L $path ]] || {
             print -u2 "ii-c-c failure disposition source unavailable: $path"
             return 1
@@ -13007,8 +13015,8 @@ function verify_iicc_failure_disposition_contract() {
     /bin/zsh -n $verifier || return $?
     /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior \
         $v9_before_v10 $v9_before_v11 $v10_evidence $v10_before_v11 \
-        $v11_evidence $v12_evidence $tests $boundary $report $v9_report \
-        $v10_report $v11_report $v12_report <<'PY'
+        $v11_evidence $v12_evidence $v13_evidence $tests $boundary $report \
+        $v9_report $v10_report $v11_report $v12_report $v13_report <<'PY'
 from pathlib import Path
 import hashlib
 import json
@@ -13016,8 +13024,8 @@ import re
 import sys
 
 verifier, evidence, v9_evidence, v9_prior, v9_before_v10, v9_before_v11, \
-v10_evidence, v10_before_v11, v11_evidence, v12_evidence, tests, boundary, \
-report, v9_report, v10_report, v11_report, v12_report = (
+v10_evidence, v10_before_v11, v11_evidence, v12_evidence, v13_evidence, tests, \
+boundary, report, v9_report, v10_report, v11_report, v12_report, v13_report = (
     Path(value) for value in sys.argv[1:])
 source = verifier.read_text(encoding="utf-8")
 test_source = tests.read_text(encoding="utf-8")
@@ -13027,6 +13035,7 @@ v9_report_source = v9_report.read_text(encoding="utf-8")
 v10_report_source = v10_report.read_text(encoding="utf-8")
 v11_report_source = v11_report.read_text(encoding="utf-8")
 v12_report_source = v12_report.read_text(encoding="utf-8")
+v13_report_source = v13_report.read_text(encoding="utf-8")
 match = re.fullmatch(
     r"([0-9a-f]{64})",
     re.search(
@@ -13055,6 +13064,9 @@ required = (
     "consumedCampaignDeadlineExhaustion",
     "consumedPostArmFailureUnclassified",
     "consumedPostArmAuthorizationDeadlineExhaustion",
+    "consumedClosedPostArmFailure",
+    "notCampaignArtifactBound",
+    "persistentOwnConsumedAttemptPresent",
     "gateBaseAbsentAfterObservedResidueLoss",
     "externalGateCacheResidueLost", "unattributedExternalRemoval",
     "closed failure projection reason",
@@ -13089,6 +13101,8 @@ checked = (
      ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
     (v12_evidence, "consumedPostArmAuthorizationDeadlineExhaustion",
      ["prepared", "armedConsumed", "spawnUncertain"]),
+    (v13_evidence, "consumedClosedPostArmFailure",
+     ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
 )
 checked_digests = {
     evidence: "7351c8312315b5673c7610a3421a20eb14fdb53fb6bdd181abfde4732d16b072",
@@ -13096,6 +13110,7 @@ checked_digests = {
     v10_evidence: "178a87626086f7a4be9e8d80c82f2d5f21f79aa4f847173e6712b02b7a8e097d",
     v11_evidence: "c70594ea5bd6d7ee3acc53f45e7f7e803e762c33cc01570cc48f098b89f96d48",
     v12_evidence: "27a20d6cb5350ba2c0f7d70c9cbf1f4787eb811fecec2a19476fb225f814c139",
+    v13_evidence: "09c62579bf4a78ce00f491993ccfbeb5f4cd22ed11e0e8744f1e52922080bafd",
 }
 
 for checked_path, classification, events in checked:
@@ -13164,6 +13179,11 @@ for marker in (
     '"STORNAUT_TASK39_V12_EVIDENCE_ROOT"',
     "Opt in to the read-only frozen v12 failure-evidence verification",
     "Opt in to the read-only frozen v12 forgery-rejection verification",
+    "checkedV13FailureDispositionBindsPersistentEvidenceWhenAvailable",
+    '"STORNAUT_TASK39_V13_EVIDENCE_ROOT"',
+    "Opt in to the read-only frozen v13 failure-evidence verification",
+    "checkedV13FailureDispositionRejectsSchemaEightForgeryWhenAvailable",
+    "Opt in to the read-only frozen v13 forgery-rejection verification",
 ):
     if marker not in test_source:
         raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
@@ -13228,6 +13248,19 @@ for marker in (
     if marker not in v12_report_source:
         raise SystemExit("ii-c-c v12 failure disposition report drifted: " + marker)
 for marker in (
+    "consumedClosedPostArmFailure",
+    "1,395,098,532", "1 incorrect password attempt",
+    "persistent Gate", "non-admitting", "non-retryable",
+    "cannot make that interpretation\ncampaign-bound",
+    "is compatible with the observed timing but is not a campaign-bound\nconclusion",
+):
+    if marker not in v13_report_source:
+        raise SystemExit("ii-c-c v13 failure disposition report drifted: " + marker)
+for forbidden in ("therefore exhausted", "system-rejected credential attempt"):
+    if forbidden in v13_report_source:
+        raise SystemExit(
+            "ii-c-c v13 supplemental observation became causal: " + forbidden)
+for marker in (
     "--iic-c-v12-external-evidence-only",
     "function verify_iicc_v12_external_evidence() {",
     "ii-c-c frozen v12 evidence root unavailable or noncanonical",
@@ -13235,20 +13268,21 @@ for marker in (
     if marker not in boundary_source:
         raise SystemExit("ii-c-c v12 external evidence gate drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "6a53ce49c770a1f1f0624d0247eabb3c5d61dcf0f297ff01661812ff624d05b6"),
-    (Path("README.md"), "f19e35796f287d8f230681cd92b2dfd3c2dd21520eb6e810f3fe4ffb480568be"),
-    (Path("docs/README.md"), "a4b51278cdfa8bea0dc38b24837a2337b79b3af48a81c5cd0ca28569e1667b2e"),
-    (Path("docs/agent/coding-agent-handoff.md"), "0f85fe09e9c6af86b855b6f106e8acedf8502f9113d80dcd726fb6562a2733a9"),
-    (Path("docs/plans/active/README.md"), "2886f995a0c3bcc42108581154114a5e2f970ed71e486972198ab08afedd3e40"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "a2725bd5cf628d4c33674be2f07bdab36ace780397c6314d3b4668105636b267"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "f327e6511c37f27bb4fedeaa9fef4d5b87d17f60a514b15d63b3b97b8892b948"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "5d410d2e630a3fb76c873b396cb92845ca6591e9c576bd4fffe532963235fc85"),
-    (Path("docs/plans/roadmap.md"), "a9dc1003d0c364f128af9c7073869a57efdc94ca4c49e3fb7805189e705f3865"),
+    (Path("AGENTS.md"), "eec6325129ab95d22aa4638b71a6bf890c14604c0820ad97aa59f21e714a8855"),
+    (Path("README.md"), "790ab2bf639bb1b5f14c0e6653537377097561650107cd7c124661c04141cafe"),
+    (Path("docs/README.md"), "af29446611126a702f3b6e2bdef178f37b634fa0ac255b0212b593287df9bcaa"),
+    (Path("docs/agent/coding-agent-handoff.md"), "6028f3d0c1f7fe77664ba250d82aca7aa51336a4b61b0d95cdbd64a1224c2d86"),
+    (Path("docs/plans/active/README.md"), "7f4b0ff1d6077dcee9bf9988597d61af5775ea348ff9a3511589f6e73308d7f7"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "7bc5673d15b66ad14ca85e65f3842ecbc2d42bb90e16d0c380ea9b52998f8430"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "ed33ba90a3d49d29e52bc682da53ea797c791ef387f54091f561533fa69a71ca"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "efdf3f00056b56093d8cfb02bfcd08f94c808994180694d2a48d3d0b232be1c8"),
+    (Path("docs/plans/roadmap.md"), "415c2fdaeeba56d8521be65b1e5e88365da68e16e9cac9483935c177adb8ed72"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"), "a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"), "17348ae20ae056bc87fdf198502526a80b54e2c8347387b7931cfb7b434860c2"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"), "9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "72f47237c18d0f7418e010deaccd9edd0179350f62e7952fa8f2fdb9e601e4eb"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13265,9 +13299,10 @@ active_status_expected_paths = {
     Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"),
 }
 active_status_paths = [path for path, _ in active_status_entries]
-if (len(active_status_entries) != 14
+if (len(active_status_entries) != 15
         or len(set(active_status_paths)) != len(active_status_paths)
         or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
@@ -13281,36 +13316,38 @@ semantic_status = {
     Path("AGENTS.md"): (
         "v8 与 replacement v9", "v10", "v11",
         "v12 machine campaign\n  已从 `212320f`", "consumed/non-admitting/non-retryable",
-        "authorization-only descendant `c7c94eb` 已推送",
-        "authorized/pending/unconsumed",
+        "fresh v13 已从 `8885161` 唯一执行",
+        "persistent Gate residue 保留",
         "Task 40 仍 blocked",
     ),
     Path("docs/plans/active/README.md"): (
         "v8, v9, v10 and v11", "consumed/no-go records", "v12 campaign ran once",
         "bounded schema-v2 reason and remains non-admitting",
         "bounded credential repair and persistent Gate P1/P2 are complete/non-admitting",
-        "v13 campaign based on `46e1f94`",
-        "pending/unconsumed",
+        "authorized v13 campaign ran once from descendant `8885161`",
+        "consumed/non-admitting/non-retryable",
         "blocked on Task 39 under the approved sequential plan",
     ),
     Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
         "That v9-era status is historical",
         "v10 and v11", "were subsequently authorized and consumed",
         "consumed replacement campaigns v9 through v12",
-        "authorized one fresh v13 campaign based on `46e1f94`",
-        "pending/unconsumed",
+        "authorized v13 campaign ran once from descendant `8885161`",
+        "consumed/non-admitting/non-retryable",
         "Task 40 remains blocked",
     ),
     Path("docs/plans/active/task-39-implementation-brief.md"): (
-        "v8 through v12 are conclusive",
+        "v8 through v13 are conclusive",
         "consumedPostArmAuthorizationDeadlineExhaustion",
-        "One fresh v13 is authorized from `46e1f94`",
+        "consumedClosedPostArmFailure",
+        "authorization-window/one-attempt EOF repair are\n> complete/non-admitting",
         "Task 40 start condition remains blocked",
     ),
     Path("docs/plans/active/task-40-implementation-brief.md"): (
-        "v8 through v12 campaigns", "do not satisfy",
+        "v8 through v13 campaigns", "do not satisfy",
         "v12 is consumed/non-admitting/non-retryable",
-        "Fresh v13 is authorized/pending/unconsumed",
+        "v13 is consumed/non-admitting/non-retryable",
+        "a supplemental sudo/PAM observation\nis not campaign-bound",
         "blocked on pushed Task 39 Ready baseline",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"): (
@@ -13322,10 +13359,14 @@ semantic_status = {
         "Task 40 remains blocked",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"): (
-        "Status: authorized / pending / unconsumed",
+        "Status: consumed / non-admitting / non-retryable",
         "46e1f94a2e78b7f132a182c00c510a228a5d140f",
         "one fresh nonzero campaign UUID", "Once v13 durably records",
         "Task 40 remains blocked",
+    ),
+    Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"): (
+        "v13 disposition and authorization hardening complete/non-admitting",
+        "Remaining order: separately authorized green campaign -> L3c3d -> L3c4",
     ),
 }
 for active_path, markers in semantic_status.items():
@@ -13338,9 +13379,9 @@ task39_status = " ".join(
     .read_text(encoding="utf-8")
     .split()
 )
-for marker in ("v8 through v12 are conclusive",
+for marker in ("v8 through v13 are conclusive",
                "consumedPostArmAuthorizationDeadlineExhaustion",
-               "One fresh v13 is authorized from `46e1f94`"):
+               "consumedClosedPostArmFailure"):
     if marker not in task39_status:
         raise SystemExit("ii-c-c current campaign disposition drifted")
 for stale in (
@@ -13370,6 +13411,18 @@ function verify_iicc_v12_external_evidence() {
         return 1
     }
     "$verifier" "$iicc_v12_external_evidence_root" "$PWD/$disposition"
+}
+
+function verify_iicc_v13_external_evidence() {
+    local verifier=scripts/verify-investigation-runtime-machine-failure
+    local disposition=docs/reports/evidence/task-39-iic-v13-failure-disposition.json
+    [[ $iicc_v13_external_evidence_root == /* \
+        && -d $iicc_v13_external_evidence_root \
+        && ! -L $iicc_v13_external_evidence_root ]] || {
+        print -u2 "ii-c-c frozen v13 evidence root unavailable or noncanonical"
+        return 1
+    }
+    "$verifier" "$iicc_v13_external_evidence_root" "$PWD/$disposition"
 }
 
 function verify_iicc_persistent_gate_contract() {
@@ -13486,12 +13539,15 @@ function verify_iicc_credential_deadline_contract() {
         Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h
         Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c
         Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationHandoffContract/InvestigationCohortCapsuleContract.swift
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
         Tests/Fixtures/InvestigationMachineCampaignCredential/main.c
         Tests/StornautInvestigationTests/InvestigationMachineCampaignCredentialDeadlineTests.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
         scripts/verify-contract
     ); fi
-    (( ${#p} == 7 )) || {
+    (( ${#p} == 10 )) || {
         print -u2 "ii-c-c credential deadline source cardinality drifted"
         return 1
     }
@@ -13504,10 +13560,11 @@ function verify_iicc_credential_deadline_contract() {
         -I "${p[1]:h}" "${p[2]}" || return $?
     /usr/bin/xcrun clang -fsyntax-only -std=c11 -Wall -Wextra -Werror \
         -DSTORNAUT_INVESTIGATION_CAMPAIGN_TESTING=1 \
-        -I "${p[1]:h}" "${p[4]}" || return $?
+        -I "${p[1]:h}" "${p[6]}" || return $?
     /usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex \
-        "${p[3]}" "${p[5]}" "${p[6]}" || return $?
-    /bin/zsh -n "${p[7]}" || return $?
+        "${p[3]}" "${p[4]}" "${p[5]}" "${p[7]}" "${p[8]}" \
+        "${p[9]}" || return $?
+    /bin/zsh -n "${p[10]}" || return $?
     /usr/bin/python3 -I - \
         "$iicc_credential_deadline_mutation_contract_only" \
         "$iicc_credential_deadline_mutation_name" \
@@ -13518,19 +13575,22 @@ import hashlib
 import re
 import sys
 
-if len(sys.argv) != 12:
+if len(sys.argv) != 15:
     raise SystemExit("ii-c-c credential deadline source cardinality drifted")
 mutation_mode, mutation_name, mutation_slot, mutation_sha = sys.argv[1:5]
-names = ("header", "c", "campaign", "fixture", "tests",
-         "boundary", "aggregate")
+names = ("header", "c", "campaign", "handoff", "gate",
+         "fixture", "tests", "gate_tests", "boundary", "aggregate")
 paths = tuple(map(Path, sys.argv[5:]))
 sources = dict(zip(names, (path.read_text(encoding="utf-8") for path in paths)))
 canonical_paths = tuple(map(Path, (
     "Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h",
     "Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c",
     "Sources/StornautInvestigationMachineCampaign/main.swift",
+    "Sources/StornautInvestigationHandoffContract/InvestigationCohortCapsuleContract.swift",
+    "Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift",
     "Tests/Fixtures/InvestigationMachineCampaignCredential/main.c",
     "Tests/StornautInvestigationTests/InvestigationMachineCampaignCredentialDeadlineTests.swift",
+    "Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift",
     "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift",
     "scripts/verify-contract",
 )))
@@ -13569,6 +13629,27 @@ mutations = {
     "bounded-prompt-owner": ("c",
         '"Stornaut Task 39 ii-c administrator authorization: ",',
         '"",'),
+    "single-attempt-eof": ("c",
+        "frame[credential_length + 1] = end_of_input;",
+        "frame[credential_length + 1] = '\\n';"),
+    "authorization-window": ("handoff",
+        "maximumAuthorizationWallClockSeconds: UInt64 = 120",
+        "maximumAuthorizationWallClockSeconds: UInt64 = 1400"),
+    "gate-authorization-bound": ("gate",
+        "nowNanoseconds: continuousNanoseconds(),",
+        "nowNanoseconds: 1,"),
+    "control-byte-rejection": ("c",
+        "if (byte < 0x20 || byte == 0x7f) { return EINVAL; }",
+        "if (false) { return EINVAL; }"),
+    "inlcr-rejection": ("c",
+        "|| (attributes.c_iflag & INLCR) != 0",
+        "|| false"),
+    "reader-nul-sentinel": ("c",
+        "|| !untouched_suffix) {",
+        "|| false) {"),
+    "control-test-vacuity": ("tests",
+        'for controlCredential in ["prefix\\u{03}suffix", "prefix\\u{7f}suffix"] {',
+        "for controlCredential in [String]() {"),
 }
 if mutation_mode == "true":
     if mutation_name not in mutations:
@@ -13585,7 +13666,7 @@ if mutation_mode == "true":
         if name != mutation_slot and sources[name] != canonical[name]:
             raise SystemExit("ii-c-c credential deadline mutation changed another source")
 
-header, c, campaign, fixture, tests, boundary, aggregate = \
+header, c, campaign, handoff, gate, fixture, tests, gate_tests, boundary, aggregate = \
     (sources[name] for name in names)
 for marker in (
     "STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES 1023",
@@ -13607,6 +13688,15 @@ for marker in (
     "if (reaped) {\n            child_created = 0;\n        }", "sigaction(SIGPIPE",
     '"Stornaut Task 39 ii-c administrator authorization: ",',
     "TCSAFLUSH | TCSASOFT", "memset_s",
+    "stornaut_investigation_campaign_relay_single_credential",
+    "attributes.c_cc[VEOF]",
+    "end_of_input == _POSIX_VDISABLE",
+    "(attributes.c_iflag & INLCR) != 0",
+    "frame[credential_length + 1] = end_of_input",
+    "if (byte < 0x20 || byte == 0x7f) { return EINVAL; }",
+    "for (size_t control = 0; control < NCCS; control += 1)",
+    "if ((unsigned char)credential[index] != 0xa5)",
+    "|| !untouched_suffix) {",
     "poll(&event, 1, timeout)",
 ):
     if marker not in c:
@@ -13621,18 +13711,34 @@ if "writeAll(STDERR_FILENO, bytes: prompt)" in campaign:
     raise SystemExit("ii-c-c credential prompt regained unbounded Swift relay")
 for marker in (
     "stornaut_investigation_campaign_readpassphrase_bounded",
+    "stornaut_investigation_campaign_relay_single_credential",
     "credentialAbsoluteDeadline",
     "let credentialAbsoluteDeadline = credentialClockNow",
-    "+ (credentialDeadline - now)",
+    "+ (credentialDeadline - relayStart)",
     "&credential, credential.count, credentialAbsoluteDeadline,",
     "guard DispatchTime.now().uptimeNanoseconds < credentialDeadline",
     "STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_DEADLINE",
     "--stornaut-credential-reader-v1",
     "stornaut_investigation_campaign_credential_reader_child",
-    "throw Failure.deadline", "raw.prefix(length)",
+    "throw Failure.deadline", "bytes.baseAddress, length",
 ):
     if marker not in campaign:
         raise SystemExit("ii-c-c credential deadline campaign drifted: " + marker)
+for marker in (
+    "maximumAuthorizationWallClockSeconds: UInt64 = 120",
+    "maximumAuthorizationWallClockNanoseconds",
+):
+    if marker not in handoff:
+        raise SystemExit("ii-c-c authorization deadline contract drifted: " + marker)
+for marker in (
+    "static func authorizationDeadline(",
+    "InvestigationCohortCapsule.maximumAuthorizationWallClockNanoseconds",
+    "let deadline = try InvestigationMachineGateDeadlinePolicy",
+    ".authorizationDeadline(",
+    "nowNanoseconds: continuousNanoseconds(),",
+):
+    if marker not in gate:
+        raise SystemExit("ii-c-c Gate authorization deadline drifted: " + marker)
 for marker in (
     "forkpty(&master", "fixture-ready", "ECHO | ECHONL",
     "strcmp(argv[1], \"timeout\")", "strcmp(argv[1], \"overflow\")",
@@ -13640,6 +13746,9 @@ for marker in (
     "STORNAUT_INVESTIGATION_CAMPAIGN_TEST_TERMINATE_SIGNAL_FAILURE",
     "STORNAUT_INVESTIGATION_CAMPAIGN_TEST_TERMINATE_CLOCK_FAILURE",
     "STORNAUT_INVESTIGATION_CAMPAIGN_TEST_TERMINATE_WAIT_FAILURE",
+    '"single-attempt-relay"',
+    '"single-attempt-inlcr"',
+    '"single-attempt-nul"', '"reader-nul"',
 ):
     if marker not in fixture:
         raise SystemExit("ii-c-c credential deadline fixture drifted: " + marker)
@@ -13651,10 +13760,21 @@ for marker in (
     "status=2 error=5 length=0 beforeEcho=1 afterEcho=1 zeroed=1",
     'for mode in ["reap-signal", "reap-clock", "reap-wait"] {',
     "childResidue=0",
+    "relayStatus=0 childExit=0 childResidue=0",
+    "firstMatch=1 secondEOF=1 afterEcho=1",
+    '"single-attempt-inlcr"',
+    'for controlCredential in ["prefix\\u{03}suffix", "prefix\\u{7f}suffix"] {',
+    '"reader-nul"',
     "#expect(!overflow.contains(overflowCredential))",
 ):
     if marker not in tests:
         raise SystemExit("ii-c-c credential deadline tests drifted: " + marker)
+for marker in (
+    "InvestigationMachineGateDeadlinePolicy.authorizationDeadline(",
+    "maximumAuthorizationWallClockNanoseconds + 100",
+):
+    if marker not in gate_tests:
+        raise SystemExit("ii-c-c Gate authorization deadline test drifted: " + marker)
 for marker in (
     "iiCCCredentialDeadlineContractIsClosed",
     "--iic-c-credential-deadline-contract-only",
@@ -13668,6 +13788,11 @@ for marker in (
     "child-mode", "credential-cap", "test-vacuity", "absolute-deadline",
     "deadline-recheck", "reap-ownership", "reap-test-vacuity",
     "bounded-prompt-owner",
+    "single-attempt-eof",
+    "authorization-window", "gate-authorization-bound",
+    "control-byte-rejection", "reader-nul-sentinel",
+    "inlcr-rejection",
+    "control-test-vacuity",
 ):
     if marker not in aggregate:
         raise SystemExit("ii-c-c credential deadline aggregate drifted: " + marker)
@@ -18854,6 +18979,11 @@ fi
 if $iicc_v12_external_evidence_only; then
     verify_iicc_v12_external_evidence
     print "ii-c-c frozen v12 external evidence verification passed."
+    exit 0
+fi
+if $iicc_v13_external_evidence_only; then
+    verify_iicc_v13_external_evidence
+    print "ii-c-c frozen v13 external evidence verification passed."
     exit 0
 fi
 if $iicc_persistent_gate_contract_only \

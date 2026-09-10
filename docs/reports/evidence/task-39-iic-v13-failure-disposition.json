@@ -1,0 +1,116 @@
+{
+  "admission" : "rejected",
+  "artifactSHA256" : {
+    "01-preflight/source-build.json" : "19fdb458637cefb4cc3f7338ca7f9756c26ab35bc8c07b7341da70ac93da3207",
+    "02-install/installed.json" : "e2c6f06db556c7a358bc8680fdeb70e1c602f8c5cf407e59120aa0b28dbf7895",
+    "03-authorization/attempt-event-0001.bin" : "6c2daa83b9e6061bd3071e7b1c369e5356d79665f5cb4c8b87e386a6c2ac89a9",
+    "03-authorization/attempt-event-0002.bin" : "4ff55f6c412d33191d78912760b43dfb57a053f9fb94b480f46a5976c33e22ca",
+    "03-authorization/attempt-event-0003.bin" : "7ae1b315a8b431ec296983f140296d1325524914cf0cb29c3a1838753b5746ee",
+    "03-authorization/attempt-event-0004.bin" : "977b5bcf4e92629cf566a78ab327c0c4db9ad3dc1ee494bf3ca3045977577428",
+    "03-authorization/capability-counts.json" : "b3d776d019634c3263bf3bf6b2af74ea6de2d114b1858aac8a6b704b9e38ede1",
+    "03-authorization/human-attestation.json" : "0db2c48aa4f766737d85f2c943d76ad36b6b3a4bb2facb9d3d95bdf9cdb535a0",
+    "03-authorization/policy-probe.json" : "1b921211e36dad3dbfc53456aae359314842386a559a47b8f35d5b5c4b3c1eb0"
+  },
+  "attemptUUID" : "a77c4d21-9bba-46f6-b694-3d1d1e55209d",
+  "campaignUUID" : "864065f6-8c9e-48e1-bedf-b0f6becd7b21",
+  "classification" : "consumedClosedPostArmFailure",
+  "domain" : "stornaut.task39.iic.failure-disposition.v8",
+  "eventChain" : [
+    "prepared",
+    "armedConsumed",
+    "spawnUncertain",
+    "terminal"
+  ],
+  "evidenceSetSHA256" : "95834147f74c92d932d27d0b261a1ebc8edf4a33f0d34d9e8217e2fbbf116dbb",
+  "nonClaims" : [
+    "no manifest or external seal",
+    "no uninstall or global post-teardown artifact",
+    "no machine admission",
+    "no L3c3d authenticated model success",
+    "no Task 39 readiness",
+    "no campaign-bound credential validity conclusion",
+    "live zero-runtime observation is not durable campaign cleanup evidence",
+    "supplemental unified log is not campaign-bound evidence"
+  ],
+  "parentIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "523653077",
+    "size" : "96"
+  },
+  "requiredMissingArtifacts" : [
+    "manifest.bin",
+    "../seal.json",
+    "04-driver-epochs/coordinator-receipt.bin",
+    "04-driver-epochs/diagnostic-output.bin",
+    "05-uninstall/uninstall.json",
+    "06-verifier/global-post-teardown.json",
+    "06-verifier/verification-input.json"
+  ],
+  "retry" : "forbidden",
+  "rootCauseObservation" : {
+    "armedConsumedObservedAtUTCMicroseconds" : "1789013747278745",
+    "authorizationDeadlinePolicy" : "sharedCampaignDeadlineOnly",
+    "cleanupIssueMask" : "02",
+    "configuredCampaignDeadlineNanoseconds" : "1400000000000",
+    "credentialRetainedByteCount" : 0,
+    "driverEpochArtifactCount" : 0,
+    "elapsedAfterArmMicroseconds" : "1395098532",
+    "exactWaitClassification" : "exited-82",
+    "humanActionObserved" : true,
+    "machinePromptObserved" : true,
+    "reason" : "closedPostArmReceiptInvalidExit82",
+    "receiptEOFObserved" : true,
+    "source" : "durableAttemptTimelineAndSourceAudit",
+    "spawnUncertainObservedAtUTCMicroseconds" : "1789015142377277",
+    "terminalEOFObserved" : true,
+    "terminalObservedAtUTCMicroseconds" : "1789015142393485"
+  },
+  "rootIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "523653078",
+    "size" : "256"
+  },
+  "schemaVersion" : 8,
+  "sourceBinding" : {
+    "attemptUUID" : "a77c4d21-9bba-46f6-b694-3d1d1e55209d",
+    "buildProvenanceSHA256" : "b1b6b598cf1c4509fa94f9ddbb8f5b38f88774e1b2d665dc7d81ee63d3258170",
+    "campaignUUID" : "864065f6-8c9e-48e1-bedf-b0f6becd7b21",
+    "canonicalSourceManifestSHA256" : "8256e96f213e4df5d8b6ccba93e0034fae456d78ace09d8d9878098da4d81355",
+    "preArmFrameSHA256" : "95834147f74c92d932d27d0b261a1ebc8edf4a33f0d34d9e8217e2fbbf116dbb",
+    "repositoryHEAD" : "88851614b090d6d6b9da6a6d7208743b85689cda",
+    "repositoryTree" : "f9fcb08f66a5a31ec78a7fc87cb9aff95bdf5458",
+    "role" : "sourceBuildIdentity",
+    "schemaVersion" : 1,
+    "signedRuntimeBindingSHA256" : "30781dff5429a00271b6b41feaad573081e1b7560e115648b6bf9b6a8d2af4b9"
+  },
+  "supplementalSystemObservation" : {
+    "binding" : "notCampaignArtifactBound",
+    "messageClassification" : "oneIncorrectPasswordAttempt",
+    "nonClaim" : "notUsedForDispositionClassificationOrAdmission",
+    "observedAtUTC" : "2026-09-10T04:39:02.324696Z",
+    "process" : "/usr/bin/sudo",
+    "source" : "macOSUnifiedLog"
+  },
+  "systemObservation" : {
+    "fixedPathsAbsent" : true,
+    "fixedProcessCount" : 0,
+    "fixedServiceAbsent" : true,
+    "gateAttemptName" : "attempt-a77c4d21-9bba-46f6-b694-3d1d1e55209d",
+    "gateBaseChangeTimeNanoseconds" : "1789013747293111064",
+    "gateBaseDevice" : "16777229",
+    "gateBaseGeneration" : "0",
+    "gateBaseInode" : "523290479",
+    "gateBaseState" : "persistentOwnConsumedAttemptPresent",
+    "gateCapsuleByteCount" : 28997,
+    "gateCapsuleName" : "projected-cohort-c484b8c14a5e70a4ee4364584013f864af30738c52494ebb727ac4fb326dfdc0.bin",
+    "gateCapsuleSHA256" : "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17",
+    "ownerLockChangeTimeNanoseconds" : "1789005773847687627",
+    "ownerLockDevice" : "16777229",
+    "ownerLockGeneration" : "0",
+    "ownerLockInode" : "523290480",
+    "ownerLockSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "verifierExecutableSHA256" : "a657556f519e7acc6b11ae5444a7f42ab82450b17a27a1089f0d8ff1a2f69ffc"
+}
