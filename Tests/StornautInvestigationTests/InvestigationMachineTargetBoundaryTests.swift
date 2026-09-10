@@ -341,15 +341,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 lifecycle call-graph drifted",
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
-            "01395e6a03e0da8f9cb76837b24950cfa2451c181cebaa9e7e1738768206a886",
+            "894672e6445776c9d76f69799358a1be423fc99344678ddb5b36d0aeb27a1510",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
-            "ad4ff57f503cc600ef24f6b5bceda5ce28d6b925725be9e5bbf5a57a41b9d56d",
+            "f270aedd9039210386d0d4c65731c4edb9f1f12fb997ab0f6f959191b19fd74d",
             "require_body_digest(",
             "fea0c249566d0f57babb384980713873ed4a303e7943e5490d25d01e1357215c",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
-            "2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd",
+            "67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac",
             "active_executable.count('Self.runLifecycle(') != 3",
             "active_executable.count('runFixed(') != 4",
             "active_executable.count('posix_spawn(') != 1",
@@ -631,12 +631,12 @@ struct InvestigationMachineTargetBoundaryTests {
             path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
             encoding: .utf8)
         #expect(evidenceTests.contains(
-            "independentVerifierBindsExactPreservedV11GateWhenOptedIn"
+            "independentVerifierReadsButDoesNotAdmitExactPreservedV11GateWhenOptedIn"
         ))
         #expect(evidenceTests.contains(
             "independentVerifierRejectsAdmittingSchemaOneTeardown"
         ))
-        #expect(verifier.contains("admitting preservation schema"))
+        #expect(verifier.contains("admitting persistent Gate schema"))
         for forbidden in [
             "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
             "os.remove", "os.unlink", "os.rename", "os.mkdir",
@@ -648,14 +648,88 @@ struct InvestigationMachineTargetBoundaryTests {
         let aggregate = try String(contentsOf: root.appending(
             path: "scripts/verify-contract"), encoding: .utf8)
         for marker in [
-            "preserved-sha-bypass", "production-preservation-drop",
-            "teardown-preserved-count-zero",
-            "swift-evidence-preserved-sha-bypass", "verifier-gate-skip",
-            "producer-schema-downgrade",
-            "verifier-preserved-sha-bypass",
+            "production-preservation-regression", "producer-schema-downgrade",
+            "producer-cache-path", "producer-inventory-bypass",
+            "producer-lock-bypass", "producer-close-bypass",
+            "swift-schema-three-drop",
+            "swift-lock-exclusive-bypass", "verifier-admission-downgrade",
+            "verifier-path-regression", "verifier-lock-bypass",
+            "verifier-identity-bypass", "verifier-revalidation-bypass",
         ] {
             #expect(aggregate.contains(marker), "missing: \(marker)")
         }
+        for marker in [
+            "os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)",
+            "staging = \".stornaut-p2-gate-\" + secrets.token_hex(16)",
+            "os.mkdir(staging, 0o700, dir_fd=staging_parent_fd)",
+            "os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NONBLOCK",
+            "| 0x20000000 | 0x00001000 | 0x00002000",
+            "\".owner-lock-v1\", lock_flags, 0o600, dir_fd=base_fd",
+            "named_lock = os.stat(",
+            "held_lock = os.fstat(lock_fd)",
+            "rename_flags = 0x00000004 | 0x00000010 | 0x00000020",
+            "libc.renameatx_np(",
+            "staging_parent_fd, staging.encode(),",
+            "parent_fd, leaf.encode(), rename_flags",
+            "function create_persistent_gate() {",
+            "physical_out=$(cd \"$out\" && /bin/pwd -P)",
+            "scratch_base=\"$scratch_parent/com.eriklee.stornaut.task39-machine-gate\"",
+            "create_persistent_gate \"$scratch_base\" \"$physical_out\"",
+            "attack_base=\"$attack_parent/com.eriklee.stornaut.task39-machine-gate\"",
+            "/bin/ln -s \"$attack_target\" \"$attack_base\"",
+            "(( attack_status != 0 )) || exit 1",
+            "$(/usr/bin/stat -f '%Lp' \"$attack_target\")",
+            "create_persistent_gate \"$persistent_base\" \"$physical_out\"",
+            "STORNAUT_TASK39_PERSISTENT_GATE_BASE=\"$persistent_base\"",
+        ] {
+            #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+        for forbidden in [
+            "cleanup_persistent_gate_fixture",
+            "/usr/bin/touch \"$persistent_lock\"",
+            "/bin/chmod 600 \"$persistent_lock\"",
+            "os.mkdir(leaf, 0o700, dir_fd=parent_fd)",
+            "os.unlink(\".owner-lock-v1\", dir_fd=base_fd)",
+            "os.rmdir(base)", "os.rmdir(leaf, dir_fd=parent_fd)",
+            "quarantine_leaf = \".stornaut-p2-gate-\"",
+        ] {
+            #expect(!aggregate.contains(forbidden), "forbidden: \(forbidden)")
+        }
+    }
+
+    @Test
+    func iiCCPersistentGateSchemaV3AdmissionContractIsClosed() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let campaign = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineCampaign/main.swift"),
+            encoding: .utf8)
+        let evidence = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift"),
+            encoding: .utf8)
+        let verifier = try String(contentsOf: root.appending(path:
+            "scripts/verify-investigation-runtime-machine-report"),
+            encoding: .utf8)
+        let coordinator = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift"),
+            encoding: .utf8)
+        for marker in [
+            "InvestigationMachinePersistentGateObserver",
+            "observeIfPresent(basePath: String)",
+            "persistentGateRelativePath", "persistentGateBaseDevice",
+            "persistentGateLockInode", "persistentGateLockExclusive",
+            "schemaVersion:3",
+        ] { #expect(campaign.contains(marker), "missing: \(marker)") }
+        #expect(evidence.contains("? [schemaVersion, 2, 3]"))
+        for marker in [
+            "def open_persistent_gate(owner, evidence):",
+            "def revalidate_persistent_gate(gate, owner):",
+            "admitting persistent Gate schema",
+            "persistent Gate base inventory",
+        ] { #expect(verifier.contains(marker), "missing: \(marker)") }
+        #expect(coordinator.contains("InvestigationFixedGateHandoff().run("))
+        #expect(!coordinator.contains(
+            "preservedCapsules: [try .retainedV11()]"))
     }
 
     @Test

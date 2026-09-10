@@ -202,10 +202,10 @@ struct InvestigationMachineCampaignEvidenceTests {
         #expect(validated.epochs.map(\.claimEvidenceSHA256) == transport.epochs.map(\.claimEvidenceSHA256))
         #expect(validated.epochs.map(\.helperIdentitySHA256) == transport.epochs.map(\.helperIdentitySHA256))
         #expect(validated.epochs.map(\.completionBindingSHA256) == transport.epochs.map(\.completionBindingSHA256))
-        if Self.hasExplicitPreservedGateFixture {
+        if let persistent = try Self.explicitPersistentGateIdentity() {
             let verifier = try privilegedVerifierResult(
                 fixture: fixture, transport: transport,
-                preservedGlobal: true)
+                persistentGlobal: persistent)
             #expect(verifier.status == 0, Comment(rawValue: verifier.stderr))
         }
     }
@@ -358,6 +358,282 @@ struct InvestigationMachineCampaignEvidenceTests {
                 )
             }
         }
+    }
+
+    @Test
+    func globalTeardownV3AcceptsOnlyExactPersistentLockIdentity() throws {
+        let fixture = try CampaignEvidenceFixture.make()
+        let path = try InvestigationMachineEvidenceRelativePath(
+            phase: .verifier, leafName: "global-post-teardown.json"
+        )
+        let exact = Self.globalTeardownV3(
+            campaignUUID: fixture.campaignUUID,
+            attemptUUID: fixture.attemptUUID
+        )
+        let bytes = try InvestigationMachineEvidenceJSON.canonicalData(exact)
+        try InvestigationMachineEvidenceJSON.validate(
+            bytes, role: .globalPostTeardown, path: path,
+            campaignUUID: fixture.campaignUUID,
+            attemptUUID: fixture.attemptUUID,
+            sourceBinding: fixture.sourceBinding
+        )
+
+        var mutations: [[String: Any]] = []
+        for (key, value) in [
+            ("persistentGateRelativePath",
+             "Library/Caches/com.eriklee.stornaut.task39-machine-gate" as Any),
+            ("persistentGateEntryCount", 2 as Any),
+            ("persistentGateBaseDevice", "0" as Any),
+            ("persistentGateBaseInode", "0" as Any),
+            ("persistentGateBaseGeneration", "01" as Any),
+            ("persistentGateLockDevice", "0" as Any),
+            ("persistentGateLockDevice", "102" as Any),
+            ("persistentGateLockInode", "0" as Any),
+            ("persistentGateLockGeneration", "01" as Any),
+            ("persistentGateLockByteCount", 1 as Any),
+            ("persistentGateLockExclusive", false as Any),
+            ("schemaVersion", 4 as Any),
+        ] {
+            var mutation = exact
+            mutation[key] = value
+            mutations.append(mutation)
+        }
+        var missing = exact
+        missing.removeValue(forKey: "persistentGateLockInode")
+        mutations.append(missing)
+        var unknown = exact
+        unknown["persistentGateUnknown"] = true
+        mutations.append(unknown)
+
+        for mutation in mutations {
+            #expect(throws: InvestigationMachineEvidenceContractError
+                .invalidEncoding) {
+                try InvestigationMachineEvidenceJSON.validate(
+                    InvestigationMachineEvidenceJSON.canonicalData(mutation),
+                    role: .globalPostTeardown, path: path,
+                    campaignUUID: fixture.campaignUUID,
+                    attemptUUID: fixture.attemptUUID,
+                    sourceBinding: fixture.sourceBinding
+                )
+            }
+        }
+    }
+
+    @Test(arguments: [
+        PersistentGateObserverMutation.none, .extraEntry, .baseMode, .lockMode,
+        .lockBytes, .lockHardLink, .baseSymlink, .lockSymlink,
+    ])
+    fileprivate func persistentGateObserverBindsExactLockOnlyIdentityAndRejectsDrift(
+        _ mutation: PersistentGateObserverMutation
+    ) throws {
+        let logicalParent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-persistent-observer-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: logicalParent, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        guard let resolved = realpath(logicalParent.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        let parent = URL(filePath: String(cString: resolved),
+            directoryHint: .isDirectory)
+        let home = parent.appending(path: "home", directoryHint: .isDirectory)
+        let base = home.appending(path:
+            InvestigationMachinePersistentGateIdentity.relativePath,
+            directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: parent) }
+        try FileManager.default.createDirectory(
+            at: base, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        try #require(chmod(base.path, 0o700) == 0)
+        let lock = base.appending(path: ".owner-lock-v1")
+        try Data().write(to: lock)
+        try #require(chmod(lock.path, 0o600) == 0)
+        try mutation.apply(base: base, lock: lock)
+
+        if mutation == .none {
+            let observed = try InvestigationMachinePersistentGateObserver
+                .observe(basePath: base.path)
+            var baseNode = stat(), lockNode = stat()
+            try #require(lstat(base.path, &baseNode) == 0)
+            try #require(lstat(lock.path, &lockNode) == 0)
+            #expect(observed.baseDevice == UInt64(baseNode.st_dev))
+            #expect(observed.baseInode == UInt64(baseNode.st_ino))
+            #expect(observed.baseGeneration == UInt64(baseNode.st_gen))
+            #expect(observed.lockDevice == UInt64(lockNode.st_dev))
+            #expect(observed.lockInode == UInt64(lockNode.st_ino))
+            #expect(observed.lockGeneration == UInt64(lockNode.st_gen))
+        } else {
+            #expect(throws: (any Error).self) {
+                _ = try InvestigationMachinePersistentGateObserver
+                    .observe(basePath: base.path)
+            }
+        }
+    }
+
+    @Test
+    func persistentGateObserverRejectsContendedOwnerLock() throws {
+        let fixture = try PersistentGateObserverFixture.make()
+        defer { fixture.remove() }
+        let descriptor = Darwin.open(
+            fixture.lock.path, O_RDONLY | O_CLOEXEC | O_NONBLOCK
+                | O_NOFOLLOW_ANY)
+        try #require(descriptor >= 3)
+        defer { _ = close(descriptor) }
+        try #require(flock(descriptor, LOCK_EX | LOCK_NB) == 0)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachinePersistentGateObserver.observe(
+                basePath: fixture.base.path)
+        }
+    }
+
+    @Test
+    func persistentGateObserverDistinguishesAbsentBaseFromInvalidState() throws {
+        let parent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-persistent-absent-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: parent, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: parent) }
+        guard let resolved = realpath(parent.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        let applicationSupport = URL(filePath: String(cString: resolved))
+            .appending(path: "home/Library/Application Support",
+                directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: applicationSupport, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        let path = String(cString: resolved) + "/home/"
+            + InvestigationMachinePersistentGateIdentity.relativePath
+        #expect(try InvestigationMachinePersistentGateObserver.observeIfPresent(
+            basePath: path) == nil)
+        #expect(throws: InvestigationMachinePersistentGateObserver.Error.invalid) {
+            _ = try InvestigationMachinePersistentGateObserver.observeIfPresent(
+                basePath: String(cString: resolved) + "/wrong")
+        }
+    }
+
+    @Test
+    func persistentGateAbsentPathRejectsEveryAncestorCloseFailure() throws {
+        let parent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-persistent-absent-close-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: parent, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: parent) }
+        guard let resolved = realpath(parent.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        let applicationSupport = URL(filePath: String(cString: resolved))
+            .appending(path: "home/Library/Application Support",
+                directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: applicationSupport, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        let path = String(cString: resolved) + "/home/"
+            + InvestigationMachinePersistentGateIdentity.relativePath
+
+        var expectedCloseCount = 0
+        #expect(try InvestigationMachinePersistentGateObserver.observeIfPresent(
+            basePath: path, closeDescriptor: { descriptor in
+                expectedCloseCount += 1
+                return Darwin.close(descriptor)
+            }) == nil)
+        #expect(expectedCloseCount > 3)
+
+        for failingClose in 1...expectedCloseCount {
+            var closeCount = 0
+            #expect(throws: InvestigationMachinePersistentGateObserver.Error.invalid) {
+                _ = try InvestigationMachinePersistentGateObserver.observeIfPresent(
+                    basePath: path, closeDescriptor: { descriptor in
+                        closeCount += 1
+                        let result = Darwin.close(descriptor)
+                        return closeCount == failingClose ? -1 : result
+                    })
+            }
+            #expect(closeCount == expectedCloseCount)
+        }
+    }
+
+    @Test
+    func persistentGateObserverRejectsEveryHeldDescriptorCloseFailure() throws {
+        let measurement = try PersistentGateObserverFixture.make()
+        var expectedCloseCount = 0
+        _ = try InvestigationMachinePersistentGateObserver.observe(
+            basePath: measurement.base.path,
+            closeDescriptor: { descriptor in
+                expectedCloseCount += 1
+                return Darwin.close(descriptor)
+            })
+        measurement.remove()
+        #expect(expectedCloseCount > 4)
+
+        for failingClose in 1...expectedCloseCount {
+            let fixture = try PersistentGateObserverFixture.make()
+            defer { fixture.remove() }
+            var closeCount = 0
+            #expect(throws: InvestigationMachinePersistentGateObserver.Error.invalid) {
+                _ = try InvestigationMachinePersistentGateObserver.observe(
+                    basePath: fixture.base.path,
+                    closeDescriptor: { descriptor in
+                        closeCount += 1
+                        let result = Darwin.close(descriptor)
+                        return closeCount == failingClose ? -1 : result
+                    })
+            }
+            #expect(closeCount == expectedCloseCount)
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func persistentGateObserverRejectsEveryInventoryStreamCloseFailure(
+        _ failingClose: Int
+    ) throws {
+        let fixture = try PersistentGateObserverFixture.make()
+        defer { fixture.remove() }
+        var closeCount = 0
+        #expect(throws: InvestigationMachinePersistentGateObserver.Error.invalid) {
+            _ = try InvestigationMachinePersistentGateObserver.observe(
+                basePath: fixture.base.path,
+                closeDirectoryStream: { directory in
+                    closeCount += 1
+                    let result = Darwin.closedir(directory)
+                    return closeCount == failingClose ? -1 : result
+                })
+        }
+        #expect(closeCount == failingClose)
+    }
+
+    @Test
+    func persistentGateObserverRejectsDirectoryStreamOpenCleanupFailure() throws {
+        let fixture = try PersistentGateObserverFixture.make()
+        defer { fixture.remove() }
+        var enumerationDescriptor: Int32?
+        var targetedCloseObserved = false
+        #expect(throws: InvestigationMachinePersistentGateObserver.Error.invalid) {
+            _ = try InvestigationMachinePersistentGateObserver.observe(
+                basePath: fixture.base.path,
+                closeDescriptor: { descriptor in
+                    let result = Darwin.close(descriptor)
+                    if descriptor == enumerationDescriptor {
+                        targetedCloseObserved = true
+                        return -1
+                    }
+                    return result
+                },
+                openDirectoryStream: { descriptor in
+                    enumerationDescriptor = descriptor
+                    errno = EMFILE
+                    return nil
+                })
+        }
+        #expect(targetedCloseObserved)
     }
 
     @Test(arguments: [
@@ -2646,14 +2922,15 @@ struct InvestigationMachineCampaignEvidenceTests {
     ) throws {
         let result = try privilegedVerifierResult(
             epochCount: epochCount,
-            preservedGlobal: epochCount == 8 && Self.hasExplicitPreservedGateFixture
+            persistentGlobal: epochCount == 8
+                ? try Self.explicitPersistentGateIdentity() : nil
         )
         if epochCount == 8 {
-            if Self.hasExplicitPreservedGateFixture {
+            if Self.hasExplicitPersistentGateFixture {
                 #expect(result.status == 0, Comment(rawValue: result.stderr))
             } else {
                 #expect(result.status != 0)
-                #expect(result.stderr.contains("admitting preservation schema"))
+                #expect(result.stderr.contains("admitting persistent Gate schema"))
             }
         } else {
             #expect(result.status != 0)
@@ -2668,11 +2945,58 @@ struct InvestigationMachineCampaignEvidenceTests {
             sealName: "legacy-schema-one-admitting-seal.json"
         )
         #expect(result.status != 0)
-        #expect(result.stderr.contains("admitting preservation schema"))
+        #expect(result.stderr.contains("admitting persistent Gate schema"))
     }
 
     @Test
-    func independentVerifierBindsExactPreservedV11GateWhenOptedIn() throws {
+    func independentVerifierRejectsAdmittingSchemaTwoTeardownWithoutLiveGate()
+        throws
+    {
+        let result = try privilegedVerifierResult(
+            epochCount: 8, preservedGlobal: true,
+            sealName: "historical-schema-two-admitting-seal.json"
+        )
+        #expect(result.status != 0)
+        #expect(result.stderr.contains("preserved Gate")
+            || result.stderr.contains("No such file")
+            || result.stderr.contains("noncanonical path spelling"),
+            Comment(rawValue: result.stderr))
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentGateFixture,
+            "Requires an explicit owner-lock-only persistent Gate fixture"
+        )
+    )
+    func independentVerifierBindsExactPersistentLockOnlyGateWhenOptedIn()
+        throws
+    {
+        let base = try #require(Self.explicitPersistentGateFixtureURL)
+        let expectedBase = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path:
+                "Library/Application Support/com.eriklee.stornaut.task39-machine-gate")
+        try #require(base.path == expectedBase.path)
+        let before = try Self.treeSnapshot(base)
+        var baseNode = stat(), lockNode = stat()
+        try #require(lstat(base.path, &baseNode) == 0)
+        try #require(lstat(base.appending(path: ".owner-lock-v1").path,
+            &lockNode) == 0)
+
+        let result = try privilegedVerifierResult(
+            persistentGlobal: .init(base: baseNode, lock: lockNode),
+            sealName: "persistent-lock-only-gate-seal.json"
+        )
+
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(result.stdout == "stornaut ii-c machine evidence verified\n")
+        #expect(try Self.treeSnapshot(base) == before)
+    }
+
+    @Test
+    func independentVerifierReadsButDoesNotAdmitExactPreservedV11GateWhenOptedIn()
+        throws
+    {
         guard let rawBase = ProcessInfo.processInfo.environment[
             "STORNAUT_TASK39_V11_GATE_BASE"
         ] else { return }
@@ -2687,13 +3011,36 @@ struct InvestigationMachineCampaignEvidenceTests {
             preservedGlobal: true, sealName: "preserved-v11-gate-seal.json"
         )
 
-        #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "stornaut ii-c machine evidence verified\n")
+        #expect(result.status != 0)
+        #expect(result.stderr.contains("consumed failure is non-admitting"),
+            Comment(rawValue: result.stderr))
         #expect(try Self.treeSnapshot(base) == before)
     }
 
     private static var hasExplicitPreservedGateFixture: Bool {
         ProcessInfo.processInfo.environment["STORNAUT_TASK39_V11_GATE_BASE"] != nil
+    }
+
+    private static var explicitPersistentGateFixtureURL: URL? {
+        ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_PERSISTENT_GATE_BASE"
+        ].map { URL(filePath: $0, directoryHint: .isDirectory) }
+    }
+
+    private static var hasExplicitPersistentGateFixture: Bool {
+        explicitPersistentGateFixtureURL != nil
+    }
+
+    private static func explicitPersistentGateIdentity() throws
+        -> CampaignPersistentGateIdentity?
+    {
+        guard let base = explicitPersistentGateFixtureURL else { return nil }
+        var baseNode = stat(), lockNode = stat()
+        guard lstat(base.path, &baseNode) == 0,
+              lstat(base.appending(path: ".owner-lock-v1").path,
+                    &lockNode) == 0
+        else { throw CampaignEvidenceFixtureError.realpath(errno) }
+        return .init(base: baseNode, lock: lockNode)
     }
 
     @Test
@@ -2741,6 +3088,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         joinMutation: CampaignVerifierJoinMutation? = nil,
         diagnosticMutation: CampaignDiagnosticMutation? = nil,
         preservedGlobal: Bool = false,
+        persistentGlobal: CampaignPersistentGateIdentity? = nil,
         sealName: String = "seal.json") throws -> CampaignVerifierResult {
         let fixture = try CampaignEvidenceDiskFixture.make()
         defer { fixture.remove() }
@@ -2751,6 +3099,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             fixture: fixture, transport: transport, epochCount: epochCount,
             semanticForgery: semanticForgery, promptVerifierForgery: promptVerifierForgery,
             joinMutation: joinMutation, preservedGlobal: preservedGlobal,
+            persistentGlobal: persistentGlobal,
             sealName: sealName)
     }
 
@@ -2759,6 +3108,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         semanticForgery: Bool = false, promptVerifierForgery: Bool = false,
         joinMutation: CampaignVerifierJoinMutation? = nil,
         preservedGlobal: Bool = false,
+        persistentGlobal: CampaignPersistentGateIdentity? = nil,
         sealName: String = "seal.json") throws -> CampaignVerifierResult {
         let writer = try fixture.makeWriter(mode: .privileged)
         for (index, kind) in [
@@ -2773,7 +3123,7 @@ struct InvestigationMachineCampaignEvidenceTests {
             writer, epochCount: epochCount, semanticForgery: semanticForgery,
             promptVerifierForgery: promptVerifierForgery,
             joinMutation: joinMutation, transport: transport,
-            preservedGlobal: preservedGlobal)
+            preservedGlobal: preservedGlobal, persistentGlobal: persistentGlobal)
         var seal = try writer.finalize()
         if epochCount == 8 {
             seal = try fixture.completePrivilegedCorpus(
@@ -2945,6 +3295,36 @@ struct InvestigationMachineCampaignEvidenceTests {
                 preserved.wholeInputSHA256.lowercaseHex,
             "preservedGateCapsuleByteCount": Int(preserved.byteCount),
             "preservedGateCapsuleSHA256": preserved.fileSHA256.lowercaseHex,
+        ]
+    }
+
+    private static func globalTeardownV3(
+        campaignUUID: UUID, attemptUUID: UUID,
+        identity: CampaignPersistentGateIdentity = .fixture
+    ) -> [String: Any] {
+        [
+            "schemaVersion": 3, "role": "globalPostTeardown",
+            "campaignUUID": campaignUUID.uuidString.lowercased(),
+            "attemptUUID": attemptUUID.uuidString.lowercased(),
+            "observationReceiptSHA256": digest(0xd3).lowercaseHex,
+            "appProcessCount": 0, "helperProcessCount": 0,
+            "driverProcessCount": 0, "gateProcessCount": 0,
+            "coordinatorProcessCount": 0, "childCount": 0,
+            "descendantCount": 0, "openChannelCount": 0,
+            "ownedProcessGroupMemberCount": 0, "serviceAbsent": true,
+            "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0,
+            "gateCapsuleEntryCount": 0,
+            "persistentGateRelativePath":
+                "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+            "persistentGateEntryCount": 1,
+            "persistentGateBaseDevice": String(identity.baseDevice),
+            "persistentGateBaseInode": String(identity.baseInode),
+            "persistentGateBaseGeneration": String(identity.baseGeneration),
+            "persistentGateLockDevice": String(identity.lockDevice),
+            "persistentGateLockInode": String(identity.lockInode),
+            "persistentGateLockGeneration": String(identity.lockGeneration),
+            "persistentGateLockByteCount": 0,
+            "persistentGateLockExclusive": true,
         ]
     }
 
@@ -3990,6 +4370,107 @@ enum CampaignTreeMutation: CaseIterable {
     case missingDirectory
 }
 
+private struct CampaignPersistentGateIdentity: Sendable {
+    let baseDevice: UInt64
+    let baseInode: UInt64
+    let baseGeneration: UInt64
+    let lockDevice: UInt64
+    let lockInode: UInt64
+    let lockGeneration: UInt64
+
+    static let fixture = Self(
+        baseDevice: 101, baseInode: 201, baseGeneration: 3,
+        lockDevice: 101, lockInode: 202, lockGeneration: 4
+    )
+
+    init(base: stat, lock: stat) {
+        baseDevice = UInt64(base.st_dev)
+        baseInode = UInt64(base.st_ino)
+        baseGeneration = UInt64(base.st_gen)
+        lockDevice = UInt64(lock.st_dev)
+        lockInode = UInt64(lock.st_ino)
+        lockGeneration = UInt64(lock.st_gen)
+    }
+
+    private init(
+        baseDevice: UInt64, baseInode: UInt64, baseGeneration: UInt64,
+        lockDevice: UInt64, lockInode: UInt64, lockGeneration: UInt64
+    ) {
+        self.baseDevice = baseDevice
+        self.baseInode = baseInode
+        self.baseGeneration = baseGeneration
+        self.lockDevice = lockDevice
+        self.lockInode = lockInode
+        self.lockGeneration = lockGeneration
+    }
+}
+
+private enum PersistentGateObserverMutation: CaseIterable, Sendable {
+    case none, extraEntry, baseMode, lockMode, lockBytes, lockHardLink
+    case baseSymlink, lockSymlink
+
+    func apply(base: URL, lock: URL) throws {
+        switch self {
+        case .none:
+            return
+        case .extraEntry:
+            try Data().write(to: base.appending(path: "extra"))
+        case .baseMode:
+            try #require(chmod(base.path, 0o755) == 0)
+        case .lockMode:
+            try #require(chmod(lock.path, 0o644) == 0)
+        case .lockBytes:
+            try Data([1]).write(to: lock)
+        case .lockHardLink:
+            try #require(link(lock.path, base.deletingLastPathComponent()
+                .appending(path: "lock-alias").path) == 0)
+        case .baseSymlink:
+            let original = base.deletingLastPathComponent().appending(
+                path: "original-base")
+            try FileManager.default.moveItem(at: base, to: original)
+            try #require(symlink(original.path, base.path) == 0)
+        case .lockSymlink:
+            let original = base.appending(path: "original-lock")
+            try FileManager.default.moveItem(at: lock, to: original)
+            try #require(symlink(original.lastPathComponent, lock.path) == 0)
+        }
+    }
+}
+
+private struct PersistentGateObserverFixture {
+    let parent: URL
+    let base: URL
+    let lock: URL
+
+    static func make() throws -> Self {
+        let logicalParent = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-persistent-contention-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: logicalParent, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        guard let resolved = realpath(logicalParent.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        let parent = URL(filePath: String(cString: resolved),
+            directoryHint: .isDirectory)
+        let base = parent.appending(path: "home/"
+            + InvestigationMachinePersistentGateIdentity.relativePath,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: base, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        try #require(chmod(base.path, 0o700) == 0)
+        let lock = base.appending(path: ".owner-lock-v1")
+        try Data().write(to: lock)
+        try #require(chmod(lock.path, 0o600) == 0)
+        return .init(parent: parent, base: base, lock: lock)
+    }
+
+    func remove() { try? FileManager.default.removeItem(at: parent) }
+}
+
 enum CampaignEvidenceFault: CaseIterable {
     case validatePending
     case writePending
@@ -4172,7 +4653,8 @@ private final class CampaignEvidenceDiskFixture {
         epochSemanticMutation: CampaignEpochSemanticMutation? = nil,
         joinMutation: CampaignVerifierJoinMutation? = nil,
         transport suppliedTransport: CampaignPrivilegedTransport? = nil,
-        preservedGlobal: Bool = false
+        preservedGlobal: Bool = false,
+        persistentGlobal: CampaignPersistentGateIdentity? = nil
     ) throws {
         let transport = try suppliedTransport ?? privilegedTransport(
             joinMutation: joinMutation,
@@ -4184,7 +4666,7 @@ private final class CampaignEvidenceDiskFixture {
             preArmFrameSHA256: joinMutation == .sourcePreArm
                 ? InvestigationMachineCampaignEvidenceTests.digest(0xee)
                 : transport.preArmFrameSHA256,
-            preservedGlobal: preservedGlobal)
+            preservedGlobal: preservedGlobal, persistentGlobal: persistentGlobal)
         if epochCount == 8 {
             values.insert(contentsOf: [
                 (.driverEpochs, "coordinator-receipt.bin", .protocolReceipt,
@@ -4353,7 +4835,7 @@ private final class CampaignEvidenceDiskFixture {
 
     private typealias Artifact = (InvestigationMachineEvidencePhase, String, InvestigationMachineEvidenceRole, InvestigationMachineEvidenceEncoding, Data)
 
-    private func commonArtifacts(expectedConsumed: Bool, epochCount: Int, cancellationAttestation: Bool, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, preservedGlobal: Bool = false) throws -> [Artifact] {
+    private func commonArtifacts(expectedConsumed: Bool, epochCount: Int, cancellationAttestation: Bool, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, preservedGlobal: Bool = false, persistentGlobal: CampaignPersistentGateIdentity? = nil) throws -> [Artifact] {
         try [
             (.preflight, "source-build.json", .sourceBuildIdentity, .strictJSON, typed(.sourceBuildIdentity, preArmFrameSHA256: preArmFrameSHA256)),
             (.install, "installed.json", .builtStagingInstalledIdentity, .strictJSON, typed(.builtStagingInstalledIdentity)),
@@ -4361,7 +4843,7 @@ private final class CampaignEvidenceDiskFixture {
             (.authorization, "human-attestation.json", .humanPromptAttestation, .strictJSON, typed(.humanPromptAttestation, cancellationAttestation: cancellationAttestation)),
             (.authorization, "capability-counts.json", .noAuthModelNetworkCounters, .strictJSON, typed(.noAuthModelNetworkCounters)),
             (.uninstall, "uninstall.json", .uninstallEvidence, .strictJSON, typed(.uninstallEvidence)),
-            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, typed(.globalPostTeardown, preservedGlobal: preservedGlobal)),
+            (.verifier, "global-post-teardown.json", .globalPostTeardown, .strictJSON, typed(.globalPostTeardown, preservedGlobal: preservedGlobal, persistentGlobal: persistentGlobal)),
             (.verifier, "verification-input.json", .verifierInput, .strictJSON, typed(.verifierInput, ordinal: epochCount, expectedConsumed: expectedConsumed)),
         ]
     }
@@ -4542,7 +5024,7 @@ private final class CampaignEvidenceDiskFixture {
     }
     private func framed(_ bytes: Data) -> Data { handoffData(UInt32(bytes.count)) + bytes }
 
-    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, installedL2Proof: Data? = nil, claimEvidenceSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil, terminalEvidence: Data? = nil, helperIdentitySHA256: InvestigationHandoffSHA256? = nil, completionBindingSHA256: InvestigationHandoffSHA256? = nil, preservedGlobal: Bool = false) throws -> Data {
+    private func typed(_ role: InvestigationMachineEvidenceRole, ordinal: Int = 0, l2ArtifactSHA256: InvestigationHandoffSHA256? = nil, cancellationAttestation: Bool = false, expectedConsumed: Bool = true, preArmFrameSHA256: InvestigationHandoffSHA256? = nil, wholeProjectedInputSHA256: InvestigationHandoffSHA256? = nil, installedL2Proof: Data? = nil, claimEvidenceSHA256: InvestigationHandoffSHA256? = nil, physicalOwnershipSHA256: InvestigationHandoffSHA256? = nil, terminalEvidence: Data? = nil, helperIdentitySHA256: InvestigationHandoffSHA256? = nil, completionBindingSHA256: InvestigationHandoffSHA256? = nil, preservedGlobal: Bool = false, persistentGlobal: CampaignPersistentGateIdentity? = nil) throws -> Data {
         let digest = InvestigationMachineCampaignEvidenceTests.digest
         let hex: (UInt8) -> String = { digest($0).lowercaseHex }
         var value: [String: Any] = ["schemaVersion": 1, "role": roleName(role), "campaignUUID": campaignUUID.uuidString.lowercased(), "attemptUUID": attemptUUID.uuidString.lowercased()]
@@ -4569,7 +5051,22 @@ private final class CampaignEvidenceDiskFixture {
             fields = ["transactionReceiptSHA256": hex(0xd2), "installedIdentitySHA256": hex(0x65), "plistSHA256": hex(0x67), "appExecutableSHA256": hex(0x71), "helperExecutableSHA256": hex(0x72), "machineDriverExecutableSHA256": hex(0x73), "gateExecutableSHA256": hex(0x74), "coordinatorExecutableSHA256": hex(0xe5), "bootoutCompleted": true, "installedRootRemoved": true, "installedAppRemoved": true, "plistRemoved": true, "runtimeRootRemoved": true, "leaseRootRemoved": true]
         case .globalPostTeardown:
             var teardown: [String: Any] = ["observationReceiptSHA256": hex(0xd3), "appProcessCount": 0, "helperProcessCount": 0, "driverProcessCount": 0, "gateProcessCount": 0, "coordinatorProcessCount": 0, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "serviceAbsent": true, "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0, "gateCapsuleEntryCount": 0]
-            if preservedGlobal {
+            if let persistentGlobal {
+                value["schemaVersion"] = 3
+                teardown.merge([
+                    "persistentGateRelativePath":
+                        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+                    "persistentGateEntryCount": 1,
+                    "persistentGateBaseDevice": String(persistentGlobal.baseDevice),
+                    "persistentGateBaseInode": String(persistentGlobal.baseInode),
+                    "persistentGateBaseGeneration": String(persistentGlobal.baseGeneration),
+                    "persistentGateLockDevice": String(persistentGlobal.lockDevice),
+                    "persistentGateLockInode": String(persistentGlobal.lockInode),
+                    "persistentGateLockGeneration": String(persistentGlobal.lockGeneration),
+                    "persistentGateLockByteCount": 0,
+                    "persistentGateLockExclusive": true,
+                ]) { _, new in new }
+            } else if preservedGlobal {
                 let preserved = try InvestigationHistoricalGateCapsule.retainedV11()
                 value["schemaVersion"] = 2
                 teardown.merge([

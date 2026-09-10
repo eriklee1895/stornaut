@@ -1589,9 +1589,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
             throw InvestigationMachineGateCoordinatorProductionError
               .protocolFailure
           }
-          let value = try InvestigationFixedGateHandoff(
-            preservedCapsules: [try .retainedV11()]
-          ).run(
+          let value = try InvestigationFixedGateHandoff().run(
             canonicalProjectedInput: bytes
           )
           let transport = value.gateTransportReceipt

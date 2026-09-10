@@ -11877,7 +11877,7 @@ if executable.count(actor_end) != 1:
 actor_block = executable[executable.index(actor_marker):
                          executable.index(actor_end, executable.index(actor_marker)) + len('\n    }')]
 if hashlib.sha256(actor_block.encode()).hexdigest() != \
-        'ad4ff57f503cc600ef24f6b5bceda5ce28d6b925725be9e5bbf5a57a41b9d56d':
+        'f270aedd9039210386d0d4c65731c4edb9f1f12fb997ab0f6f959191b19fd74d':
     raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
 def require_body_digest(start, end, expected):
     if executable.count(start) != 1 or executable.count(end) != 1:
@@ -11898,7 +11898,7 @@ require_body_digest(
 require_body_digest(
     '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
     '\n\n        private func writePostArm',
-    '2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd')
+    '67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac')
 target = '''        .executableTarget(
             name: "StornautInvestigationMachineCampaign",
             dependencies: [
@@ -11977,7 +11977,7 @@ if executable.count(debug_end) != 1:
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 debug_executable = executable[:executable.index(debug_end)]
 if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-        '01395e6a03e0da8f9cb76837b24950cfa2451c181cebaa9e7e1738768206a886':
+        '894672e6445776c9d76f69799358a1be423fc99344678ddb5b36d0aeb27a1510':
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 authority_surface = active_executable
 for marker in allowed_sudo:
@@ -12666,7 +12666,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     actor_block = main[main.index(actor_marker):
                        main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
     if hashlib.sha256(actor_block.encode()).hexdigest() != \
-            'ad4ff57f503cc600ef24f6b5bceda5ce28d6b925725be9e5bbf5a57a41b9d56d':
+            'f270aedd9039210386d0d4c65731c4edb9f1f12fb997ab0f6f959191b19fd74d':
         raise SystemExit("ii-c-c lifecycle actor drifted")
     def require_body_digest(start, end, expected):
         if main.count(start) != 1 or main.count(end) != 1:
@@ -12687,7 +12687,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     require_body_digest(
         '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
         '\n\n        private func writePostArm',
-        '2cd03ff8bec74ade73e7e93380c8362390801833bad3a1efa0fb828985d6c1bd')
+        '67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac')
 if (main.count('Self.runLifecycle(') != 3
         or main.count('runLifecycle(') != 4
         or main.count('Self.runFixed(') != 2
@@ -12701,7 +12701,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '01395e6a03e0da8f9cb76837b24950cfa2451c181cebaa9e7e1738768206a886':
+            '894672e6445776c9d76f69799358a1be423fc99344678ddb5b36d0aeb27a1510':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -13726,25 +13726,43 @@ canonical_paths = tuple(map(Path, (
 )))
 canonical = [path.read_text(encoding="utf-8") for path in canonical_paths]
 mutations = {
-    "preserved-sha-bypass": ("capsule",
-        "InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256",
-        "true"),
-    "production-preservation-drop": ("coordinator",
-        "preservedCapsules: [try .retainedV11()]",
-        "preservedCapsules: []"),
-    "teardown-preserved-count-zero": ("campaign",
-        '"preservedGateAttemptEntryCount":1',
-        '"preservedGateAttemptEntryCount":0'),
-    "swift-evidence-preserved-sha-bypass": ("evidence",
-        "== preserved.fileSHA256.lowercaseHex", "!= preserved.fileSHA256.lowercaseHex"),
-    "verifier-gate-skip": ("verifier",
-        'if values[11][0][1]["schemaVersion"] == 2:', "if False:"),
+    "production-preservation-regression": ("coordinator",
+        "let value = try InvestigationFixedGateHandoff().run(",
+        "let value = try InvestigationFixedGateHandoff("
+        "preservedCapsules: [try .retainedV11()]).run("),
     "producer-schema-downgrade": ("campaign",
-        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2',
-        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:1'),
-    "verifier-preserved-sha-bypass": ("verifier",
-        "and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,",
-        "and True,"),
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3',
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2'),
+    "producer-cache-path": ("campaign",
+        '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "producer-inventory-bypass": ("campaign",
+        'guard try inventory(\n                base, closeDescriptor: closeDescriptor,\n                openDirectoryStream: openDirectoryStream,\n                closeDirectoryStream: closeDirectoryStream\n            ) == [".owner-lock-v1"] else {',
+        'guard true else {'),
+    "producer-lock-bypass": ("campaign",
+        "flock(lock, LOCK_EX | LOCK_NB) == 0", "true"),
+    "producer-close-bypass": ("campaign",
+        "guard closeAll(&descriptors, using: closeDescriptor) else {",
+        "guard true else { throw invalid() }"),
+    "swift-schema-three-drop": ("evidence",
+        "? [schemaVersion, 2, 3]", "? [schemaVersion, 2]"),
+    "swift-lock-exclusive-bypass": ("evidence",
+        'boolean(object, "persistentGateLockExclusive") == true', "true"),
+    "verifier-admission-downgrade": ("verifier",
+        "require(teardown_schema == 3,",
+        "require(teardown_schema == 2,"),
+    "verifier-path-regression": ("verifier",
+        'home + "/" + evidence["persistentGateRelativePath"]',
+        'home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "verifier-lock-bypass": ("verifier",
+        'fcntl.flock(lock_record[2], fcntl.LOCK_EX | fcntl.LOCK_NB) is None',
+        "True"),
+    "verifier-identity-bypass": ("verifier",
+        "require(path_identity(base_before) == expected_base\n"
+        "                and path_identity(lock_before) == expected_lock,",
+        "require(True,"),
+    "verifier-revalidation-bypass": ("verifier",
+        "revalidate_persistent_gate(persistent_gate, owner)", "pass"),
 }
 if mutation_mode == "true":
     if mutation_name not in mutations or mutation_slot not in slots \
@@ -13752,9 +13770,27 @@ if mutation_mode == "true":
         raise SystemExit("ii-c-c preserved-capsule mutation contract drifted")
     expected_slot, old, new = mutations[mutation_name]
     index = slots.index(mutation_slot)
+    expected_source = canonical[index].replace(old, new, 1)
+    if mutation_slot == "verifier":
+        normalized, count = re.subn(
+            r"(?m)^typeset -r iicc_self_sha=[0-9a-f]{64} # iicc-self-seal$",
+            "typeset -r iicc_self_sha=SELF # iicc-self-seal",
+            expected_source,
+        )
+        if count != 1:
+            raise SystemExit(
+                "ii-c-c preserved-capsule verifier mutation seal drifted"
+            )
+        expected_source = normalized.replace(
+            "typeset -r iicc_self_sha=SELF # iicc-self-seal",
+            "typeset -r iicc_self_sha="
+            + hashlib.sha256(normalized.encode()).hexdigest()
+            + " # iicc-self-seal",
+            1,
+        )
     if mutation_slot != expected_slot or paths[index] == canonical_paths[index] \
             or canonical[index].count(old) != 1 \
-            or sources[index] != canonical[index].replace(old, new, 1) \
+            or sources[index] != expected_source \
             or hashlib.sha256(paths[index].read_bytes()).hexdigest() != mutation_sha \
             or any(sources[i] != canonical[i] for i in range(len(slots)) if i != index):
         raise SystemExit("ii-c-c preserved-capsule unrecognized mutation")
@@ -13785,37 +13821,64 @@ required = {
         "preservedCapsules: preservedCapsules"),
     "handoff": ("preservedCapsules: [InvestigationHistoricalGateCapsule] = []",
         "InvestigationOwnerOnlyCapsulePublisher("),
-    "coordinator": ("preservedCapsules: [try .retainedV11()]",),
+    "coordinator": ("InvestigationFixedGateHandoff().run(",),
     "campaign": ("private struct GlobalObservation",
-        '"preservedGateAttemptEntryCount":1',
-        '"preservedGateCapsuleEntryCount":1',
-        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2',
-        "InvestigationProjectedCohortInput.decode(bytes)",
-        "decoded.wholeInputSHA256==preserved.wholeInputSHA256"),
+        "InvestigationMachinePersistentGateObserver",
+        '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+        '"persistentGateEntryCount":1',
+        '"persistentGateLockExclusive":true',
+        'guard try inventory(\n                base, closeDescriptor: closeDescriptor,\n                openDirectoryStream: openDirectoryStream,\n                closeDirectoryStream: closeDirectoryStream\n            ) == [".owner-lock-v1"] else {',
+        "flock(lock, LOCK_EX | LOCK_NB) == 0",
+        "observeIfPresent(basePath: String)",
+        "withClosedDescriptors<T>(",
+        "guard closeAll(&descriptors, using: closeDescriptor) else {",
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3'),
     "evidence": ("acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown",
+        "? [schemaVersion, 2, 3]",
         '"preservedGateAttemptEntryCount"',
         "InvestigationHistoricalGateCapsule.retainedV11()",
-        "== preserved.fileSHA256.lowercaseHex"),
+        "== preserved.fileSHA256.lowercaseHex",
+        '"persistentGateRelativePath"',
+        'boolean(object, "persistentGateLockExclusive") == true'),
     "capsule_tests": ("exactHistoricalCapsuleIsPreservedWhileOtherStaleAndFreshNodesSettle",
         "historicalCapsuleMismatchFailsBeforeCleanupOrPublication",
         "historicalCapsuleDriftDuringOtherStaleCleanupBlocksFreshPublication",
         "#expect(system.unlinkCalls.isEmpty)",
         "#expect(system.createCalls.isEmpty)"),
     "evidence_tests": ("globalTeardownV2AcceptsOnlyExactPreservedV11Capsule",
+        "globalTeardownV3AcceptsOnlyExactPersistentLockIdentity",
+        "persistentGateObserverBindsExactLockOnlyIdentityAndRejectsDrift",
+        "persistentGateObserverDistinguishesAbsentBaseFromInvalidState",
+        "persistentGateAbsentPathRejectsEveryAncestorCloseFailure",
+        "persistentGateObserverRejectsEveryHeldDescriptorCloseFailure",
+        "persistentGateObserverRejectsEveryInventoryStreamCloseFailure",
+        "persistentGateObserverRejectsDirectoryStreamOpenCleanupFailure",
         "independentVerifierRejectsAdmittingSchemaOneTeardown",
-        "independentVerifierBindsExactPreservedV11GateWhenOptedIn",
+        "independentVerifierRejectsAdmittingSchemaTwoTeardownWithoutLiveGate",
+        "independentVerifierBindsExactPersistentLockOnlyGateWhenOptedIn",
+        "independentVerifierReadsButDoesNotAdmitExactPreservedV11GateWhenOptedIn",
         '"STORNAUT_TASK39_V11_GATE_BASE"',
+        '"STORNAUT_TASK39_PERSISTENT_GATE_BASE"',
         "#expect(try Self.treeSnapshot(base) == before)"),
     "boundary_tests": ("iiCCPreservedHistoricalGateCapsuleContractIsClosed",),
     "verifier": ("def parse_projected_input(data):",
         "def open_preserved_gate(owner):",
         "def revalidate_preserved_gate(gate, owner):",
+        "def open_persistent_gate(owner, evidence):",
+        "def revalidate_persistent_gate(gate, owner):",
         '"preserved Gate base inventory"',
         '"preserved Gate capsule contract"',
         "if admitting:",
-        '"admitting preservation schema"',
+        '"admitting persistent Gate schema"',
+        "require(teardown_schema == 3,",
+        '"persistent Gate base inventory"',
+        'home + "/" + evidence["persistentGateRelativePath"]',
+        "path_identity(base_before) == expected_base",
+        "and path_identity(lock_before) == expected_lock",
+        "fcntl.flock(lock_record[2], fcntl.LOCK_EX | fcntl.LOCK_NB) is None",
         "and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,",
-        "revalidate_preserved_gate(preserved_gate, owner)"),
+        "persistent_gate = open_persistent_gate(",
+        "revalidate_persistent_gate(persistent_gate, owner)"),
 }
 named = dict(zip(("contract","capsule","ownership","handoff",
     "coordinator","campaign","evidence","capsule_tests",
@@ -14093,7 +14156,7 @@ for marker in ("physicalCompactPreArmFailurePreservesVerifiedExitAndZeroResidue"
         raise SystemExit("pre-arm failure physical coverage drifted: " + marker)
 finish = main[main.index("func finishProduction"):main.index("private func writePostArm")]
 ordered = ("InvestigationMachineCampaignLifecycleFinalizer.run(",
-           "let global = try globalObservation()",
+           "let global = try globalObservation(allowAbsentGate: true)",
            "try Self.writePreArmFailureReport(")
 if [finish.index(x) for x in ordered] != sorted(finish.index(x) for x in ordered):
     raise SystemExit("pre-arm failure teardown order drifted")
@@ -14114,7 +14177,9 @@ for forbidden in ("localizedDescription", "String(describing: originalError)",
 for marker in ("harnessPreservesOnlyExactExitedPreArmFailureWithoutArming",
                "harnessRejectsPreArmFailureWithTerminalBytesMissingEOFOrResidue",
                "preArmFailureReportRequiresExactExitAndCompleteTeardown",
-               "productionFirstFrameClassifierReadsCompactFailureByDomain"):
+               "productionFirstFrameClassifierReadsCompactFailureByDomain",
+               "persistentGateObserverDistinguishesAbsentBaseFromInvalidState",
+               "persistentGateObserverRejectsEveryHeldDescriptorCloseFailure"):
     if marker not in tests:
         raise SystemExit("pre-arm failure coverage drifted: " + marker)
 PY

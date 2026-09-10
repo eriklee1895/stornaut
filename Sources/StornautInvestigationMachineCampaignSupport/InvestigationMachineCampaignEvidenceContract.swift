@@ -725,7 +725,7 @@ package enum InvestigationMachineEvidenceJSON {
         sourceBinding: InvestigationMachineCampaignSourceBinding
     ) throws {
         let acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown
-            ? [schemaVersion, 2] : [schemaVersion]
+            ? [schemaVersion, 2, 3] : [schemaVersion]
         try exactCommon(
             object, role: roleName(role), campaignUUID: campaignUUID,
             attemptUUID: attemptUUID,
@@ -906,6 +906,19 @@ package enum InvestigationMachineEvidenceJSON {
                     "preservedGateCapsuleByteCount",
                     "preservedGateCapsuleSHA256",
                 ])
+            } else if integer(object, "schemaVersion") == 3 {
+                keys.formUnion([
+                    "persistentGateRelativePath",
+                    "persistentGateEntryCount",
+                    "persistentGateBaseDevice",
+                    "persistentGateBaseInode",
+                    "persistentGateBaseGeneration",
+                    "persistentGateLockDevice",
+                    "persistentGateLockInode",
+                    "persistentGateLockGeneration",
+                    "persistentGateLockByteCount",
+                    "persistentGateLockExclusive",
+                ])
             }
             try exact(object, keys)
             guard digest(object, "observationReceiptSHA256") != nil,
@@ -926,6 +939,24 @@ package enum InvestigationMachineEvidenceJSON {
                         == Int(preserved.byteCount),
                     digest(object, "preservedGateCapsuleSHA256")
                         == preserved.fileSHA256.lowercaseHex
+                else { throw invalid() }
+            } else if integer(object, "schemaVersion") == 3 {
+                let baseDevice = positiveDecimal(
+                    object, "persistentGateBaseDevice")
+                let lockDevice = positiveDecimal(
+                    object, "persistentGateLockDevice")
+                guard
+                    string(object, "persistentGateRelativePath") ==
+                        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+                    integer(object, "persistentGateEntryCount") == 1,
+                    baseDevice != nil,
+                    positiveDecimal(object, "persistentGateBaseInode") != nil,
+                    decimal(object, "persistentGateBaseGeneration") != nil,
+                    lockDevice == baseDevice,
+                    positiveDecimal(object, "persistentGateLockInode") != nil,
+                    decimal(object, "persistentGateLockGeneration") != nil,
+                    integer(object, "persistentGateLockByteCount") == 0,
+                    boolean(object, "persistentGateLockExclusive") == true
                 else { throw invalid() }
             }
         case .verifierInput:
@@ -1177,6 +1208,19 @@ package enum InvestigationMachineEvidenceJSON {
         else { return nil }
         return text
     }
+    private static func decimal(
+        _ value: [String: Any], _ key: String
+    ) -> UInt64? {
+        guard let text = string(value, key), !text.isEmpty,
+              text.utf8.allSatisfy({ (48...57).contains($0) }),
+              text == "0" || !text.hasPrefix("0"),
+              let result = UInt64(text)
+        else { return nil }
+        return result
+    }
+    private static func positiveDecimal(
+        _ value: [String: Any], _ key: String
+    ) -> UInt64? { decimal(value, key).flatMap { $0 > 0 ? $0 : nil } }
     private static func base64Digest(
         _ value: [String: Any], bytes: String, digest name: String
     ) -> Bool {

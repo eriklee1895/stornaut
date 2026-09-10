@@ -100,6 +100,314 @@ package enum InvestigationMachineCampaignExecutableReportError: Error {
     case invalid
 }
 
+package struct InvestigationMachinePersistentGateIdentity:
+    Equatable, Sendable
+{
+    package static let relativePath =
+        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
+    package let baseDevice: UInt64
+    package let baseInode: UInt64
+    package let baseGeneration: UInt64
+    package let lockDevice: UInt64
+    package let lockInode: UInt64
+    package let lockGeneration: UInt64
+}
+
+package enum InvestigationMachinePersistentGateObserver {
+    package enum Error: Swift.Error, Equatable {
+        case absent
+        case invalid
+        case posix(Int32)
+    }
+    private static let rootFlags = Int32(
+        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW_ANY
+    )
+    private static let directoryFlags = Int32(
+        rootFlags | O_RESOLVE_BENEATH
+    )
+    private static let lockFlags = Int32(
+        O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW_ANY
+            | O_RESOLVE_BENEATH | O_UNIQUE
+    )
+    private static let namedFlags = Int32(
+        AT_SYMLINK_NOFOLLOW_ANY | AT_RESOLVE_BENEATH | AT_UNIQUE
+    )
+
+    package static func observeIfPresent(basePath: String) throws
+        -> InvestigationMachinePersistentGateIdentity?
+    {
+        do { return try observe(basePath: basePath) }
+        catch Error.absent { return nil }
+    }
+
+    package static func observeIfPresent(
+        basePath: String, closeDescriptor: (Int32) -> Int32
+    ) throws -> InvestigationMachinePersistentGateIdentity? {
+        do {
+            return try observe(
+                basePath: basePath, closeDescriptor: closeDescriptor)
+        } catch Error.absent {
+            return nil
+        }
+    }
+
+    package static func observe(
+        basePath: String,
+        closeDescriptor: (Int32) -> Int32 = Darwin.close,
+        openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>? = fdopendir,
+        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32 = closedir
+    ) throws
+        -> InvestigationMachinePersistentGateIdentity
+    {
+        guard basePath.first == "/", !basePath.hasSuffix("/"),
+              !basePath.contains("\0"),
+              basePath.hasSuffix("/"
+                + InvestigationMachinePersistentGateIdentity.relativePath)
+        else { throw invalid() }
+        let components = basePath.split(
+            separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard !components.isEmpty, components.allSatisfy({
+            !$0.isEmpty && $0 != "." && $0 != ".."
+        }), "/" + components.joined(separator: "/") == basePath
+        else { throw invalid() }
+
+        return try withClosedDescriptors(using: closeDescriptor) { descriptors in
+            let root = Darwin.open("/", rootFlags)
+            guard root >= 3 else { throw posix() }
+            descriptors.append(root)
+            var parent = root
+            var nodes: [(
+                parent: Int32, name: String, descriptor: Int32, stat
+            )] = []
+            for (index, component) in components.enumerated() {
+                let descriptor = openat(parent, component, directoryFlags)
+                guard descriptor >= 3 else {
+                    if errno == ENOENT && index == components.count - 1 {
+                        throw Error.absent
+                    }
+                    throw posix()
+                }
+                guard !descriptors.contains(descriptor) else {
+                    throw invalid()
+                }
+                descriptors.append(descriptor)
+                let named = try metadata(parent: parent, name: component)
+                let held = try metadata(descriptor)
+                guard sameNode(named, held), held.st_mode & S_IFMT == S_IFDIR,
+                      descriptorState(descriptor, access: O_RDONLY)
+                else { throw invalid() }
+                nodes.append((parent, component, descriptor, held))
+                parent = descriptor
+            }
+            let base = parent
+            let baseBefore = try metadata(base)
+            try validatePrivateNode(
+                baseBefore, descriptor: base, regular: false, mode: 0o700,
+                device: baseBefore.st_dev
+            )
+            guard try inventory(
+                base, closeDescriptor: closeDescriptor,
+                openDirectoryStream: openDirectoryStream,
+                closeDirectoryStream: closeDirectoryStream
+            ) == [".owner-lock-v1"] else {
+                throw invalid()
+            }
+            let lock = openat(base, ".owner-lock-v1", lockFlags)
+            guard lock >= 3, !descriptors.contains(lock) else { throw posix() }
+            descriptors.append(lock)
+            let lockNamed = try metadata(parent: base, name: ".owner-lock-v1")
+            let lockBefore = try metadata(lock)
+            try validatePrivateNode(
+                lockBefore, descriptor: lock, regular: true, mode: 0o600,
+                device: baseBefore.st_dev
+            )
+            guard sameNode(lockNamed, lockBefore), lockBefore.st_nlink == 1,
+                  lockBefore.st_size == 0,
+                  descriptorState(lock, access: O_RDONLY),
+                  flock(lock, LOCK_EX | LOCK_NB) == 0
+            else { throw invalid() }
+
+            guard try inventory(
+                base, closeDescriptor: closeDescriptor,
+                openDirectoryStream: openDirectoryStream,
+                closeDirectoryStream: closeDirectoryStream
+            ) == [".owner-lock-v1"],
+                  sameNode(baseBefore, try metadata(base)),
+                  sameNode(baseBefore, try metadata(
+                    parent: nodes.last!.parent, name: nodes.last!.name)),
+                  sameNode(lockBefore, try metadata(lock)),
+                  sameNode(lockBefore, try metadata(
+                    parent: base, name: ".owner-lock-v1"))
+            else { throw invalid() }
+            for node in nodes {
+                guard sameNode(node.3, try metadata(node.descriptor)),
+                      sameNode(node.3, try metadata(
+                        parent: node.parent, name: node.name))
+                else { throw invalid() }
+            }
+            return InvestigationMachinePersistentGateIdentity(
+                baseDevice: UInt64(baseBefore.st_dev),
+                baseInode: UInt64(baseBefore.st_ino),
+                baseGeneration: UInt64(baseBefore.st_gen),
+                lockDevice: UInt64(lockBefore.st_dev),
+                lockInode: UInt64(lockBefore.st_ino),
+                lockGeneration: UInt64(lockBefore.st_gen)
+            )
+        }
+    }
+
+    private static func withClosedDescriptors<T>(
+        using closeDescriptor: (Int32) -> Int32,
+        _ body: (inout [Int32]) throws -> T
+    ) throws -> T {
+        var descriptors: [Int32] = []
+        let outcome: Result<T, Swift.Error>
+        do { outcome = .success(try body(&descriptors)) }
+        catch { outcome = .failure(error) }
+        guard closeAll(&descriptors, using: closeDescriptor) else {
+            throw invalid()
+        }
+        return try outcome.get()
+    }
+
+    private static func validatePrivateNode(
+        _ value: stat, descriptor: Int32, regular: Bool, mode: mode_t,
+        device: dev_t
+    ) throws {
+        guard value.st_dev == device, value.st_ino > 0,
+              value.st_uid == 501, value.st_gid == 20,
+              value.st_mode & 0o7777 == mode, value.st_flags == 0,
+              value.st_nlink > 0,
+              regular ? value.st_mode & S_IFMT == S_IFREG
+                      : value.st_mode & S_IFMT == S_IFDIR,
+              try emptyACL(descriptor), flistxattr(descriptor, nil, 0, 0) == 0
+        else { throw invalid() }
+    }
+
+    private static func inventory(
+        _ descriptor: Int32,
+        closeDescriptor: (Int32) -> Int32,
+        openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>?,
+        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32
+    ) throws -> [String] {
+        let enumeration = openat(descriptor, ".", directoryFlags)
+        guard enumeration >= 3 else { throw posix() }
+        guard let directory = openDirectoryStream(enumeration) else {
+            let saved = errno
+            guard closeDescriptor(enumeration) == 0 else { throw invalid() }
+            throw Error.posix(saved)
+        }
+        var names: [String] = []
+        let outcome: Result<[String], Swift.Error>
+        do {
+            while names.count <= 1 {
+                errno = 0
+                guard let entry = readdir(directory) else {
+                    guard errno == 0 else { throw posix() }
+                    break
+                }
+                let name = try directoryEntryName(entry)
+                if name != "." && name != ".." { names.append(name) }
+            }
+            guard names.count <= 1 else { throw invalid() }
+            outcome = .success(names.sorted())
+        } catch {
+            outcome = .failure(error)
+        }
+        let closeResult = closeDirectoryStream(directory)
+        guard closeResult == 0 else { throw invalid() }
+        return try outcome.get()
+    }
+
+    private static func directoryEntryName(
+        _ entry: UnsafePointer<dirent>
+    ) throws -> String {
+        guard
+            let recordOffset = MemoryLayout<dirent>.offset(of: \.d_reclen),
+            let lengthOffset = MemoryLayout<dirent>.offset(of: \.d_namlen),
+            let nameOffset = MemoryLayout<dirent>.offset(of: \.d_name)
+        else { throw invalid() }
+        let raw = UnsafeRawPointer(entry)
+        let recordLength = Int(
+            raw.load(fromByteOffset: recordOffset, as: UInt16.self))
+        let nameLength = Int(
+            raw.load(fromByteOffset: lengthOffset, as: UInt16.self))
+        guard nameLength > 0,
+              nameLength < MemoryLayout.size(ofValue: dirent().d_name),
+              recordLength <= MemoryLayout<dirent>.size,
+              nameOffset + nameLength + 1 <= recordLength
+        else { throw invalid() }
+        let bytes = UnsafeBufferPointer(
+            start: raw.advanced(by: nameOffset)
+                .assumingMemoryBound(to: UInt8.self),
+            count: nameLength)
+        guard !bytes.contains(0),
+              raw.load(fromByteOffset: nameOffset + nameLength, as: UInt8.self) == 0,
+              let name = String(validating: bytes, as: UTF8.self)
+        else { throw invalid() }
+        return name
+    }
+
+    private static func emptyACL(_ descriptor: Int32) throws -> Bool {
+        errno = 0
+        guard let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else {
+            if errno == ENOENT { return true }
+            throw posix()
+        }
+        var entry: acl_entry_t?
+        let result = acl_get_entry(
+            acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry)
+        let saved = errno
+        guard acl_free(UnsafeMutableRawPointer(acl)) == 0 else { throw posix() }
+        guard result >= 0 else { throw Error.posix(saved) }
+        return result != 0
+    }
+
+    private static func descriptorState(_ descriptor: Int32, access: Int32)
+        -> Bool
+    {
+        let descriptorFlags = fcntl(descriptor, F_GETFD)
+        let statusFlags = fcntl(descriptor, F_GETFL)
+        return descriptorFlags >= 0 && descriptorFlags & FD_CLOEXEC != 0
+            && statusFlags >= 0 && statusFlags & O_NONBLOCK != 0
+            && statusFlags & O_ACCMODE == access
+    }
+
+    private static func metadata(_ descriptor: Int32) throws -> stat {
+        var value = stat()
+        guard fstat(descriptor, &value) == 0 else { throw posix() }
+        return value
+    }
+
+    private static func metadata(parent: Int32, name: String) throws -> stat {
+        var value = stat()
+        guard fstatat(parent, name, &value, namedFlags) == 0 else { throw posix() }
+        return value
+    }
+
+    private static func sameNode(_ lhs: stat, _ rhs: stat) -> Bool {
+        lhs.st_dev == rhs.st_dev && lhs.st_ino == rhs.st_ino
+            && lhs.st_gen == rhs.st_gen
+    }
+
+    private static func closeAll(
+        _ descriptors: inout [Int32],
+        using closeDescriptor: (Int32) -> Int32
+    ) -> Bool {
+        var succeeded = true
+        while let descriptor = descriptors.popLast() {
+            if closeDescriptor(descriptor) != 0 { succeeded = false }
+        }
+        return succeeded
+    }
+
+    private static func invalid() -> Error {
+        .invalid
+    }
+
+    private static func posix() -> Error { .posix(errno) }
+}
+
 package enum InvestigationMachineCampaignFirstFrameClassifier {
     package enum Kind: Equatable { case preArmFailure, legacyReceipt, normalPreArm }
     package static func hasCompleteDeclaredPayload(_ frame: Data) -> Bool {
@@ -286,13 +594,30 @@ package enum InvestigationMachineCampaignExecutable {
         private struct TerminalEvidence { let bundle:Data;let epochs:[InvestigationMachineCampaignVerifiedEpoch];let diagnostic:Data;let rawGateReceipt:Data;let finalReceipt:InvestigationMachineCoordinatorRawReceiptV1 };private var spawned:InvestigationMachineCampaignSpawnedProcess?;private var deadline:UInt64?;private var channelsClosed=false,bootstrapVerified=false,activationPrepared=false,preparedPublished=false,armedConsumed=false,promptObserved=false,humanActionObserved=false,attestationPublished=false
         private struct GlobalObservation {
             let processCounts: [Int]
-            let preserved: InvestigationHistoricalGateCapsule
+            let persistentGate: InvestigationMachinePersistentGateIdentity?
             var canonicalObject: [String: Any] {
-                ["processCounts": processCounts,
-                 "preservedGateAttemptUUID": preserved.outerAttemptUUID.uuidString.lowercased(),
-                 "preservedGateWholeInputSHA256": preserved.wholeInputSHA256.lowercaseHex,
-                 "preservedGateCapsuleByteCount": preserved.byteCount,
-                 "preservedGateCapsuleSHA256": preserved.fileSHA256.lowercaseHex]
+                var value: [String: Any] = [
+                    "processCounts": processCounts,
+                    "persistentGateState": persistentGate == nil
+                        ? "absentBeforeHandoff" : "ownerLockOnly",
+                ]
+                if let persistentGate {
+                    value["persistentGateRelativePath"] =
+                        InvestigationMachinePersistentGateIdentity.relativePath
+                    value["persistentGateBaseDevice"] =
+                        String(persistentGate.baseDevice)
+                    value["persistentGateBaseInode"] =
+                        String(persistentGate.baseInode)
+                    value["persistentGateBaseGeneration"] =
+                        String(persistentGate.baseGeneration)
+                    value["persistentGateLockDevice"] =
+                        String(persistentGate.lockDevice)
+                    value["persistentGateLockInode"] =
+                        String(persistentGate.lockInode)
+                    value["persistentGateLockGeneration"] =
+                        String(persistentGate.lockGeneration)
+                }
+                return value
             }
         }
         private var preparedFrameSHA256:Data?;private var bufferedReceipt=Data();private var evidenceWriter:InvestigationMachineRawEvidenceWriter?;private var evidenceParentDescriptor:Int32 = -1;private var lastEvidenceTime:Int64=0;private var installReceipt:[String:Any]?;private var lifecyclePayload:(root:String,bytes:Data,hashes:[String],plist:String)?
@@ -410,7 +735,6 @@ package enum InvestigationMachineCampaignExecutable {
                     reportUncertainty: { Self.writeFixedError(
                         "stornaut ii-c installed-state-uncertain\n") })
             } catch { throw Failure.installedStateUncertain }
-            let global = try globalObservation()
             if case let .failed(failure) = outcome,
                let diagnostic = failure.verifiedPreArmFailure,
                !armedConsumed,
@@ -418,12 +742,14 @@ package enum InvestigationMachineCampaignExecutable {
                failure.exactWait
                 == .exited(status: diagnostic.reason.expectedExitStatus)
             {
+                let global = try globalObservation(allowAbsentGate: true)
                 try Self.writePreArmFailureReport(
                     diagnostic, exactWait: failure.exactWait,
                     install: install, uninstall: un, global: global
                 )
                 return false
             }
+            let global = try globalObservation(allowAbsentGate: false)
             guard let preArm, let writer, evidenceUsable else { return false }
             try writeTeardown(un, preArm: preArm, global: global,
                 expectedConsumed: armedConsumed,
@@ -1018,6 +1344,9 @@ package enum InvestigationMachineCampaignExecutable {
             preArm: InvestigationMachineCampaignPreArmFrame,
             global: GlobalObservation,
             expectedConsumed: Bool, expectedEpochCount: Int) throws {
+            guard let persistentGate = global.persistentGate else {
+                throw Failure.invalid
+            }
             var un:[String:Any]=["transactionReceiptSHA256":Self.digest(try Self.canonical(uninstall)),
                 "bootoutCompleted":true,"installedRootRemoved":true,"installedAppRemoved":true,
                 "plistRemoved":true,"runtimeRootRemoved":true,"leaseRootRemoved":true]
@@ -1037,14 +1366,19 @@ package enum InvestigationMachineCampaignExecutable {
                 "openChannelCount":global.processCounts[7],
                 "ownedProcessGroupMemberCount":global.processCounts[8],
                 "serviceAbsent":true,"gateOwnerLockRevalidated":true,"gateAttemptEntryCount":0,
-                "gateCapsuleEntryCount":0,"preservedGateAttemptEntryCount":1,
-                "preservedGateCapsuleEntryCount":1,
-                "preservedGateAttemptUUID":global.preserved.outerAttemptUUID.uuidString.lowercased(),
-                "preservedGateWholeInputSHA256":global.preserved.wholeInputSHA256.lowercaseHex,
-                "preservedGateCapsuleByteCount":global.preserved.byteCount,
-                "preservedGateCapsuleSHA256":global.preserved.fileSHA256.lowercaseHex],
+                "gateCapsuleEntryCount":0,
+                "persistentGateRelativePath":InvestigationMachinePersistentGateIdentity.relativePath,
+                "persistentGateEntryCount":1,
+                "persistentGateBaseDevice":String(persistentGate.baseDevice),
+                "persistentGateBaseInode":String(persistentGate.baseInode),
+                "persistentGateBaseGeneration":String(persistentGate.baseGeneration),
+                "persistentGateLockDevice":String(persistentGate.lockDevice),
+                "persistentGateLockInode":String(persistentGate.lockInode),
+                "persistentGateLockGeneration":String(persistentGate.lockGeneration),
+                "persistentGateLockByteCount":0,
+                "persistentGateLockExclusive":true],
                 role:.globalPostTeardown,phase:.verifier,
-                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2)
+                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3)
             try writeJSON(["expectedConsumed":expectedConsumed,
                 "expectedEpochCount":expectedEpochCount,
                 "evidenceSetSHA256":preArm.frameSHA256.lowercaseHex,
@@ -1122,7 +1456,7 @@ package enum InvestigationMachineCampaignExecutable {
         private static func scenario(_ index:Int)->String{["success","cancellation","timeout",
             "invalidEnvelope","identityMismatch","transportLoss","lifecycleRecovery",
             "artifactCleanupFailure"][index]}
-        private func globalObservation()throws->GlobalObservation{
+        private func globalObservation(allowAbsentGate: Bool)throws->GlobalObservation{
             let exact=["/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationDiagnostic","/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautLifecycleHelper","/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineDriver","/Library/Application Support/Stornaut/Stornaut-R5-Diagnostic.app/Contents/MacOS/StornautInvestigationMachineGate",installedCoordinator]
             var counts=[Int](repeating:0,count:9),capacity=4096
             while capacity<=131072{var pids=[pid_t](repeating:0,count:capacity);let n=pids.withUnsafeMutableBytes{proc_listallpids($0.baseAddress,Int32($0.count))};guard n>=0 else{throw Failure.posix(errno)};if n<capacity{for pid in pids.prefix(Int(n)) where pid>1{var path=[CChar](repeating:0,count:Int(MAXPATHLEN));let size=proc_pidpath(pid,&path,UInt32(path.count));if size>0,let value=String(bytes:path.prefix(Int(size)).map(UInt8.init(bitPattern:)),encoding:.utf8),let i=exact.firstIndex(of:value){counts[i]+=1}};break};capacity*=2}
@@ -1133,33 +1467,15 @@ package enum InvestigationMachineCampaignExecutable {
             for path in exact{var absent=stat();guard lstat(path,&absent) != 0,
                 errno==ENOENT else{throw Failure.invalid}}
             guard let pw=getpwuid(getuid()) else{throw Failure.invalid}
-            let base=String(cString:pw.pointee.pw_dir)+"/Library/Caches/com.eriklee.stornaut.task39-machine-gate"
-            let preserved=try InvestigationHistoricalGateCapsule.retainedV11()
-            let names=try FileManager.default.contentsOfDirectory(atPath:base).sorted()
-            guard names==[".owner-lock-v1",preserved.attemptName].sorted()
-            else{throw Failure.invalid}
-            var lock=stat();guard lstat(base+"/.owner-lock-v1",&lock)==0,
-                  lock.st_mode&S_IFMT==S_IFREG,lock.st_uid==getuid(),lock.st_nlink==1
-            else{throw Failure.invalid}
-            let attempt=base+"/"+preserved.attemptName, capsule=attempt+"/"+preserved.capsuleName
-            var attemptNode=stat(),capsuleNode=stat()
-            guard lstat(attempt,&attemptNode)==0,attemptNode.st_mode&S_IFMT==S_IFDIR,
-                  attemptNode.st_mode&0o7777==0o700,attemptNode.st_uid==getuid(),
-                  attemptNode.st_gid==getgid(),
-                  try FileManager.default.contentsOfDirectory(atPath:attempt)
-                    == [preserved.capsuleName],
-                  lstat(capsule,&capsuleNode)==0,capsuleNode.st_mode&S_IFMT==S_IFREG,
-                  capsuleNode.st_mode&0o7777==0o600,capsuleNode.st_uid==getuid(),
-                  capsuleNode.st_gid==getgid(),capsuleNode.st_nlink==1,
-                  capsuleNode.st_size==preserved.byteCount,
-                  let bytes=Self.stableFileBytes(capsule,privateParent:true,
-                    maximum:preserved.byteCount),
-                  InvestigationHandoffSHA256.hashing(bytes)==preserved.fileSHA256,
-                  let decoded=try? InvestigationProjectedCohortInput.decode(bytes),
-                  decoded.capsule.outerAttemptUUID==preserved.outerAttemptUUID,
-                  decoded.wholeInputSHA256==preserved.wholeInputSHA256
-            else{throw Failure.invalid}
-            return .init(processCounts: counts, preserved: preserved)}
+            let base = String(cString:pw.pointee.pw_dir) + "/"
+                + InvestigationMachinePersistentGateIdentity.relativePath
+            let persistentGate: InvestigationMachinePersistentGateIdentity?
+            persistentGate = allowAbsentGate
+                ? try InvestigationMachinePersistentGateObserver
+                    .observeIfPresent(basePath: base)
+                : try InvestigationMachinePersistentGateObserver
+                    .observe(basePath: base)
+            return .init(processCounts: counts, persistentGate: persistentGate)}
 
         nonisolated var isBootstrapInvocation: Bool {
             CommandLine.argc == 1 && getpid() > 1 && getsid(0) == getpid()

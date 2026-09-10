@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=77d265387eb7a049b5dbf82d14b993daf31346d589eca9c12fb4d281ea4d4cc0
+# ib2_self_sha=4828e06ef15b83d48e8b15d2bd820d7d2f3fbaa8e56d337a9ce1bd90466ae614
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -238,6 +238,8 @@ function verify_iic0biia3_contract() {
     mkdir -p "$out/candidates"
     python3 - "$source" "$out/candidates" <<'PY'
 from pathlib import Path
+import hashlib
+import re
 import sys
 
 source_path, output = map(Path, sys.argv[1:])
@@ -926,6 +928,8 @@ PY
     mkdir -p "$out/candidates"
     python3 - "$capsule" "$out/candidates" <<'PY'
 from pathlib import Path
+import hashlib
+import re
 import sys
 
 source_path, output = map(Path, sys.argv[1:])
@@ -3817,31 +3821,51 @@ function verify_iicc_contract() {
         "${preserved_paths[@]}" >"$out/preserved-capsule.log"
     /usr/bin/python3 -I - "$out" "${preserved_paths[@]}" <<'PY'
 from pathlib import Path
+import hashlib
+import re
 import sys
 out = Path(sys.argv[1]); paths = tuple(map(Path, sys.argv[2:]))
 slots = ("contract","capsule","ownership","handoff","coordinator",
     "campaign","evidence","capsule_tests","evidence_tests",
     "boundary_tests","verifier")
 mutations = (
-    ("preserved-sha-bypass", "capsule",
-     "InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256",
-     "true"),
-    ("production-preservation-drop", "coordinator",
-     "preservedCapsules: [try .retainedV11()]", "preservedCapsules: []"),
-    ("teardown-preserved-count-zero", "campaign",
-     '"preservedGateAttemptEntryCount":1',
-     '"preservedGateAttemptEntryCount":0'),
-    ("swift-evidence-preserved-sha-bypass", "evidence",
-     "== preserved.fileSHA256.lowercaseHex",
-     "!= preserved.fileSHA256.lowercaseHex"),
-    ("verifier-gate-skip", "verifier",
-     "if admitting:", "if False:"),
+    ("production-preservation-regression", "coordinator",
+     "let value = try InvestigationFixedGateHandoff().run(",
+     "let value = try InvestigationFixedGateHandoff("
+     "preservedCapsules: [try .retainedV11()]).run("),
     ("producer-schema-downgrade", "campaign",
-     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2',
-     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:1'),
-    ("verifier-preserved-sha-bypass", "verifier",
-     "and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,",
-     "and True,"),
+     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3',
+     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2'),
+    ("producer-cache-path", "campaign",
+     '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
+     '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    ("producer-inventory-bypass", "campaign",
+     'guard try inventory(\n                base, closeDescriptor: closeDescriptor,\n                openDirectoryStream: openDirectoryStream,\n                closeDirectoryStream: closeDirectoryStream\n            ) == [".owner-lock-v1"] else {',
+     'guard true else {'),
+    ("producer-lock-bypass", "campaign",
+     "flock(lock, LOCK_EX | LOCK_NB) == 0", "true"),
+    ("producer-close-bypass", "campaign",
+     "guard closeAll(&descriptors, using: closeDescriptor) else {",
+     "guard true else { throw invalid() }"),
+    ("swift-schema-three-drop", "evidence",
+     "? [schemaVersion, 2, 3]", "? [schemaVersion, 2]"),
+    ("swift-lock-exclusive-bypass", "evidence",
+     'boolean(object, "persistentGateLockExclusive") == true', "true"),
+    ("verifier-admission-downgrade", "verifier",
+     "require(teardown_schema == 3,",
+     "require(teardown_schema == 2,"),
+    ("verifier-path-regression", "verifier",
+     'home + "/" + evidence["persistentGateRelativePath"]',
+     'home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    ("verifier-lock-bypass", "verifier",
+     'fcntl.flock(lock_record[2], fcntl.LOCK_EX | fcntl.LOCK_NB) is None',
+     "True"),
+    ("verifier-identity-bypass", "verifier",
+     "require(path_identity(base_before) == expected_base\n"
+     "                and path_identity(lock_before) == expected_lock,",
+     "require(True,"),
+    ("verifier-revalidation-bypass", "verifier",
+     "revalidate_persistent_gate(persistent_gate, owner)", "pass"),
 )
 with (out / "preserved-capsule-mutations").open("w") as manifest:
     for name, slot, old, new in mutations:
@@ -3849,8 +3873,27 @@ with (out / "preserved-capsule-mutations").open("w") as manifest:
         if source.count(old) != 1:
             raise SystemExit("cannot construct preserved-capsule mutation: " + name)
         target = out / ("preserved-" + name + ".source")
-        target.write_text(source.replace(old, new, 1), encoding="utf-8")
-        print(name, slot, slots.index(slot) + 1, target, sep="\t", file=manifest)
+        mutated = source.replace(old, new, 1)
+        if slot == "verifier":
+            normalized, count = re.subn(
+                r"(?m)^typeset -r iicc_self_sha=[0-9a-f]{64} # iicc-self-seal$",
+                "typeset -r iicc_self_sha=SELF # iicc-self-seal",
+                mutated,
+            )
+            if count != 1:
+                raise SystemExit(
+                    "cannot reseal preserved-capsule verifier mutation: " + name
+                )
+            mutated = normalized.replace(
+                "typeset -r iicc_self_sha=SELF # iicc-self-seal",
+                "typeset -r iicc_self_sha="
+                + hashlib.sha256(normalized.encode()).hexdigest()
+                + " # iicc-self-seal",
+                1,
+            )
+        target.write_text(mutated, encoding="utf-8")
+        print(name, slot, slots.index(slot) + 1, target,
+              sep="\t", file=manifest)
 PY
     local preserved_name preserved_slot preserved_index preserved_target
     local preserved_sha preserved_status
@@ -3867,6 +3910,157 @@ PY
         (( preserved_status != 0 )) \
             || fail_contract "ii-c-c preserved-capsule mutation accepted: $preserved_name"
     done <"$out/preserved-capsule-mutations"
+    (
+        local account_home persistent_base physical_out scratch_parent scratch_base
+        account_home=$(/usr/bin/python3 -I - <<'PY'
+import os
+import pwd
+print(pwd.getpwuid(os.getuid()).pw_dir)
+PY
+        )
+        persistent_base="$account_home/Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
+        function create_persistent_gate() {
+        /usr/bin/python3 -I - "$1" "$2" <<'PY'
+import ctypes
+import os
+import secrets
+import stat
+import sys
+
+base, staging_parent = sys.argv[1:]
+parent, leaf = os.path.split(base)
+if (not parent or not leaf or base != os.path.join(parent, leaf)
+        or not os.path.isabs(staging_parent)):
+    raise SystemExit(1)
+directory_flags = (
+    os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NONBLOCK
+    | 0x20000000 | 0x00002000
+)
+relative_directory_flags = directory_flags | 0x00001000
+lock_flags = (
+    os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NONBLOCK
+    | 0x20000000 | 0x00001000 | 0x00002000
+)
+parent_fd = staging_parent_fd = base_fd = lock_fd = -1
+libc = ctypes.CDLL(None, use_errno=True)
+libc.renameatx_np.argtypes = [
+    ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint,
+]
+libc.renameatx_np.restype = ctypes.c_int
+rename_flags = 0x00000004 | 0x00000010 | 0x00000020
+try:
+    parent_fd = os.open(parent, directory_flags)
+    try:
+        os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        pass
+    else:
+        raise SystemExit(1)
+    staging_parent_fd = os.open(staging_parent, directory_flags)
+    if os.fstat(staging_parent_fd).st_dev != os.fstat(parent_fd).st_dev:
+        raise SystemExit(1)
+    staging = ".stornaut-p2-gate-" + secrets.token_hex(16)
+    os.mkdir(staging, 0o700, dir_fd=staging_parent_fd)
+    base_fd = os.open(
+        staging, relative_directory_flags, dir_fd=staging_parent_fd)
+    named_base = os.stat(
+        staging, dir_fd=staging_parent_fd, follow_symlinks=False)
+    held_base = os.fstat(base_fd)
+    if ((held_base.st_dev, held_base.st_ino, held_base.st_gen)
+            != (named_base.st_dev, named_base.st_ino, named_base.st_gen)
+            or not stat.S_ISDIR(held_base.st_mode)
+            or stat.S_IMODE(held_base.st_mode) != 0o700
+            or held_base.st_uid != os.getuid()
+            or held_base.st_gid != os.getgid()):
+        raise SystemExit(1)
+    lock_fd = os.open(
+        ".owner-lock-v1", lock_flags, 0o600, dir_fd=base_fd)
+    named_lock = os.stat(
+        ".owner-lock-v1", dir_fd=base_fd, follow_symlinks=False)
+    held_lock = os.fstat(lock_fd)
+    if ((held_lock.st_dev, held_lock.st_ino, held_lock.st_gen)
+            != (named_lock.st_dev, named_lock.st_ino, named_lock.st_gen)
+            or held_lock.st_dev != held_base.st_dev
+            or not stat.S_ISREG(held_lock.st_mode)
+            or stat.S_IMODE(held_lock.st_mode) != 0o600
+            or held_lock.st_uid != os.getuid()
+            or held_lock.st_gid != os.getgid()
+            or held_lock.st_nlink != 1 or held_lock.st_size != 0
+            or sorted(os.listdir(base_fd)) != [".owner-lock-v1"]):
+        raise SystemExit(1)
+    os.fsync(lock_fd)
+    os.fsync(base_fd)
+    ctypes.set_errno(0)
+    if libc.renameatx_np(
+        staging_parent_fd, staging.encode(),
+        parent_fd, leaf.encode(), rename_flags
+    ) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+    named_base = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+    named_lock = os.stat(
+        ".owner-lock-v1", dir_fd=base_fd, follow_symlinks=False)
+    if ((held_base.st_dev, held_base.st_ino, held_base.st_gen)
+            != (named_base.st_dev, named_base.st_ino, named_base.st_gen)
+            or (held_lock.st_dev, held_lock.st_ino, held_lock.st_gen)
+                != (named_lock.st_dev, named_lock.st_ino, named_lock.st_gen)
+            or sorted(os.listdir(base_fd)) != [".owner-lock-v1"]):
+        raise SystemExit(1)
+    os.fsync(parent_fd)
+finally:
+    close_failed = False
+    for descriptor in (lock_fd, base_fd, staging_parent_fd, parent_fd):
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                close_failed = True
+    if close_failed:
+        raise SystemExit(1)
+PY
+        }
+        physical_out=$(cd "$out" && /bin/pwd -P) || exit $?
+        scratch_parent="$physical_out/persistent-create-parent"
+        scratch_base="$scratch_parent/com.eriklee.stornaut.task39-machine-gate"
+        /bin/mkdir -m 700 "$scratch_parent" || exit $?
+        create_persistent_gate "$scratch_base" "$physical_out" || exit $?
+        /usr/bin/python3 -I - "$scratch_base" <<'PY' || exit $?
+import os
+import stat
+import sys
+base = sys.argv[1]
+lock = os.path.join(base, ".owner-lock-v1")
+base_node, lock_node = os.lstat(base), os.lstat(lock)
+if (not stat.S_ISDIR(base_node.st_mode)
+        or stat.S_IMODE(base_node.st_mode) != 0o700
+        or not stat.S_ISREG(lock_node.st_mode)
+        or stat.S_IMODE(lock_node.st_mode) != 0o600
+        or lock_node.st_nlink != 1 or lock_node.st_size != 0
+        or base_node.st_dev != lock_node.st_dev
+        or os.listdir(base) != [".owner-lock-v1"]):
+    raise SystemExit(1)
+PY
+        local attack_parent="$physical_out/persistent-create-attack-parent"
+        local attack_base="$attack_parent/com.eriklee.stornaut.task39-machine-gate"
+        local attack_target="$physical_out/persistent-create-attack-target"
+        /bin/mkdir -m 700 "$attack_parent" || exit $?
+        /usr/bin/touch "$attack_target" || exit $?
+        /bin/chmod 644 "$attack_target" || exit $?
+        /bin/ln -s "$attack_target" "$attack_base" || exit $?
+        local attack_status=0
+        create_persistent_gate "$attack_base" "$physical_out" || attack_status=$?
+        (( attack_status != 0 )) || exit 1
+        [[ -L $attack_base \
+            && "$(/usr/bin/stat -f '%Lp' "$attack_target")" == 644 ]] || exit 1
+        if [[ ! -e $persistent_base && ! -L $persistent_base ]]; then
+            create_persistent_gate "$persistent_base" "$physical_out" || exit $?
+        fi
+        STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
+            /usr/bin/swift test --no-parallel \
+            --filter InvestigationMachineCampaignEvidenceTests.independentVerifierBindsExactPersistentLockOnlyGateWhenOptedIn \
+            >"$out/persistent-gate-positive.log" || exit $?
+        true
+    ) || fail_contract "ii-c-c persistent Gate positive verification failed"
     "$gate" --iic-c-source-contract-only "${paths[@]}" >"$out/source.log"
     "$gate" --iic-c-deadline-budget-contract-only >"$out/deadline-budget.log"
     "$gate" --iic-c-credential-deadline-contract-only \
