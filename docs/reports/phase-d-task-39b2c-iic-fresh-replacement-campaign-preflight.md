@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c fresh replacement campaign preflight
 
-> Status: historical preflight / v13 consumed / non-admitting / non-retryable
+> Status: v14 authorized / pending / unconsumed
 >
 > Date: 2026-09-10
 >
@@ -20,6 +20,8 @@ campaign UUID, attempt UUID or evidence root exists yet.
 Historical update: the user later authorized v13, which ran once from
 `8885161` and is now consumed/non-admitting/non-retryable after one
 closed post-arm failure. See the v13 failure disposition.
+The user has now separately authorized one fresh v14 campaign based on pushed
+authorization-hardening baseline `d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7`.
 
 ## Read-only machine state
 
@@ -83,8 +85,8 @@ release/notarization, Task 40, production Deep Dive, L3c3d or L3c4.
 ## Authorization requirement
 
 The user explicitly approved one fresh privileged replacement machine campaign
-based on pushed preflight commit
-`46e1f94a2e78b7f132a182c00c510a228a5d140f`. It is recorded as v13 only to
-distinguish it from consumed v8-v12 attempts. The authorization is pending and
+based on pushed authorization-hardening commit
+`d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7`. It is recorded as v14 only to
+distinguish it from consumed v8-v13 attempts. The authorization is pending and
 unconsumed until the authorization-only descendant is pushed and the sealed
 executable begins its unique launch.
