@@ -39,8 +39,9 @@ v12 is consumed/non-admitting/non-retryable after post-arm authorization-path de
 exhaustion; its bounded credential repair and persistent Gate P2 are complete/
 non-admitting. v13 is consumed/non-admitting/non-retryable after the closed
 post-arm `receiptInvalid/exited-82` failure; a supplemental sudo/PAM observation
-is not campaign-bound. Task 40 remains blocked until a separately
-authorized green campaign and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
+is not campaign-bound. Fresh v14 is authorized/pending/unconsumed from pushed
+authorization-only record `959ac3a`. Task 40 remains blocked until that campaign
+and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
 Inputs are:
 
 - one persisted Task 37 immutable partial/final Investigation report;

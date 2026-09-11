@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8-v13 consumed failures / persistent Gate P2 complete / v13 disposition and authorization hardening complete/non-admitting
+> Status: frozen / v8-v13 consumed failures / v14 authorized pending unconsumed
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: separately authorized green campaign -> L3c3d -> L3c4
+> Remaining order: pushed authorization-only launch seal -> one-shot v14 campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -36,6 +36,9 @@
 > authorized one fresh v13 from `46e1f94`; it ran once from descendant `8885161`,
 > recorded a closed post-arm failure near the shared deadline, and
 > is consumed/non-admitting/non-retryable. Its persistent Gate residue is intact.
+> Its disposition and authorization hardening are complete/non-admitting. The
+> user authorized one fresh v14 from `d5a7df3`; authorization-only record
+> `959ac3a` is pushed and v14 is pending/unconsumed.
 
 ## 1. Decision
 

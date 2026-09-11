@@ -13268,21 +13268,22 @@ for marker in (
     if marker not in boundary_source:
         raise SystemExit("ii-c-c v12 external evidence gate drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "eec6325129ab95d22aa4638b71a6bf890c14604c0820ad97aa59f21e714a8855"),
-    (Path("README.md"), "790ab2bf639bb1b5f14c0e6653537377097561650107cd7c124661c04141cafe"),
-    (Path("docs/README.md"), "af29446611126a702f3b6e2bdef178f37b634fa0ac255b0212b593287df9bcaa"),
-    (Path("docs/agent/coding-agent-handoff.md"), "6028f3d0c1f7fe77664ba250d82aca7aa51336a4b61b0d95cdbd64a1224c2d86"),
-    (Path("docs/plans/active/README.md"), "7f4b0ff1d6077dcee9bf9988597d61af5775ea348ff9a3511589f6e73308d7f7"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "7bc5673d15b66ad14ca85e65f3842ecbc2d42bb90e16d0c380ea9b52998f8430"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "ed33ba90a3d49d29e52bc682da53ea797c791ef387f54091f561533fa69a71ca"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "efdf3f00056b56093d8cfb02bfcd08f94c808994180694d2a48d3d0b232be1c8"),
-    (Path("docs/plans/roadmap.md"), "415c2fdaeeba56d8521be65b1e5e88365da68e16e9cac9483935c177adb8ed72"),
+    (Path("AGENTS.md"), "71fe6a76e37542cfad80f9ee34b7dc991f447f967424648a8dc1550a775d9404"),
+    (Path("README.md"), "bfab2dee0febe74fb6cc10cbc9f17cb13f52e24c423a82ee5e24d147c1fe1f25"),
+    (Path("docs/README.md"), "d2282aea4360ba048659fe54ddd9c8e383b6f784a138e1a97e2a9c7b1d43c655"),
+    (Path("docs/agent/coding-agent-handoff.md"), "c3041d54cb078ab0c5dd204ce3424a98451d0bb16d66525ee5798ff324a06aa1"),
+    (Path("docs/plans/active/README.md"), "bbe85f7323c3305c634c630b9c47ed812bd3560210d5f1ed6e80a6d3a61ab5cc"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "8c706824f598cddfb640dc9da8dcc1acea121430f2b5cef6eb7a438af127f983"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "71a2f63160b07e046a076221c9876a72da7c6ae086f6327ba693d5c81e917f6b"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "c97ca07ba75c197039e85f3cebea4ef7fab32fdedddbb6b8fdd9276e663d2987"),
+    (Path("docs/plans/roadmap.md"), "e0d5410eed05f115950a5276d071a4df34d2d5d89213731c6a0caa378df0f751"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"), "a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"), "9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "72f47237c18d0f7418e010deaccd9edd0179350f62e7952fa8f2fdb9e601e4eb"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "48b7f1cf5ed12305cd1a8df95944e5072caa407eb3a5fd447889ef7160b08347"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"), "76871d7760c7bf81a032848eb471fd632204f866cd9e4d0677f9ac98d262058e"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13300,9 +13301,10 @@ active_status_expected_paths = {
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"),
 }
 active_status_paths = [path for path, _ in active_status_entries]
-if (len(active_status_entries) != 15
+if (len(active_status_entries) != 16
         or len(set(active_status_paths)) != len(active_status_paths)
         or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
@@ -13318,6 +13320,8 @@ semantic_status = {
         "v12 machine campaign\n  已从 `212320f`", "consumed/non-admitting/non-retryable",
         "fresh v13 已从 `8885161` 唯一执行",
         "persistent Gate residue 保留",
+        "fresh v14", "authorization-only record\n  `959ac3a` 已推送",
+        "pending/unconsumed",
         "Task 40 仍 blocked",
     ),
     Path("docs/plans/active/README.md"): (
@@ -13326,6 +13330,8 @@ semantic_status = {
         "bounded credential repair and persistent Gate P1/P2 are complete/non-admitting",
         "authorized v13 campaign ran once from descendant `8885161`",
         "consumed/non-admitting/non-retryable",
+        "fresh v14 campaign based on `d5a7df3`",
+        "record `959ac3a` is pushed", "pending/unconsumed",
         "blocked on Task 39 under the approved sequential plan",
     ),
     Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
@@ -13334,6 +13340,8 @@ semantic_status = {
         "consumed replacement campaigns v9 through v12",
         "authorized v13 campaign ran once from descendant `8885161`",
         "consumed/non-admitting/non-retryable",
+        "fresh v14 campaign based on `d5a7df3`",
+        "record `959ac3a` is pushed", "pending/unconsumed",
         "Task 40 remains blocked",
     ),
     Path("docs/plans/active/task-39-implementation-brief.md"): (
@@ -13341,6 +13349,8 @@ semantic_status = {
         "consumedPostArmAuthorizationDeadlineExhaustion",
         "consumedClosedPostArmFailure",
         "authorization-window/one-attempt EOF repair are\n> complete/non-admitting",
+        "One fresh v14 is authorized from\n> `d5a7df3`",
+        "authorization-only record `959ac3a`", "pending/unconsumed",
         "Task 40 start condition remains blocked",
     ),
     Path("docs/plans/active/task-40-implementation-brief.md"): (
@@ -13348,6 +13358,8 @@ semantic_status = {
         "v12 is consumed/non-admitting/non-retryable",
         "v13 is consumed/non-admitting/non-retryable",
         "a supplemental sudo/PAM observation\nis not campaign-bound",
+        "Fresh v14 is authorized/pending/unconsumed",
+        "authorization-only record `959ac3a`",
         "blocked on pushed Task 39 Ready baseline",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"): (
@@ -13365,8 +13377,15 @@ semantic_status = {
         "Task 40 remains blocked",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"): (
-        "v13 disposition and authorization hardening complete/non-admitting",
-        "Remaining order: separately authorized green campaign -> L3c3d -> L3c4",
+        "v14 authorized pending unconsumed",
+        "Remaining order: pushed authorization-only launch seal -> one-shot v14 campaign -> L3c3d -> L3c4",
+        "authorization-only record\n> `959ac3a` is pushed and v14 is pending/unconsumed",
+    ),
+    Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"): (
+        "Status: authorized / pending / unconsumed",
+        "d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7",
+        "one fresh nonzero campaign UUID", "Once v14 durably records",
+        "No v8-v13 artifact", "Task 40 remains blocked",
     ),
 }
 for active_path, markers in semantic_status.items():
@@ -13381,7 +13400,9 @@ task39_status = " ".join(
 )
 for marker in ("v8 through v13 are conclusive",
                "consumedPostArmAuthorizationDeadlineExhaustion",
-               "consumedClosedPostArmFailure"):
+               "consumedClosedPostArmFailure",
+               "One fresh v14 is authorized from > `d5a7df3`",
+               "authorization-only record `959ac3a`"):
     if marker not in task39_status:
         raise SystemExit("ii-c-c current campaign disposition drifted")
 for stale in (
