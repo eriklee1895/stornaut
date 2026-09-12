@@ -1,6 +1,6 @@
 #!/bin/zsh -f
 set -euo pipefail
-typeset -r iicc_self_sha=2b7a1d9b22f4744feb36b3277c3882872c40d42bfd9b5a9b29eb90d79c0e3778 # iicc-self-seal
+typeset -r iicc_self_sha=75ab5e0ae3d24e011e68316501e4983538e6a27436e1bcd0655c6c6cb55d9dc0 # iicc-self-seal
 if [[ $0 != /dev/fd/9 ]]; then
     self=${0:A}
     [[ -f $self && ! -L $self ]] || exit 2
@@ -50,6 +50,10 @@ PRESERVED_GATE_ATTEMPT = "18a85048-5e1c-40c5-99e4-3785185070d3"
 PRESERVED_GATE_WHOLE = "a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104"
 PRESERVED_GATE_SIZE = 28_997
 PRESERVED_GATE_SHA256 = "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72"
+PRESERVED_V13_ATTEMPT = "a77c4d21-9bba-46f6-b694-3d1d1e55209d"
+PRESERVED_V13_WHOLE = "c484b8c14a5e70a4ee4364584013f864af30738c52494ebb727ac4fb326dfdc0"
+PRESERVED_V13_SIZE = 28_997
+PRESERVED_V13_SHA256 = "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17"
 ROOT_DRIVER_CLAIM_BYTES = 1_006
 DRIVER_COMPLETION_V3_BYTES = 180
 FIXED_DRIVER_PATH = ("/Library/Application Support/Stornaut/"
@@ -295,7 +299,7 @@ def decoded_base64(value, name, maximum=MAX_ARTIFACT):
     return decoded
 def common_json(value, role, manifest):
     version = exact_int(value["schemaVersion"], "evidence schema")
-    require((version == 1 or role == 11 and version in (2, 3))
+    require((version == 1 or role == 11 and version in (2, 3, 4))
             and value["role"] == ROLE_NAMES[role]
             and exact_uuid(value["campaignUUID"], "evidence campaign") == manifest["campaign"]
             and exact_uuid(value["attemptUUID"], "evidence attempt") == manifest["attempt"], "evidence common binding")
@@ -495,9 +499,11 @@ def validate_json_artifacts(manifest, contents):
             require(all(value[n] is True for n in {"bootoutCompleted","installedRootRemoved","installedAppRemoved","plistRemoved","runtimeRootRemoved","leaseRootRemoved"}), "uninstall absence")
         elif role == 11:
             zeros = {"appProcessCount","helperProcessCount","driverProcessCount","gateProcessCount","coordinatorProcessCount","childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount","gateAttemptEntryCount","gateCapsuleEntryCount"}
-            preserved = {"preservedGateAttemptEntryCount","preservedGateCapsuleEntryCount","preservedGateAttemptUUID","preservedGateWholeInputSHA256","preservedGateCapsuleByteCount","preservedGateCapsuleSHA256"} if value["schemaVersion"] == 2 else set()
-            persistent = {"persistentGateRelativePath","persistentGateEntryCount","persistentGateBaseDevice","persistentGateBaseInode","persistentGateBaseGeneration","persistentGateLockDevice","persistentGateLockInode","persistentGateLockGeneration","persistentGateLockByteCount","persistentGateLockExclusive"} if value["schemaVersion"] == 3 else set()
-            exact_object(value, common | zeros | preserved | persistent | {"observationReceiptSHA256","serviceAbsent","gateOwnerLockRevalidated"}, "global teardown")
+            schema = value["schemaVersion"]
+            preserved = {"preservedGateAttemptEntryCount","preservedGateCapsuleEntryCount","preservedGateAttemptUUID","preservedGateWholeInputSHA256","preservedGateCapsuleByteCount","preservedGateCapsuleSHA256"} if schema in (2, 4) else set()
+            persistent = {"persistentGateRelativePath","persistentGateEntryCount","persistentGateBaseDevice","persistentGateBaseInode","persistentGateBaseGeneration","persistentGateLockDevice","persistentGateLockInode","persistentGateLockGeneration","persistentGateLockByteCount","persistentGateLockExclusive"} if schema in (3, 4) else set()
+            preserved_nodes = {"preservedGateAttemptDevice","preservedGateAttemptInode","preservedGateAttemptGeneration","preservedGateCapsuleDevice","preservedGateCapsuleInode","preservedGateCapsuleGeneration"} if schema == 4 else set()
+            exact_object(value, common | zeros | preserved | persistent | preserved_nodes | {"observationReceiptSHA256","serviceAbsent","gateOwnerLockRevalidated"}, "global teardown")
             require(all(exact_int(value[n], n) == 0 for n in zeros) and value["serviceAbsent"] is True and value["gateOwnerLockRevalidated"] is True, "global teardown values")
             if value["schemaVersion"] == 2:
                 require(exact_int(value["preservedGateAttemptEntryCount"], "preserved attempt count") == 1
@@ -506,7 +512,7 @@ def validate_json_artifacts(manifest, contents):
                     and digest_text(value["preservedGateWholeInputSHA256"], "preserved whole input") == PRESERVED_GATE_WHOLE
                     and exact_int(value["preservedGateCapsuleByteCount"], "preserved capsule bytes") == PRESERVED_GATE_SIZE
                     and digest_text(value["preservedGateCapsuleSHA256"], "preserved capsule sha") == PRESERVED_GATE_SHA256, "preserved Gate evidence")
-            elif value["schemaVersion"] == 3:
+            elif schema == 3:
                 base_device = parse_decimal(value["persistentGateBaseDevice"], "persistent Gate base device")
                 lock_device = parse_decimal(value["persistentGateLockDevice"], "persistent Gate lock device")
                 require(value["persistentGateRelativePath"] ==
@@ -521,6 +527,32 @@ def validate_json_artifacts(manifest, contents):
                     and exact_int(value["persistentGateLockByteCount"], "persistent Gate lock bytes") == 0
                     and value["persistentGateLockExclusive"] is True,
                     "persistent Gate evidence")
+            elif schema == 4:
+                base_device = parse_decimal(value["persistentGateBaseDevice"], "persistent Gate base device")
+                require(value["persistentGateRelativePath"] ==
+                    "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
+                    and exact_int(value["persistentGateEntryCount"], "persistent Gate entry count") == 2
+                    and base_device > 0
+                    and parse_decimal(value["persistentGateBaseInode"], "persistent Gate base inode") > 0
+                    and parse_decimal(value["persistentGateBaseGeneration"], "persistent Gate base generation") >= 0
+                    and parse_decimal(value["persistentGateLockDevice"], "persistent Gate lock device") == base_device
+                    and parse_decimal(value["persistentGateLockInode"], "persistent Gate lock inode") > 0
+                    and parse_decimal(value["persistentGateLockGeneration"], "persistent Gate lock generation") >= 0
+                    and exact_int(value["persistentGateLockByteCount"], "persistent Gate lock bytes") == 0
+                    and value["persistentGateLockExclusive"] is True
+                    and exact_int(value["preservedGateAttemptEntryCount"], "preserved attempt count") == 1
+                    and exact_int(value["preservedGateCapsuleEntryCount"], "preserved capsule count") == 1
+                    and exact_uuid(value["preservedGateAttemptUUID"], "preserved attempt") == PRESERVED_V13_ATTEMPT
+                    and digest_text(value["preservedGateWholeInputSHA256"], "preserved whole input") == PRESERVED_V13_WHOLE
+                    and exact_int(value["preservedGateCapsuleByteCount"], "preserved capsule bytes") == PRESERVED_V13_SIZE
+                    and digest_text(value["preservedGateCapsuleSHA256"], "preserved capsule sha") == PRESERVED_V13_SHA256
+                    and parse_decimal(value["preservedGateAttemptDevice"], "preserved attempt device") == base_device
+                    and parse_decimal(value["preservedGateAttemptInode"], "preserved attempt inode") > 0
+                    and parse_decimal(value["preservedGateAttemptGeneration"], "preserved attempt generation") >= 0
+                    and parse_decimal(value["preservedGateCapsuleDevice"], "preserved capsule device") == base_device
+                    and parse_decimal(value["preservedGateCapsuleInode"], "preserved capsule inode") > 0
+                    and parse_decimal(value["preservedGateCapsuleGeneration"], "preserved capsule generation") >= 0,
+                    "preserved persistent Gate evidence")
             digest_text(value["observationReceiptSHA256"], "teardown receipt")
         elif role == 12:
             exact_object(value, common | {"expectedConsumed","expectedEpochCount","evidenceSetSHA256","verifierExecutableSHA256"}, "verifier input")
@@ -1506,6 +1538,89 @@ def revalidate_persistent_gate(gate, owner):
             "persistent Gate final base inventory")
     revalidate_absolute_walk(gate["base_walk"])
 
+def open_persistent_preserved_gate(owner, evidence):
+    require(owner == (501, 20), "preserved persistent Gate verifier identity")
+    account = pwd.getpwuid(owner[0])
+    home = account.pw_dir
+    require(isinstance(home, str) and home.startswith("/") and home != "/",
+            "preserved persistent Gate account home")
+    require(evidence["persistentGateRelativePath"] ==
+        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+        "preserved persistent Gate relative path")
+    base_path = canonical_absolute_path(
+        home + "/" + evidence["persistentGateRelativePath"])
+    base_fd, base_walk, base_node = open_absolute(
+        base_path, DIRECTORY_FLAGS, False)
+    attempt_fd = -1
+    held_files = []
+    try:
+        parent_fd, leaf, _, _, _ = base_node
+        named_base = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        device = named_base.st_dev
+        base_before = validate_open_fd(
+            base_fd, named_base, owner, device, 0o700, False)
+        attempt_name = "attempt-" + PRESERVED_V13_ATTEMPT
+        capsule_name = "projected-cohort-" + PRESERVED_V13_WHOLE + ".bin"
+        require(inventory(base_fd, 2) == [".owner-lock-v1", attempt_name],
+                "preserved persistent Gate base inventory")
+        lock_bytes = read_child(
+            base_fd, ".owner-lock-v1", 0, owner, device, held_files)
+        require(lock_bytes == b"", "preserved persistent Gate lock bytes")
+        lock_before = held_files[0][3]
+        require(fcntl.flock(held_files[0][2], fcntl.LOCK_EX | fcntl.LOCK_NB)
+                is None, "preserved persistent Gate owner lock")
+        named_attempt = os.stat(
+            attempt_name, dir_fd=base_fd, follow_symlinks=False)
+        attempt_fd = os.open(attempt_name, DIRECTORY_FLAGS, dir_fd=base_fd)
+        watch(attempt_fd, True)
+        attempt_before = validate_open_fd(
+            attempt_fd, named_attempt, owner, device, 0o700, False)
+        require(inventory(attempt_fd, 1) == [capsule_name],
+                "preserved persistent Gate attempt inventory")
+        capsule = read_child(
+            attempt_fd, capsule_name, PRESERVED_V13_SIZE, owner, device,
+            held_files)
+        require(len(capsule) == PRESERVED_V13_SIZE
+                and hashlib.sha256(capsule).hexdigest() == PRESERVED_V13_SHA256,
+                "preserved persistent Gate capsule bytes")
+        projected = parse_projected_input(capsule)
+        require(projected["capsule"]["attempt"] == PRESERVED_V13_ATTEMPT
+                and projected["whole"].hex() == PRESERVED_V13_WHOLE,
+                "preserved persistent Gate capsule contract")
+        require(path_identity(base_before) == (
+                    parse_decimal(evidence["persistentGateBaseDevice"], "base device"),
+                    parse_decimal(evidence["persistentGateBaseInode"], "base inode"),
+                    parse_decimal(evidence["persistentGateBaseGeneration"], "base generation"))
+                and path_identity(lock_before) == (
+                    parse_decimal(evidence["persistentGateLockDevice"], "lock device"),
+                    parse_decimal(evidence["persistentGateLockInode"], "lock inode"),
+                    parse_decimal(evidence["persistentGateLockGeneration"], "lock generation"))
+                and path_identity(attempt_before) == (
+                    parse_decimal(evidence["preservedGateAttemptDevice"], "attempt device"),
+                    parse_decimal(evidence["preservedGateAttemptInode"], "attempt inode"),
+                    parse_decimal(evidence["preservedGateAttemptGeneration"], "attempt generation"))
+                and path_identity(held_files[1][3]) == (
+                    parse_decimal(evidence["preservedGateCapsuleDevice"], "capsule device"),
+                    parse_decimal(evidence["preservedGateCapsuleInode"], "capsule inode"),
+                    parse_decimal(evidence["preservedGateCapsuleGeneration"], "capsule generation")),
+                "preserved persistent Gate evidence identity")
+        return {
+            "base_fd": base_fd, "base_walk": base_walk,
+            "base_node": base_node, "base_before": base_before,
+            "attempt_fd": attempt_fd, "attempt_name": attempt_name,
+            "attempt_before": attempt_before, "capsule_name": capsule_name,
+            "held_files": held_files, "device": device,
+        }
+    except BaseException:
+        close_descriptors([record[2] for record in reversed(held_files)])
+        if attempt_fd >= 0:
+            os.close(attempt_fd)
+        close_absolute_walk(base_walk)
+        raise
+
+def revalidate_persistent_preserved_gate(gate, owner):
+    revalidate_preserved_gate(gate, owner)
+
 def verify(root_path, seal_path, expected_self_sha, verifier_fd):
     root_path = canonical_absolute_path(root_path)
     seal_path = canonical_absolute_path(seal_path)
@@ -1517,6 +1632,7 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
     non_admitting = False
     preserved_gate = None
     persistent_gate = None
+    persistent_preserved_gate = None
     try:
         verifier_before = os.fstat(verifier_fd)
         validate_metadata(verifier_before, (os.geteuid(), os.getegid()),
@@ -1617,11 +1733,13 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
                 if teardown_schema == 2:
                     preserved_gate = open_preserved_gate(owner)
                     non_admitting = True
+                elif teardown_schema == 4:
+                    persistent_preserved_gate = open_persistent_preserved_gate(
+                        owner, values[11][0][1])
                 else:
                     require(teardown_schema == 3,
-                            "admitting persistent Gate schema")
-                    persistent_gate = open_persistent_gate(
-                        owner, values[11][0][1])
+                            "admitting preserved persistent Gate schema")
+                    non_admitting = True
             trusted_action = (values[4][0][1]["attestationKind"]
                     == "trustedOperatorInteractiveAction"
                     and values[4][0][1]["machinePromptObserved"] is True
@@ -1681,6 +1799,9 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
             revalidate_preserved_gate(preserved_gate, owner)
         if persistent_gate is not None:
             revalidate_persistent_gate(persistent_gate, owner)
+        if persistent_preserved_gate is not None:
+            revalidate_persistent_preserved_gate(
+                persistent_preserved_gate, owner)
         verifier_after = os.fstat(verifier_fd)
         require(path_identity(verifier_before) == path_identity(verifier_after)
                 and verifier_before.st_size == verifier_after.st_size
@@ -1707,6 +1828,12 @@ def verify(root_path, seal_path, expected_self_sha, verifier_fd):
                 persistent_gate["held_files"])]
             descriptors += list(reversed(
                 persistent_gate["base_walk"]["fds"]))
+        if persistent_preserved_gate is not None:
+            descriptors += [record[2] for record in reversed(
+                persistent_preserved_gate["held_files"])]
+            descriptors.append(persistent_preserved_gate["attempt_fd"])
+            descriptors += list(reversed(
+                persistent_preserved_gate["base_walk"]["fds"]))
         descriptors += list(reversed(root_walk["fds"]))
         descriptors.append(verifier_fd)
         close_descriptors(descriptors)

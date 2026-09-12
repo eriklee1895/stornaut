@@ -725,7 +725,7 @@ package enum InvestigationMachineEvidenceJSON {
         sourceBinding: InvestigationMachineCampaignSourceBinding
     ) throws {
         let acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown
-            ? [schemaVersion, 2, 3] : [schemaVersion]
+            ? [schemaVersion, 2, 3, 4] : [schemaVersion]
         try exactCommon(
             object, role: roleName(role), campaignUUID: campaignUUID,
             attemptUUID: attemptUUID,
@@ -897,7 +897,8 @@ package enum InvestigationMachineEvidenceJSON {
                 "serviceAbsent", "gateOwnerLockRevalidated",
                 "gateAttemptEntryCount", "gateCapsuleEntryCount",
             ])
-            if integer(object, "schemaVersion") == 2 {
+            let schema = integer(object, "schemaVersion")
+            if schema == 2 || schema == 4 {
                 keys.formUnion([
                     "preservedGateAttemptEntryCount",
                     "preservedGateCapsuleEntryCount",
@@ -906,7 +907,8 @@ package enum InvestigationMachineEvidenceJSON {
                     "preservedGateCapsuleByteCount",
                     "preservedGateCapsuleSHA256",
                 ])
-            } else if integer(object, "schemaVersion") == 3 {
+            }
+            if schema == 3 || schema == 4 {
                 keys.formUnion([
                     "persistentGateRelativePath",
                     "persistentGateEntryCount",
@@ -920,14 +922,26 @@ package enum InvestigationMachineEvidenceJSON {
                     "persistentGateLockExclusive",
                 ])
             }
+            if schema == 4 {
+                keys.formUnion([
+                    "preservedGateAttemptDevice",
+                    "preservedGateAttemptInode",
+                    "preservedGateAttemptGeneration",
+                    "preservedGateCapsuleDevice",
+                    "preservedGateCapsuleInode",
+                    "preservedGateCapsuleGeneration",
+                ])
+            }
             try exact(object, keys)
             guard digest(object, "observationReceiptSHA256") != nil,
                   processCounts.allSatisfy({ integer(object, $0) == 0 }),
                   boolean(object, "serviceAbsent") == true,
                   boolean(object, "gateOwnerLockRevalidated") == true
             else { throw invalid() }
-            if integer(object, "schemaVersion") == 2 {
-                let preserved = try InvestigationHistoricalGateCapsule.retainedV11()
+            if schema == 2 || schema == 4 {
+                let preserved = try schema == 2
+                    ? InvestigationHistoricalGateCapsule.retainedV11()
+                    : InvestigationHistoricalGateCapsule.retainedV13()
                 guard
                     integer(object, "preservedGateAttemptEntryCount") == 1,
                     integer(object, "preservedGateCapsuleEntryCount") == 1,
@@ -940,7 +954,8 @@ package enum InvestigationMachineEvidenceJSON {
                     digest(object, "preservedGateCapsuleSHA256")
                         == preserved.fileSHA256.lowercaseHex
                 else { throw invalid() }
-            } else if integer(object, "schemaVersion") == 3 {
+            }
+            if schema == 3 || schema == 4 {
                 let baseDevice = positiveDecimal(
                     object, "persistentGateBaseDevice")
                 let lockDevice = positiveDecimal(
@@ -948,7 +963,8 @@ package enum InvestigationMachineEvidenceJSON {
                 guard
                     string(object, "persistentGateRelativePath") ==
                         "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
-                    integer(object, "persistentGateEntryCount") == 1,
+                    integer(object, "persistentGateEntryCount")
+                        == (schema == 4 ? 2 : 1),
                     baseDevice != nil,
                     positiveDecimal(object, "persistentGateBaseInode") != nil,
                     decimal(object, "persistentGateBaseGeneration") != nil,
@@ -957,6 +973,20 @@ package enum InvestigationMachineEvidenceJSON {
                     decimal(object, "persistentGateLockGeneration") != nil,
                     integer(object, "persistentGateLockByteCount") == 0,
                     boolean(object, "persistentGateLockExclusive") == true
+                else { throw invalid() }
+            }
+            if schema == 4 {
+                guard
+                    positiveDecimal(object, "preservedGateAttemptDevice")
+                        == positiveDecimal(
+                            object, "persistentGateBaseDevice"),
+                    positiveDecimal(object, "preservedGateAttemptInode") != nil,
+                    decimal(object, "preservedGateAttemptGeneration") != nil,
+                    positiveDecimal(object, "preservedGateCapsuleDevice")
+                        == positiveDecimal(
+                            object, "persistentGateBaseDevice"),
+                    positiveDecimal(object, "preservedGateCapsuleInode") != nil,
+                    decimal(object, "preservedGateCapsuleGeneration") != nil
                 else { throw invalid() }
             }
         case .verifierInput:

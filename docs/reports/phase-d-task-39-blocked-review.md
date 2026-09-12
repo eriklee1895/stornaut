@@ -15,8 +15,9 @@
 > complete/non-admitting；persistent Gate P1/P2 later completed. Fresh v13 ran
 > once from pushed descendant `8885161` and is consumed/non-admitting/
 > non-retryable after a closed post-arm failure.
-> The user has separately authorized one fresh v14 from `d5a7df3`;
-> authorization-only record `959ac3a` is pushed and v14 is pending/unconsumed.
+> The v14 authorization from `d5a7df3` was stopped before launch by the exact
+> v13 preservation P0. It is superseded/unconsumed; the prerequisite is complete/
+> non-admitting and fresh authorization bound to the new pushed commit is required.
 > Task 39 remains incomplete
 > and Task 40 remains blocked.
 

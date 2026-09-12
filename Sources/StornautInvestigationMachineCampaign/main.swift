@@ -111,6 +111,12 @@ package struct InvestigationMachinePersistentGateIdentity:
     package let lockDevice: UInt64
     package let lockInode: UInt64
     package let lockGeneration: UInt64
+    package let preservedAttemptDevice: UInt64?
+    package let preservedAttemptInode: UInt64?
+    package let preservedAttemptGeneration: UInt64?
+    package let preservedCapsuleDevice: UInt64?
+    package let preservedCapsuleInode: UInt64?
+    package let preservedCapsuleGeneration: UInt64?
 }
 
 package enum InvestigationMachinePersistentGateObserver {
@@ -151,6 +157,33 @@ package enum InvestigationMachinePersistentGateObserver {
         }
     }
 
+    package static func observePreservingV13(basePath: String) throws
+        -> InvestigationMachinePersistentGateIdentity
+    {
+        try observeExact(basePath: basePath, preserving: .retainedV13())
+    }
+
+    package static func observePreservingV13(
+        basePath: String,
+        closeDescriptor: (Int32) -> Int32,
+        openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>? = fdopendir,
+        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32 = closedir
+    ) throws -> InvestigationMachinePersistentGateIdentity {
+        try observeExact(
+            basePath: basePath, closeDescriptor: closeDescriptor,
+            openDirectoryStream: openDirectoryStream,
+            closeDirectoryStream: closeDirectoryStream,
+            preserving: .retainedV13()
+        )
+    }
+
+    package static func observeIfPresentPreservingV13(basePath: String) throws
+        -> InvestigationMachinePersistentGateIdentity?
+    {
+        do { return try observePreservingV13(basePath: basePath) }
+        catch Error.absent { return nil }
+    }
+
     package static func observe(
         basePath: String,
         closeDescriptor: (Int32) -> Int32 = Darwin.close,
@@ -159,6 +192,20 @@ package enum InvestigationMachinePersistentGateObserver {
     ) throws
         -> InvestigationMachinePersistentGateIdentity
     {
+        try observeExact(
+            basePath: basePath, closeDescriptor: closeDescriptor,
+            openDirectoryStream: openDirectoryStream,
+            closeDirectoryStream: closeDirectoryStream, preserving: nil
+        )
+    }
+
+    private static func observeExact(
+        basePath: String,
+        closeDescriptor: (Int32) -> Int32 = Darwin.close,
+        openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>? = fdopendir,
+        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32 = closedir,
+        preserving preserved: InvestigationHistoricalGateCapsule?
+    ) throws -> InvestigationMachinePersistentGateIdentity {
         guard basePath.first == "/", !basePath.hasSuffix("/"),
               !basePath.contains("\0"),
               basePath.hasSuffix("/"
@@ -205,11 +252,14 @@ package enum InvestigationMachinePersistentGateObserver {
                 baseBefore, descriptor: base, regular: false, mode: 0o700,
                 device: baseBefore.st_dev
             )
+            let expectedBaseInventory = [".owner-lock-v1"]
+                + (preserved.map { [$0.attemptName] } ?? [])
             guard try inventory(
                 base, closeDescriptor: closeDescriptor,
                 openDirectoryStream: openDirectoryStream,
-                closeDirectoryStream: closeDirectoryStream
-            ) == [".owner-lock-v1"] else {
+                closeDirectoryStream: closeDirectoryStream,
+                maximumEntryCount: expectedBaseInventory.count
+            ) == expectedBaseInventory.sorted() else {
                 throw invalid()
             }
             let lock = openat(base, ".owner-lock-v1", lockFlags)
@@ -227,15 +277,89 @@ package enum InvestigationMachinePersistentGateObserver {
                   flock(lock, LOCK_EX | LOCK_NB) == 0
             else { throw invalid() }
 
+            var preservedAttempt: stat?
+            var preservedCapsule: stat?
+            var preservedBytes: Data?
+            var preservedAttemptDescriptor: Int32?
+            var preservedCapsuleDescriptor: Int32?
+            if let preserved {
+                let attempt = openat(base, preserved.attemptName, directoryFlags)
+                guard attempt >= 3, !descriptors.contains(attempt) else {
+                    throw posix()
+                }
+                descriptors.append(attempt)
+                let attemptNamed = try metadata(
+                    parent: base, name: preserved.attemptName)
+                let attemptHeld = try metadata(attempt)
+                try validatePrivateNode(
+                    attemptHeld, descriptor: attempt, regular: false, mode: 0o700,
+                    device: baseBefore.st_dev
+                )
+                guard sameNode(attemptNamed, attemptHeld),
+                      try inventory(
+                        attempt, closeDescriptor: closeDescriptor,
+                        openDirectoryStream: openDirectoryStream,
+                        closeDirectoryStream: closeDirectoryStream
+                      ) == [preserved.capsuleName]
+                else { throw invalid() }
+
+                let capsule = openat(attempt, preserved.capsuleName, lockFlags)
+                guard capsule >= 3, !descriptors.contains(capsule) else {
+                    throw posix()
+                }
+                descriptors.append(capsule)
+                let capsuleNamed = try metadata(
+                    parent: attempt, name: preserved.capsuleName)
+                let capsuleHeld = try metadata(capsule)
+                try validatePrivateNode(
+                    capsuleHeld, descriptor: capsule, regular: true, mode: 0o600,
+                    device: baseBefore.st_dev
+                )
+                guard sameNode(capsuleNamed, capsuleHeld),
+                      capsuleHeld.st_nlink == 1,
+                      capsuleHeld.st_size == preserved.byteCount,
+                      descriptorState(capsule, access: O_RDONLY)
+                else { throw invalid() }
+                let bytes = try exactBytes(
+                    capsule, count: Int(preserved.byteCount)
+                )
+                guard
+                      InvestigationHandoffSHA256.hashing(bytes)
+                        == preserved.fileSHA256,
+                      let projected = try? InvestigationProjectedCohortInput
+                        .decode(bytes),
+                      projected.capsule.outerAttemptUUID
+                        == preserved.outerAttemptUUID,
+                      projected.wholeInputSHA256 == preserved.wholeInputSHA256
+                else { throw invalid() }
+                preservedAttempt = attemptHeld
+                preservedCapsule = capsuleHeld
+                preservedBytes = bytes
+                preservedAttemptDescriptor = attempt
+                preservedCapsuleDescriptor = capsule
+            }
+
+            let baseAfter = try metadata(base)
+            let lockAfter = try metadata(lock)
+            try validatePrivateNode(
+                baseAfter, descriptor: base, regular: false, mode: 0o700,
+                device: baseBefore.st_dev
+            )
+            try validatePrivateNode(
+                lockAfter, descriptor: lock, regular: true, mode: 0o600,
+                device: baseBefore.st_dev
+            )
             guard try inventory(
                 base, closeDescriptor: closeDescriptor,
                 openDirectoryStream: openDirectoryStream,
-                closeDirectoryStream: closeDirectoryStream
-            ) == [".owner-lock-v1"],
-                  sameNode(baseBefore, try metadata(base)),
+                closeDirectoryStream: closeDirectoryStream,
+                maximumEntryCount: expectedBaseInventory.count
+            ) == expectedBaseInventory.sorted(),
+                  sameNode(baseBefore, baseAfter),
                   sameNode(baseBefore, try metadata(
                     parent: nodes.last!.parent, name: nodes.last!.name)),
-                  sameNode(lockBefore, try metadata(lock)),
+                  sameNode(lockBefore, lockAfter), lockAfter.st_nlink == 1,
+                  lockAfter.st_size == 0,
                   sameNode(lockBefore, try metadata(
                     parent: base, name: ".owner-lock-v1"))
             else { throw invalid() }
@@ -245,13 +369,51 @@ package enum InvestigationMachinePersistentGateObserver {
                         parent: node.parent, name: node.name))
                 else { throw invalid() }
             }
+            if let preserved, let attemptBefore = preservedAttempt,
+               let capsuleBefore = preservedCapsule,
+               let expectedBytes = preservedBytes,
+               let attempt = preservedAttemptDescriptor,
+               let capsule = preservedCapsuleDescriptor
+            {
+                let attemptAfter = try metadata(attempt)
+                let capsuleAfter = try metadata(capsule)
+                try validatePrivateNode(
+                    attemptAfter, descriptor: attempt, regular: false, mode: 0o700,
+                    device: baseBefore.st_dev
+                )
+                try validatePrivateNode(
+                    capsuleAfter, descriptor: capsule, regular: true, mode: 0o600,
+                    device: baseBefore.st_dev
+                )
+                guard sameNode(attemptBefore, attemptAfter),
+                      sameNode(attemptBefore, try metadata(
+                        parent: base, name: preserved.attemptName)),
+                      sameNode(capsuleBefore, capsuleAfter),
+                      capsuleBefore.st_size == capsuleAfter.st_size,
+                      sameNode(capsuleBefore, try metadata(
+                        parent: attempt, name: preserved.capsuleName)),
+                      try exactBytes(capsule, count: expectedBytes.count)
+                        == expectedBytes,
+                      try inventory(
+                        attempt, closeDescriptor: closeDescriptor,
+                        openDirectoryStream: openDirectoryStream,
+                        closeDirectoryStream: closeDirectoryStream
+                      ) == [preserved.capsuleName]
+                else { throw invalid() }
+            }
             return InvestigationMachinePersistentGateIdentity(
                 baseDevice: UInt64(baseBefore.st_dev),
                 baseInode: UInt64(baseBefore.st_ino),
                 baseGeneration: UInt64(baseBefore.st_gen),
                 lockDevice: UInt64(lockBefore.st_dev),
                 lockInode: UInt64(lockBefore.st_ino),
-                lockGeneration: UInt64(lockBefore.st_gen)
+                lockGeneration: UInt64(lockBefore.st_gen),
+                preservedAttemptDevice: preservedAttempt.map { UInt64($0.st_dev) },
+                preservedAttemptInode: preservedAttempt.map { UInt64($0.st_ino) },
+                preservedAttemptGeneration: preservedAttempt.map { UInt64($0.st_gen) },
+                preservedCapsuleDevice: preservedCapsule.map { UInt64($0.st_dev) },
+                preservedCapsuleInode: preservedCapsule.map { UInt64($0.st_ino) },
+                preservedCapsuleGeneration: preservedCapsule.map { UInt64($0.st_gen) }
             )
         }
     }
@@ -288,7 +450,8 @@ package enum InvestigationMachinePersistentGateObserver {
         _ descriptor: Int32,
         closeDescriptor: (Int32) -> Int32,
         openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>?,
-        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32
+        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32,
+        maximumEntryCount: Int = 1
     ) throws -> [String] {
         let enumeration = openat(descriptor, ".", directoryFlags)
         guard enumeration >= 3 else { throw posix() }
@@ -300,7 +463,7 @@ package enum InvestigationMachinePersistentGateObserver {
         var names: [String] = []
         let outcome: Result<[String], Swift.Error>
         do {
-            while names.count <= 1 {
+            while names.count <= maximumEntryCount {
                 errno = 0
                 guard let entry = readdir(directory) else {
                     guard errno == 0 else { throw posix() }
@@ -309,7 +472,7 @@ package enum InvestigationMachinePersistentGateObserver {
                 let name = try directoryEntryName(entry)
                 if name != "." && name != ".." { names.append(name) }
             }
-            guard names.count <= 1 else { throw invalid() }
+            guard names.count <= maximumEntryCount else { throw invalid() }
             outcome = .success(names.sorted())
         } catch {
             outcome = .failure(error)
@@ -317,6 +480,30 @@ package enum InvestigationMachinePersistentGateObserver {
         let closeResult = closeDirectoryStream(directory)
         guard closeResult == 0 else { throw invalid() }
         return try outcome.get()
+    }
+
+    private static func exactBytes(_ descriptor: Int32, count: Int) throws
+        -> Data
+    {
+        guard count > 0 else { throw invalid() }
+        var bytes = Data(count: count)
+        var offset = 0
+        while offset < count {
+            let readCount = bytes.withUnsafeMutableBytes { buffer in
+                pread(
+                    descriptor, buffer.baseAddress!.advanced(by: offset),
+                    count - offset, off_t(offset)
+                )
+            }
+            if readCount < 0, errno == EINTR { continue }
+            guard readCount > 0 else { throw posix() }
+            offset += readCount
+        }
+        var trailing: UInt8 = 0
+        guard pread(descriptor, &trailing, 1, off_t(count)) == 0 else {
+            throw invalid()
+        }
+        return bytes
     }
 
     private static func directoryEntryName(
@@ -595,11 +782,18 @@ package enum InvestigationMachineCampaignExecutable {
         private struct GlobalObservation {
             let processCounts: [Int]
             let persistentGate: InvestigationMachinePersistentGateIdentity?
+            let preservedGate: InvestigationHistoricalGateCapsule?
             var canonicalObject: [String: Any] {
+                let gateState: String
+                if let persistentGate {
+                    gateState = persistentGate.preservedAttemptInode == nil
+                        ? "ownerLockOnly" : "ownerLockAndPreservedV13"
+                } else {
+                    gateState = "absentBeforeHandoff"
+                }
                 var value: [String: Any] = [
                     "processCounts": processCounts,
-                    "persistentGateState": persistentGate == nil
-                        ? "absentBeforeHandoff" : "ownerLockOnly",
+                    "persistentGateState": gateState,
                 ]
                 if let persistentGate {
                     value["persistentGateRelativePath"] =
@@ -616,6 +810,41 @@ package enum InvestigationMachineCampaignExecutable {
                         String(persistentGate.lockInode)
                     value["persistentGateLockGeneration"] =
                         String(persistentGate.lockGeneration)
+                    value["preservedV13Present"] =
+                        persistentGate.preservedAttemptInode != nil
+                    if let preserved = preservedGate,
+                       let attemptDevice =
+                        persistentGate.preservedAttemptDevice,
+                       let attemptInode = persistentGate.preservedAttemptInode,
+                       let attemptGeneration =
+                        persistentGate.preservedAttemptGeneration,
+                       let capsuleDevice =
+                        persistentGate.preservedCapsuleDevice,
+                       let capsuleInode = persistentGate.preservedCapsuleInode,
+                       let capsuleGeneration =
+                        persistentGate.preservedCapsuleGeneration
+                    {
+                        value["preservedGateAttemptUUID"] =
+                            preserved.outerAttemptUUID.uuidString.lowercased()
+                        value["preservedGateWholeInputSHA256"] =
+                            preserved.wholeInputSHA256.lowercaseHex
+                        value["preservedGateCapsuleByteCount"] =
+                            Int(preserved.byteCount)
+                        value["preservedGateCapsuleSHA256"] =
+                            preserved.fileSHA256.lowercaseHex
+                        value["preservedGateAttemptDevice"] = String(
+                            attemptDevice)
+                        value["preservedGateAttemptInode"] = String(
+                            attemptInode)
+                        value["preservedGateAttemptGeneration"] = String(
+                            attemptGeneration)
+                        value["preservedGateCapsuleDevice"] = String(
+                            capsuleDevice)
+                        value["preservedGateCapsuleInode"] = String(
+                            capsuleInode)
+                        value["preservedGateCapsuleGeneration"] = String(
+                            capsuleGeneration)
+                    }
                 }
                 return value
             }
@@ -1356,6 +1585,16 @@ package enum InvestigationMachineCampaignExecutable {
             guard let persistentGate = global.persistentGate else {
                 throw Failure.invalid
             }
+            let preserved = try InvestigationHistoricalGateCapsule.retainedV13()
+            guard let attemptDevice = persistentGate.preservedAttemptDevice,
+                  let attemptInode = persistentGate.preservedAttemptInode,
+                  let attemptGeneration =
+                    persistentGate.preservedAttemptGeneration,
+                  let capsuleDevice = persistentGate.preservedCapsuleDevice,
+                  let capsuleInode = persistentGate.preservedCapsuleInode,
+                  let capsuleGeneration =
+                    persistentGate.preservedCapsuleGeneration
+            else { throw Failure.invalid }
             var un:[String:Any]=["transactionReceiptSHA256":Self.digest(try Self.canonical(uninstall)),
                 "bootoutCompleted":true,"installedRootRemoved":true,"installedAppRemoved":true,
                 "plistRemoved":true,"runtimeRootRemoved":true,"leaseRootRemoved":true]
@@ -1377,7 +1616,7 @@ package enum InvestigationMachineCampaignExecutable {
                 "serviceAbsent":true,"gateOwnerLockRevalidated":true,"gateAttemptEntryCount":0,
                 "gateCapsuleEntryCount":0,
                 "persistentGateRelativePath":InvestigationMachinePersistentGateIdentity.relativePath,
-                "persistentGateEntryCount":1,
+                "persistentGateEntryCount":2,
                 "persistentGateBaseDevice":String(persistentGate.baseDevice),
                 "persistentGateBaseInode":String(persistentGate.baseInode),
                 "persistentGateBaseGeneration":String(persistentGate.baseGeneration),
@@ -1385,9 +1624,23 @@ package enum InvestigationMachineCampaignExecutable {
                 "persistentGateLockInode":String(persistentGate.lockInode),
                 "persistentGateLockGeneration":String(persistentGate.lockGeneration),
                 "persistentGateLockByteCount":0,
-                "persistentGateLockExclusive":true],
+                "persistentGateLockExclusive":true,
+                "preservedGateAttemptEntryCount":1,
+                "preservedGateCapsuleEntryCount":1,
+                "preservedGateAttemptUUID":
+                    preserved.outerAttemptUUID.uuidString.lowercased(),
+                "preservedGateWholeInputSHA256":
+                    preserved.wholeInputSHA256.lowercaseHex,
+                "preservedGateCapsuleByteCount":Int(preserved.byteCount),
+                "preservedGateCapsuleSHA256":preserved.fileSHA256.lowercaseHex,
+                "preservedGateAttemptDevice":String(attemptDevice),
+                "preservedGateAttemptInode":String(attemptInode),
+                "preservedGateAttemptGeneration":String(attemptGeneration),
+                "preservedGateCapsuleDevice":String(capsuleDevice),
+                "preservedGateCapsuleInode":String(capsuleInode),
+                "preservedGateCapsuleGeneration":String(capsuleGeneration)],
                 role:.globalPostTeardown,phase:.verifier,
-                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3)
+                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4)
             try writeJSON(["expectedConsumed":expectedConsumed,
                 "expectedEpochCount":expectedEpochCount,
                 "evidenceSetSHA256":preArm.frameSHA256.lowercaseHex,
@@ -1481,10 +1734,15 @@ package enum InvestigationMachineCampaignExecutable {
             let persistentGate: InvestigationMachinePersistentGateIdentity?
             persistentGate = allowAbsentGate
                 ? try InvestigationMachinePersistentGateObserver
-                    .observeIfPresent(basePath: base)
+                    .observeIfPresentPreservingV13(basePath: base)
                 : try InvestigationMachinePersistentGateObserver
-                    .observe(basePath: base)
-            return .init(processCounts: counts, persistentGate: persistentGate)}
+                    .observePreservingV13(basePath: base)
+            let preservedGate = persistentGate?.preservedAttemptInode == nil
+                ? nil : try InvestigationHistoricalGateCapsule.retainedV13()
+            return .init(
+                processCounts: counts, persistentGate: persistentGate,
+                preservedGate: preservedGate
+            )}
 
         nonisolated var isBootstrapInvocation: Bool {
             CommandLine.argc == 1 && getpid() > 1 && getsid(0) == getpid()

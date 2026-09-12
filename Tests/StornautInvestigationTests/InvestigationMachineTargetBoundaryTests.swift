@@ -341,11 +341,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 lifecycle call-graph drifted",
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
-            "36dc7c69822a26458443d1964074931fb4ad5c4dc2febaef7b74725413559f29",
+            "46dc6df47dbb80116dfce4443ec3f3fa6cb696b78404d62549a910610c6d9aca",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
-            "fccd0d7ca2cf0202b9bb9351fa58701e614461a62bd90f282973d20dd5ad8d2e",
+            "6a9dfdc4744e3869b3acee1647d664b748c61e15d96e2eaddcdb81a1805fc0df",
             "require_body_digest(",
             "fea0c249566d0f57babb384980713873ed4a303e7943e5490d25d01e1357215c",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
@@ -645,7 +645,8 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(evidenceTests.contains(
             "independentVerifierRejectsAdmittingSchemaOneTeardown"
         ))
-        #expect(verifier.contains("admitting persistent Gate schema"))
+        #expect(verifier.contains(
+            "admitting preserved persistent Gate schema"))
         for forbidden in [
             "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
             "os.remove", "os.unlink", "os.rename", "os.mkdir",
@@ -660,7 +661,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "production-preservation-regression", "producer-schema-downgrade",
             "producer-cache-path", "producer-inventory-bypass",
             "producer-lock-bypass", "producer-close-bypass",
-            "swift-schema-three-drop",
+            "swift-schema-four-drop",
             "swift-lock-exclusive-bypass", "verifier-admission-downgrade",
             "verifier-path-regression", "verifier-lock-bypass",
             "verifier-identity-bypass", "verifier-revalidation-bypass",
@@ -707,7 +708,7 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
-    func iiCCPersistentGateSchemaV3AdmissionContractIsClosed() throws {
+    func iiCCPersistentGateSchemaV4AdmissionContractIsClosed() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let campaign = try String(contentsOf: root.appending(path:
@@ -722,23 +723,44 @@ struct InvestigationMachineTargetBoundaryTests {
         let coordinator = try String(contentsOf: root.appending(path:
             "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift"),
             encoding: .utf8)
+        let handoff = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift"),
+            encoding: .utf8)
+        let physical = try String(contentsOf: root.appending(path:
+            "Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift"),
+            encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift"),
+            encoding: .utf8)
         for marker in [
             "InvestigationMachinePersistentGateObserver",
             "observeIfPresent(basePath: String)",
             "persistentGateRelativePath", "persistentGateBaseDevice",
             "persistentGateLockInode", "persistentGateLockExclusive",
-            "schemaVersion:3",
+            "schemaVersion:4",
         ] { #expect(campaign.contains(marker), "missing: \(marker)") }
-        #expect(evidence.contains("? [schemaVersion, 2, 3]"))
+        #expect(evidence.contains("? [schemaVersion, 2, 3, 4]"))
         for marker in [
             "def open_persistent_gate(owner, evidence):",
             "def revalidate_persistent_gate(gate, owner):",
-            "admitting persistent Gate schema",
+            "admitting preserved persistent Gate schema",
             "persistent Gate base inventory",
         ] { #expect(verifier.contains(marker), "missing: \(marker)") }
-        #expect(coordinator.contains("InvestigationFixedGateHandoff().run("))
-        #expect(!coordinator.contains(
-            "preservedCapsules: [try .retainedV11()]"))
+        #expect(contract.contains("static func retainedV13() throws -> Self"))
+        #expect(coordinator.contains(
+            "productionProfile: .replacementAfterV13"))
+        #expect(!coordinator.contains("preservedCapsules:"))
+        #expect(!coordinator.contains("InvestigationFixedGateHandoff()"))
+        #expect(!handoff.contains("package convenience init()"))
+        #expect(handoff.contains(
+            "#if STORNAUT_FIXED_GATE_PHYSICAL_FIXTURE"))
+        #expect(handoff.contains(
+            "physicalFixtureProfile: InvestigationFixedGateHandoffPhysicalFixtureProfile"))
+        #expect(physical.contains(
+            "-DSTORNAUT_FIXED_GATE_PHYSICAL_FIXTURE"))
+        #expect(campaign.contains("observePreservingV13(basePath: base)"))
+        #expect(campaign.contains("schemaVersion:4"))
+        #expect(verifier.contains("admitting preserved persistent Gate schema"))
     }
 
     @Test
@@ -871,22 +893,22 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"71fe6a76e37542cfad80f9ee34b7dc991f447f967424648a8dc1550a775d9404\")",
-            "(Path(\"README.md\"), \"bfab2dee0febe74fb6cc10cbc9f17cb13f52e24c423a82ee5e24d147c1fe1f25\")",
-            "(Path(\"docs/README.md\"), \"d2282aea4360ba048659fe54ddd9c8e383b6f784a138e1a97e2a9c7b1d43c655\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"c3041d54cb078ab0c5dd204ce3424a98451d0bb16d66525ee5798ff324a06aa1\")",
-            "(Path(\"docs/plans/active/README.md\"), \"bbe85f7323c3305c634c630b9c47ed812bd3560210d5f1ed6e80a6d3a61ab5cc\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"8c706824f598cddfb640dc9da8dcc1acea121430f2b5cef6eb7a438af127f983\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"71a2f63160b07e046a076221c9876a72da7c6ae086f6327ba693d5c81e917f6b\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"c97ca07ba75c197039e85f3cebea4ef7fab32fdedddbb6b8fdd9276e663d2987\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"e0d5410eed05f115950a5276d071a4df34d2d5d89213731c6a0caa378df0f751\")",
+            "(Path(\"AGENTS.md\"), \"2ac3cf6080896018a53dcbe4870a423bef83afd6d9309f9f8ae5f752030c9903\")",
+            "(Path(\"README.md\"), \"436c9a02cb477d794ebcf5068a0e7fbb38b7a200f642c1d902ed32e97920cda3\")",
+            "(Path(\"docs/README.md\"), \"8b465ae19e5e3ca46b2e112a744ac67d40afb73450de256165ae0b43063b3429\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"d422b9a47e4bd61496451bf09e13b63c6ba32c5c6ce37a8b72e16e581e6d93df\")",
+            "(Path(\"docs/plans/active/README.md\"), \"db4fd7e70a7c25072cf4573fd501e817358d645db1aed6f3b8c5cf249838bb9a\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"517b84d6daca2aad763dc25bf2bb3f61907a5a2f62f2e627850342cfe93ed7a0\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"6e03dc6529e2ac18e12321773bc9019f65e2ea134c2abb24d70a617f3e51d199\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"32f3f55eccb21df314329e836e72775143f1316b0dfa5940a32579c40a9da222\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"55c065018f6e8f68992f79fc9971a28ec3005dad79e3b9021df0f83a4ba04cc1\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md\"), \"9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"48b7f1cf5ed12305cd1a8df95944e5072caa407eb3a5fd447889ef7160b08347\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md\"), \"76871d7760c7bf81a032848eb471fd632204f866cd9e4d0677f9ac98d262058e\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"3a000d68ef99c670f5b29f02b5f585f262970e879035b97733efaca41c43dbf4\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md\"), \"e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb\")",
             "len(active_status_entries) != 16",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
@@ -901,11 +923,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "v13 is consumed/non-admitting/non-retryable",
             "authorization-window/one-attempt EOF repair are\\n> complete/non-admitting",
             "a supplemental sudo/PAM observation\\nis not campaign-bound",
-            "v14 authorized pending unconsumed",
-            "Remaining order: pushed authorization-only launch seal -> one-shot v14 campaign -> L3c3d -> L3c4",
-            "Status: authorized / pending / unconsumed",
-            "One fresh v14 is authorized from > `d5a7df3`",
-            "authorization-only record `959ac3a`",
+            "preservation prerequisite complete / fresh reauthorization required",
+            "Remaining order: push preservation prerequisite -> fresh authorization -> one-shot campaign -> L3c3d -> L3c4",
+            "Status: superseded before launch / unconsumed / reauthorization required",
+            "v14 authorization based on `d5a7df3` was stopped before launch",
+            "fresh authorization > bound to its pushed commit is required",
             "ii-c-c v13 supplemental observation became causal",
             "Task 40 start condition remains blocked",
         ]

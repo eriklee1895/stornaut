@@ -21,8 +21,10 @@
 > non-admitting/non-retryable. Its persistent Gate residue remains intact; the
 > checked disposition and authorization-window/one-attempt EOF repair are
 > complete/non-admitting.
-> The user authorized one fresh v14 campaign based on `d5a7df3`; authorization-
-> only record `959ac3a` is pushed and v14 is pending/unconsumed.
+> The v14 authorization based on `d5a7df3` was stopped before launch by the
+> exact v13 preservation P0. It remains unconsumed but is superseded; the
+> preservation prerequisite is complete/non-admitting and fresh authorization
+> bound to its pushed commit is required.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -227,9 +229,10 @@
 > descendant `8885161`; it is consumed/non-admitting/non-retryable after a
 > closed post-arm failure. The checked classification is
 > `consumedClosedPostArmFailure`; its failure disposition and authorization
-> hardening repair are complete/non-admitting. One fresh v14 is authorized from
-> `d5a7df3`, with pushed authorization-only record `959ac3a`; it is
-> pending/unconsumed. Task 39 is
+> hardening repair are complete/non-admitting. The v14 authorization from
+> `d5a7df3` was stopped before launch, remains unconsumed but is superseded;
+> the exact-v13 preservation prerequisite is complete/non-admitting and fresh
+> authorization bound to its pushed commit is required. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential

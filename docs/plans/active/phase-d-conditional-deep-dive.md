@@ -12,8 +12,10 @@
 > is consumed/non-admitting/non-retryable. Its persistent Gate residue is intact;
 > the v13 disposition plus authorization-window/one-attempt EOF repair are
 > complete/non-admitting.
-> The user authorized one fresh v14 campaign based on `d5a7df3`; authorization-
-> only record `959ac3a` is pushed and v14 is pending/unconsumed.
+> The v14 authorization based on `d5a7df3` was stopped before launch by the
+> exact v13 preservation P0. It remains unconsumed but is superseded; the
+> preservation prerequisite is complete/non-admitting and fresh authorization
+> bound to its pushed commit is required.
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is

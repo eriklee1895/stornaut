@@ -96,7 +96,9 @@ private struct Main {
         let attemptURL = attemptDirectoryURL(outerAttemptUUID)
         var report: FixtureReport
         do {
-            let receipt = try InvestigationFixedGateHandoff().run(
+            let receipt = try InvestigationFixedGateHandoff(
+                physicalFixtureProfile: .emptyGate
+            ).run(
                 canonicalProjectedInput: canonicalInput
             )
             report = FixtureReport(

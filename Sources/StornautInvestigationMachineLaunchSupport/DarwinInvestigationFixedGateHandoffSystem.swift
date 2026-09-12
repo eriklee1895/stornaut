@@ -4,15 +4,43 @@ import StornautInvestigationHandoffContract
 import StornautInvestigationMachineGateSupport
 
 #if DEBUG
+package enum InvestigationFixedGateHandoffProductionProfile: Sendable {
+    case replacementAfterV13
+}
+
 extension InvestigationFixedGateHandoff {
     package convenience init(
-        preservedCapsules: [InvestigationHistoricalGateCapsule] = []
+        productionProfile: InvestigationFixedGateHandoffProductionProfile
     ) throws {
+        let preservedCapsules: [InvestigationHistoricalGateCapsule]
+        switch productionProfile {
+        case .replacementAfterV13:
+            preservedCapsules = [try .retainedV13()]
+        }
         self.init(system: try DarwinInvestigationFixedGateHandoffSystem(
             preservedCapsules: preservedCapsules
         ))
     }
 }
+
+#if STORNAUT_FIXED_GATE_PHYSICAL_FIXTURE
+package enum InvestigationFixedGateHandoffPhysicalFixtureProfile: Sendable {
+    case emptyGate
+}
+
+extension InvestigationFixedGateHandoff {
+    package convenience init(
+        physicalFixtureProfile: InvestigationFixedGateHandoffPhysicalFixtureProfile
+    ) throws {
+        switch physicalFixtureProfile {
+        case .emptyGate:
+            self.init(system: try DarwinInvestigationFixedGateHandoffSystem(
+                preservedCapsules: []
+            ))
+        }
+    }
+}
+#endif
 
 enum InvestigationFixedGateDarwinProjectionStage: Sendable {
     case initial, published, spawned, prepared, stopped, continued

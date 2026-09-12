@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=2290f8c4e2d930ec53308f6d54724903c4da6bd4e2c66842e62fa3255b48f4f9
+# ib2_self_sha=d75d1e8048561881392fd8d005ff8fd6698c217d36e445a4cb4de24157077896
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3830,42 +3830,44 @@ slots = ("contract","capsule","ownership","handoff","coordinator",
     "boundary_tests","verifier")
 mutations = (
     ("production-preservation-regression", "coordinator",
-     "let value = try InvestigationFixedGateHandoff().run(",
-     "let value = try InvestigationFixedGateHandoff("
-     "preservedCapsules: [try .retainedV11()]).run("),
+     "let value = try InvestigationFixedGateHandoff(\n"
+     "            productionProfile: .replacementAfterV13\n"
+     "          ).run(",
+     "let value = try InvestigationFixedGateHandoff().run("),
     ("producer-schema-downgrade", "campaign",
-     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3',
-     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:2'),
+     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4',
+     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3'),
     ("producer-cache-path", "campaign",
      '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
      '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
     ("producer-inventory-bypass", "campaign",
-     'guard try inventory(\n                base, closeDescriptor: closeDescriptor,\n                openDirectoryStream: openDirectoryStream,\n                closeDirectoryStream: closeDirectoryStream\n            ) == [".owner-lock-v1"] else {',
-     'guard true else {'),
+     '+ (preserved.map { [$0.attemptName] } ?? [])',
+     '+ []'),
     ("producer-lock-bypass", "campaign",
      "flock(lock, LOCK_EX | LOCK_NB) == 0", "true"),
     ("producer-close-bypass", "campaign",
      "guard closeAll(&descriptors, using: closeDescriptor) else {",
      "guard true else { throw invalid() }"),
-    ("swift-schema-three-drop", "evidence",
-     "? [schemaVersion, 2, 3]", "? [schemaVersion, 2]"),
+    ("swift-schema-four-drop", "evidence",
+     "? [schemaVersion, 2, 3, 4]", "? [schemaVersion, 2, 3]"),
     ("swift-lock-exclusive-bypass", "evidence",
      'boolean(object, "persistentGateLockExclusive") == true', "true"),
     ("verifier-admission-downgrade", "verifier",
-     "require(teardown_schema == 3,",
-     "require(teardown_schema == 2,"),
+     "elif teardown_schema == 4:",
+     "elif teardown_schema == 3:"),
     ("verifier-path-regression", "verifier",
-     'home + "/" + evidence["persistentGateRelativePath"]',
-     'home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+     '"preserved persistent Gate relative path")\n    base_path = canonical_absolute_path(\n        home + "/" + evidence["persistentGateRelativePath"])',
+     '"preserved persistent Gate relative path")\n    base_path = canonical_absolute_path(\n        home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate")'),
     ("verifier-lock-bypass", "verifier",
-     'fcntl.flock(lock_record[2], fcntl.LOCK_EX | fcntl.LOCK_NB) is None',
+     'fcntl.flock(held_files[0][2], fcntl.LOCK_EX | fcntl.LOCK_NB)\n                is None',
      "True"),
     ("verifier-identity-bypass", "verifier",
-     "require(path_identity(base_before) == expected_base\n"
-     "                and path_identity(lock_before) == expected_lock,",
+     "require(path_identity(base_before) == (\n"
+     "                    parse_decimal(evidence[\"persistentGateBaseDevice\"], \"base device\"),",
      "require(True,"),
     ("verifier-revalidation-bypass", "verifier",
-     "revalidate_persistent_gate(persistent_gate, owner)", "pass"),
+     "revalidate_persistent_preserved_gate(\n"
+     "                persistent_preserved_gate, owner)", "pass"),
 )
 with (out / "preserved-capsule-mutations").open("w") as manifest:
     for name, slot, old, new in mutations:
@@ -4065,7 +4067,7 @@ PY
         if [[ $persistent_inventory == .owner-lock-v1 ]]; then
             STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
                 /usr/bin/swift test --no-parallel \
-                --filter InvestigationMachineCampaignEvidenceTests.independentVerifierBindsExactPersistentLockOnlyGateWhenOptedIn \
+                --filter InvestigationMachineCampaignEvidenceTests.independentVerifierReadsButDoesNotAdmitPersistentLockOnlyGate \
                 >"$out/persistent-gate-positive.log" || exit $?
         elif [[ $persistent_inventory == $'.owner-lock-v1\nattempt-a77c4d21-9bba-46f6-b694-3d1d1e55209d' ]]; then
             local v13_root
@@ -4081,6 +4083,10 @@ PY
             scripts/verify-investigation-runtime-machine-failure \
                 "$v13_root" \
                 "$PWD/docs/reports/evidence/task-39-iic-v13-failure-disposition.json" \
+                >"$out/persistent-gate-v13-failure.log" || exit $?
+            STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
+                /usr/bin/swift test --no-parallel \
+                --filter InvestigationMachineCampaignEvidenceTests.independentVerifierAdmitsOnlySchemaFourWithExactPreservedV13Gate \
                 >"$out/persistent-gate-positive.log" || exit $?
         else
             print -u2 "ii-c-c persistent Gate current-state verification unavailable"

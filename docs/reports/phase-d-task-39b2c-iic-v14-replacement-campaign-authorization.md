@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c-c v14 replacement campaign authorization
 
-> Status: authorized / pending / unconsumed
+> Status: superseded before launch / unconsumed / reauthorization required
 >
 > Authorized source baseline: `d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7`
 >
@@ -74,3 +74,15 @@ launched exactly once from an interactive controlling Terminal.
 
 No campaign UUID, attempt UUID or evidence root exists at authorization time.
 All are generated and durably bound only by the unique executable launch.
+
+## Pre-arm suspension
+
+The launch seal `e717b586cb430d1866249ddb13ac2d04e81e6519` was never
+executed. A read-only pre-arm inspection found that its production coordinator
+would not preserve the exact v13 Application Support Gate capsule. Launching it
+would have violated the historical-evidence boundary above. No campaign UUID,
+attempt UUID, launch claim, install, sudo invocation or root action occurred.
+
+The authorization is therefore unconsumed but superseded by the required
+preservation prerequisite. It cannot be transferred to changed source. A fresh
+explicit authorization bound to the pushed prerequisite commit is required.

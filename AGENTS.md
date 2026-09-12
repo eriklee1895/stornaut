@@ -458,8 +458,10 @@ Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift �
   consumed/non-admitting/non-retryable，persistent Gate residue 保留；补充
   unified log 不作 campaign-bound claim。120 秒 authorization sub-deadline
   与 one-attempt EOF repair 已完成/non-admitting。
-  用户已批准基于 `d5a7df3` 的 fresh v14；authorization-only record
-  `959ac3a` 已推送，当前 pending/unconsumed。
+  用户曾批准基于 `d5a7df3` 的 fresh v14，但 launch seal `e717b58`
+  在任何 root action、campaign/attempt UUID 或 launch claim 之前发现 exact
+  v13 capsule preservation P0；该授权未消费但已 superseded。preservation
+  prerequisite 已实现/non-admitting，必须基于其新 pushed commit 重新授权。
   Task 39 仍 incomplete，Task 40 仍 blocked。
   spawn/transfer uncertainty 不得
   settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
@@ -968,8 +970,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   Gate P1/P2 均 complete/non-admitting；用户批准的 fresh v13 已从
   `8885161` 唯一执行并 consumed/non-admitting/non-retryable；其 persistent
   Gate residue 保留，failure disposition 与 authorization hardening 已完成/
-  non-admitting；用户已批准基于 `d5a7df3` 的 fresh v14，authorization-only
-  record `959ac3a` 已推送，当前 pending/unconsumed，
+  non-admitting；基于 `d5a7df3` 的 fresh v14 授权在任何 launch/root action
+  前因 exact v13 preservation P0 而 superseded/unconsumed；preservation
+  prerequisite 已实现/non-admitting，等待基于新 pushed commit 的 fresh 授权，
   L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。

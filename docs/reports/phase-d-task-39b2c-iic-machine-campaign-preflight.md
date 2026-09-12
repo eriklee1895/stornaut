@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8-v13 consumed failures / v14 authorized pending unconsumed
+> Status: frozen / v8-v13 consumed failures / preservation prerequisite complete / fresh reauthorization required
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: pushed authorization-only launch seal -> one-shot v14 campaign -> L3c3d -> L3c4
+> Remaining order: push preservation prerequisite -> fresh authorization -> one-shot campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -37,8 +37,10 @@
 > recorded a closed post-arm failure near the shared deadline, and
 > is consumed/non-admitting/non-retryable. Its persistent Gate residue is intact.
 > Its disposition and authorization hardening are complete/non-admitting. The
-> user authorized one fresh v14 from `d5a7df3`; authorization-only record
-> `959ac3a` is pushed and v14 is pending/unconsumed.
+> v14 authorization from `d5a7df3` was stopped before launch by an exact-v13
+> preservation P0 and is superseded/unconsumed. The preservation prerequisite
+> is complete/non-admitting; fresh authorization against its pushed commit is
+> required.
 
 ## 1. Decision
 

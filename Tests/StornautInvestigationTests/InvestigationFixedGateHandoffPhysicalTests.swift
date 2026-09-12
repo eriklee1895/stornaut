@@ -4,6 +4,21 @@ import Testing
 @Suite("Investigation fixed gate handoff physical evidence", .serialized)
 struct InvestigationFixedGateHandoffPhysicalTests {
     @Test
+    func physicalFixtureCompilerUsesFixtureOnlyConstructionProfile() throws {
+        let fixture = try HandoffPhysicalFixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.directory) }
+
+        var coordinator = stat()
+        var gate = stat()
+        try #require(lstat(fixture.coordinator.path, &coordinator) == 0)
+        try #require(lstat(fixture.gate.path, &gate) == 0)
+        #expect(coordinator.st_mode & S_IFMT == S_IFREG)
+        #expect(gate.st_mode & S_IFMT == S_IFREG)
+        #expect(coordinator.st_mode & 0o777 == 0o755)
+        #expect(gate.st_mode & 0o777 == 0o755)
+    }
+
+    @Test
     func physicalFixtureEnablementRejectsHistoricalAttempts() throws {
         let parent = FileManager.default.temporaryDirectory.appending(
             path: "stornaut-fixed-gate-enablement-\(UUID().uuidString)",
@@ -192,17 +207,14 @@ private final class HandoffPhysicalFixture {
                 "InvestigationMachineResolvedRootDriverValidator",
             ]
         ),
-        (
-            "StornautInvestigationMachineLaunchSupport",
-            [
-                "DarwinInvestigationFixedGateHandoffSystem",
-                "InvestigationFixedGateDarwinLifecycle",
-                "InvestigationFixedGateHandoff",
-                "InvestigationMachineGateHandoffReceipt",
-                "InvestigationMachineGateOwnership",
-                "InvestigationOwnerOnlyCapsule",
-            ]
-        ),
+    ]
+    private static let launchSupportSources = [
+        "DarwinInvestigationFixedGateHandoffSystem",
+        "InvestigationFixedGateDarwinLifecycle",
+        "InvestigationFixedGateHandoff",
+        "InvestigationMachineGateHandoffReceipt",
+        "InvestigationMachineGateOwnership",
+        "InvestigationOwnerOnlyCapsule",
     ]
     let directory: URL
     let coordinator: URL
@@ -235,6 +247,12 @@ private final class HandoffPhysicalFixture {
             let source = repositoryRoot.appending(
                 path: "Tests/Fixtures/InvestigationFixedGateHandoff/main.swift"
             )
+            let launchSources = Self.launchSupportSources.map { name in
+                repositoryRoot.appending(path:
+                    "Sources/StornautInvestigationMachineLaunchSupport/"
+                        + name + ".swift"
+                ).path
+            }
             let coordinator = directory.appending(path: "handoff-coordinator")
             let gate = directory.appending(
                 path: "StornautInvestigationMachineGate"
@@ -270,12 +288,14 @@ private final class HandoffPhysicalFixture {
             compiler.executableURL = URL(filePath: "/usr/bin/xcrun")
             compiler.currentDirectoryURL = repositoryRoot
             compiler.arguments = [
-                "swiftc", "-parse-as-library", "-package-name",
-                packageName,
+                "swiftc", "-parse-as-library", "-DDEBUG",
+                "-DSTORNAUT_FIXED_GATE_PHYSICAL_FIXTURE",
+                "-module-name", "StornautInvestigationMachineLaunchSupport",
+                "-package-name", packageName,
                 "-I", buildRoot.appending(path: "Modules").path,
                 "-I", cIdentityBuildDirectory.path,
-                source.path,
-            ] + objects + [cIdentityObject.path, "-lbsm", "-o", coordinator.path]
+            ] + launchSources + [source.path] + objects
+                + [cIdentityObject.path, "-lbsm", "-o", coordinator.path]
             compiler.environment = [
                 "HOME": "/var/empty", "LANG": "C",
                 "LC_ALL": "C", "PATH": "/usr/bin:/bin",
