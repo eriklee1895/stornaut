@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c fresh replacement campaign preflight
 
-> Status: v15 authorized / pending / unconsumed
+> Status: v15 superseded before launch / unconsumed / reauthorization required
 >
 > Date: 2026-09-13
 >
@@ -25,7 +25,9 @@ The v14 authorization based on pushed authorization-hardening baseline
 exact v13 preservation P0. It remains unconsumed but is superseded; fresh
 authorization bound to the pushed prerequisite was required. The user has now
 authorized one fresh v15 campaign from pushed prerequisite
-`facf3eae2fbee83056189e2cfd54cf974ae1421b`; no launch has occurred.
+`facf3eae2fbee83056189e2cfd54cf974ae1421b`. Independent pre-arm review then
+found aggregate staged-scope enforcement and xattr no-mutation evidence gaps.
+No launch occurred; v15 is unconsumed but superseded.
 
 ## Read-only machine state
 
@@ -49,8 +51,9 @@ authorized one fresh v15 campaign from pushed prerequisite
 ## Proposed one-shot authority
 
 The user explicitly approved one fresh privileged replacement campaign based on
-the pushed preservation prerequisite. It may run only from an authorization-only
-descendant of that baseline.
+the pushed preservation prerequisite. That authorization is now superseded by
+the required evidence-closure prerequisite and cannot be transferred to changed
+source.
 The descendant may change only authorization/status documentation and exact
 status-verifier pins. It must not change Swift production sources, campaign/App/
 helper/driver/Gate/coordinator binaries, the lifecycle script, fixed prompts,
@@ -98,5 +101,6 @@ The user explicitly approved one fresh privileged replacement machine campaign
 based on pushed preservation prerequisite
 `facf3eae2fbee83056189e2cfd54cf974ae1421b`. It is recorded as v15 to
 distinguish it from consumed v8-v13 and superseded/unconsumed v14. The
-authorization is pending and unconsumed: no campaign UUID, attempt UUID, launch
-claim, install, sudo invocation or root action exists for v15.
+authorization is unconsumed but superseded: no campaign UUID, attempt UUID,
+launch claim, install, sudo invocation or root action exists for v15. A fresh
+authorization must bind the future pushed repair commit.

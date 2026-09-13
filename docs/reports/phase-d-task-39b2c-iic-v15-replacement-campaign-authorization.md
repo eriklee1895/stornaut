@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c-c v15 replacement campaign authorization
 
-> Status: authorized / pending / unconsumed
+> Status: superseded before launch / unconsumed / reauthorization required
 >
 > Authorized source baseline: `facf3eae2fbee83056189e2cfd54cf974ae1421b`
 >
@@ -77,3 +77,17 @@ Terminal.
 
 No campaign UUID, attempt UUID or evidence root exists at authorization time.
 All are generated and durably bound only by the unique executable launch.
+
+## Pre-arm suspension
+
+The authorization-only record `b8932dd56188e02f523bbc4b8a0cec91bdf6067e`
+was pushed, but no launch seal or campaign was executed. Independent pre-arm
+review then found two prerequisite evidence gaps: the preserved-capsule staged
+scope was not enforced by the aggregate contract, and the preserved-tree
+no-mutation snapshot did not bind extended-attribute names and values. No
+campaign UUID, attempt UUID, launch claim, install, sudo invocation or root
+action occurred.
+
+The v15 authorization is therefore unconsumed but superseded by the required
+evidence-closure prerequisite. It cannot transfer to changed source. A fresh
+explicit authorization bound to the future pushed repair commit is required.
