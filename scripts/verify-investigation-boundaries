@@ -383,6 +383,8 @@ iicc_preserved_capsule_scope_only=false
 iicc_preserved_capsule_scope_baseline=e717b586cb430d1866249ddb13ac2d04e81e6519
 iicc_evidence_closure_scope_only=false
 iicc_evidence_closure_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea
+iicc_v16_authorization_scope_only=false
+iicc_v16_authorization_scope_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -1065,6 +1067,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-evidence-closure-staged-scope-contract-only ]]; then
         iicc_evidence_closure_scope_only=true
         iicc_evidence_closure_scope_baseline=${2:-03daf8c919bad654143f03b976e74b152d5cd3ea}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-v16-authorization-staged-scope-contract-only ]]; then
+        iicc_v16_authorization_scope_only=true
+        iicc_v16_authorization_scope_baseline=${2:-103a4836f4aa80c5d3739ca357364ad5c9200cf6}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -13275,23 +13281,25 @@ for marker in (
     if marker not in boundary_source:
         raise SystemExit("ii-c-c v12 external evidence gate drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "aef15f3ae75ed867d45f7acaf69b29f225c0ffc0224c60675f5a5bfe32ded9da"),
-    (Path("README.md"), "7fce881d3a65b4e37824e029d127239a9a4ada16d87c0bb9ffe976ab3a9ac0d4"),
-    (Path("docs/README.md"), "0dcb2b0b61c272507649d79003a29f0cfc56a0400c3c8f81cababf32381339a8"),
-    (Path("docs/agent/coding-agent-handoff.md"), "0b55b9b6e0893577724bd69d4e8d1ab5a10835f55a680c6a57dd2c18d371f244"),
-    (Path("docs/plans/active/README.md"), "3be897b5981643a475d0cd00deb88542514c06d53c0917c468b386e5c0598195"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "dec28a3c3b8bc7ad7efca2bce4d731632e021cd7d925b753a4cbf3f07e8ceed9"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "b3b41fb3aed1984d47d7042960cd68e9391f95ca4ec727d9819eda8fa74139e5"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "667b7e7658534c846364a578f0491b3a69a92999a18b7f115d4b476392c30bba"),
-    (Path("docs/plans/roadmap.md"), "f307618d4dcfd42fe750e2d7fa99254cb33473582e2f7c8e80e491854452cfdc"),
+    (Path("AGENTS.md"), "0833c2db702cf50014c159eba9cce0d33c9a8b7009532d34a0b529515bb028a0"),
+    (Path("README.md"), "24e2a49461530edfb9684b06edc13a0612a2701842a869f188280eae03e3cef9"),
+    (Path("docs/README.md"), "4b487b1e385215c83eabaa35936c464581f411f77c3c9fec5573d068b4a952c8"),
+    (Path("docs/agent/coding-agent-handoff.md"), "d1c4c5ca00716448d8f8195027222f94d0df5715a5e0076bc126d3b054c4ea5a"),
+    (Path("docs/plans/active/README.md"), "cff6c60a681e0722ae3ddd2fb6783b3f8af58de4cdf03698a1486804fefa4fd1"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "63167b91c05615528754c6d3cfaf95ff36fc16c44abcc415d82db061dcf7da7b"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "77d12b1cc05ac7b6d6891648d21dedf651dfa2df8d0cee3084332d5380963d22"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "8b01bfa2b686368bee08cbed08cd901df7ac7bed815b7a49c1c79f0c450a2d3d"),
+    (Path("docs/plans/roadmap.md"), "af838348bce58b00c62452a5e0cab53b31872eb79d537175299888e5e4ae9007"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"), "a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"), "9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "9ebdc0dcfa0f589f5705565d8fb1b0d8e4e736ff1a4d1ecad7f494b957787c39"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"), "a5fd99b48b31228385db121489a99343c855dba3c876309558e6ec0b5ae7eb52"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "d160e898a8ca407f6ec5024c34fe11b1d30b4f9d50124177028bdd7490559414"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"), "e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md"), "499a1086c3a2f4b3307faf6d81937bf46e2649529cc60d393122f895876b464d"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md"), "11d7089c2d62d4d97e0cc962f1578451a75e016b24cf76ce739b20cf4f0b3f15"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13308,12 +13316,14 @@ active_status_expected_paths = {
     Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md"),
 }
 active_status_paths = [path for path, _ in active_status_entries]
-if (len(active_status_entries) != 17
+if (len(active_status_entries) != 19
         or len(set(active_status_paths)) != len(active_status_paths)
         or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
@@ -13332,7 +13342,8 @@ semantic_status = {
         "v14 授权在任何 launch/root action",
         "superseded/unconsumed", "preservation prerequisite",
         "fresh v15", "aggregate scope enforcement 与 xattr no-mutation",
-        "superseded/unconsumed", "等待基于新 pushed commit 的授权",
+        "superseded/unconsumed", "103a4836", "fresh v16",
+        "authorized/pending/unconsumed",
         "Task 40 仍 blocked",
     ),
     Path("docs/plans/active/README.md"): (
@@ -13345,7 +13356,8 @@ semantic_status = {
         "remains unconsumed", "is superseded",
         "fresh v15 campaign based on `facf3ea` was authorized",
         "aggregate scope and xattr no-mutation evidence gaps",
-        "v15 is superseded", "fresh authorization",
+        "v15 is superseded", "103a4836", "fresh v16",
+        "authorized/pending/unconsumed",
         "blocked on Task 39 under the approved sequential plan",
     ),
     Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
@@ -13356,7 +13368,8 @@ semantic_status = {
         "consumed/non-admitting/non-retryable",
         "v14 authorization based on `d5a7df3` was stopped before launch",
         "remains unconsumed but is superseded", "fresh v15 campaign",
-        "aggregate scope", "superseded/unconsumed",
+        "aggregate scope", "superseded/unconsumed", "103a4836",
+        "fresh v16", "authorized/pending/unconsumed",
         "Task 40 remains blocked",
     ),
     Path("docs/plans/active/task-39-implementation-brief.md"): (
@@ -13367,7 +13380,8 @@ semantic_status = {
         "v14 authorization based on `d5a7df3` was stopped before launch",
         "unconsumed but is superseded", "One fresh v15 was",
         "authorized from `facf3ea`", "aggregate scope",
-        "v15 is superseded/unconsumed",
+        "v15 is superseded/unconsumed", "103a4836",
+        "v16 is authorized/pending/unconsumed",
         "Task 40 start condition remains blocked",
     ),
     Path("docs/plans/active/task-40-implementation-brief.md"): (
@@ -13377,7 +13391,8 @@ semantic_status = {
         "a supplemental sudo/PAM observation\nis not campaign-bound",
         "v14 authorization from `d5a7df3` was superseded",
         "remains unconsumed", "Fresh v15 from `facf3ea` was stopped before launch",
-        "superseded/unconsumed", "fresh",
+        "superseded/unconsumed", "103a4836",
+        "v16 is authorized/pending/unconsumed",
         "blocked on pushed Task 39 Ready baseline",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"): (
@@ -13394,9 +13409,15 @@ semantic_status = {
         "one fresh nonzero campaign UUID", "Once v13 durably records",
         "Task 40 remains blocked",
     ),
+    Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"): (
+        "Status: v16 authorized / pending / unconsumed",
+        "authorized evidence-closure prerequisite\n  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal",
+        "No v16 campaign or attempt UUID",
+        "operator personally enters administrator credentials",
+    ),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"): (
-        "v15 superseded unconsumed",
-        "Remaining order: fresh authorization -> one-shot replacement campaign -> L3c3d -> L3c4",
+        "v14-v15 superseded", "v16 authorized pending unconsumed",
+        "Remaining order: pushed authorization-only seal -> one-shot v16 campaign -> L3c3d -> L3c4",
         "aggregate scope/xattr no-mutation evidence gaps",
         "v15 is superseded/unconsumed",
     ),
@@ -13414,6 +13435,15 @@ semantic_status = {
         "No v8-v14 artifact", "exact v13", "Pre-arm suspension",
         "No campaign UUID", "Task 40 remains blocked",
     ),
+    Path("docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md"): (
+        "Status: authorized / pending / unconsumed",
+        "103a4836f4aa80c5d3739ca357364ad5c9200cf6",
+        "0cfccbf6e8a500365837b4cb9551f6ff70af4bbf",
+        "one fresh nonzero campaign UUID", "Once v16 durably records",
+        "No v8-v15 artifact", "exact v13",
+        "No such identity or\nroot exists at authorization time",
+        "Task 40 remains blocked",
+    ),
 }
 for active_path, markers in semantic_status.items():
     active_source = active_path.read_text(encoding="utf-8")
@@ -13430,7 +13460,8 @@ for marker in ("v8 through v13 are conclusive",
                "consumedClosedPostArmFailure",
                "v14 authorization based on `d5a7df3` was stopped before launch",
                "One fresh v15 was > authorized from `facf3ea`",
-               "v15 is superseded/unconsumed"):
+               "v15 is superseded/unconsumed",
+               "103a4836", "v16 is authorized/pending/unconsumed"):
     if marker not in task39_status:
         raise SystemExit("ii-c-c current campaign disposition drifted")
 for stale in (
@@ -13445,8 +13476,8 @@ for stale in (
     "frontier 为 v14 campaign",
     "等待基于新 pushed commit 的 fresh 授权",
     "fresh authorization bound to its pushed commit is required",
-    "v15 authorized/pending/unconsumed",
-    "v15 is pending/unconsumed",
+    "v16 consumed",
+    "v16 is consumed",
 ):
     if stale in "\n".join(path.read_text(encoding="utf-8") for path in (
         Path("AGENTS.md"),
@@ -14252,6 +14283,64 @@ function verify_iicc_evidence_closure_staged_scope() {
             && "$(print -r -- "$entry" | awk '{print $2}')" == \
             "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
             print -u2 "ii-c-c evidence-closure staged source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+}
+
+function verify_iicc_v16_authorization_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local scope_root=${STORNAUT_IICC_SCOPE_WORKTREE_ROOT:-$repo_root}
+    [[ $scope_root == /* && -d $scope_root && ! -L $scope_root ]] || {
+        print -u2 "ii-c-c v16 authorization scope root invalid"; return 1
+    }
+    local baseline=${1:-$iicc_v16_authorization_scope_baseline}
+    local expected_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        $expected_baseline ]] || {
+        print -u2 "ii-c-c v16 authorization baseline drifted"; return 1
+    }
+    local -A ceilings=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120
+        scripts/verify-contract 320
+        scripts/verify-investigation-boundaries 260
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#expected} == 3 && ${#observed} == 3 )) \
+        && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "ii-c-c v16 authorization paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md \
+            || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || {
+            print -u2 "ii-c-c v16 authorization binary path rejected"; return 1
+        }
+        (( add + delete <= ceilings[$checkpoint_path] )) || {
+            print -u2 "ii-c-c v16 authorization path budget drifted: $checkpoint_path"
+            return 1
+        }
+        (( total += add + delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 600 )) || {
+        print -u2 "ii-c-c v16 authorization aggregate budget drifted"; return 1
+    }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "ii-c-c v16 authorization index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" == \
+            "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
+            print -u2 "ii-c-c v16 authorization staged source drifted: $checkpoint_path"
             return 1
         }
     done
@@ -19170,6 +19259,12 @@ if $iicc_evidence_closure_scope_only; then
     verify_iicc_evidence_closure_staged_scope \
         "$iicc_evidence_closure_scope_baseline"
     print "ii-c-c evidence-closure staged scope verification passed."
+    exit 0
+fi
+if $iicc_v16_authorization_scope_only; then
+    verify_iicc_v16_authorization_staged_scope \
+        "$iicc_v16_authorization_scope_baseline"
+    print "ii-c-c v16 authorization staged scope verification passed."
     exit 0
 fi
 if $iicc_scope_contract_only; then

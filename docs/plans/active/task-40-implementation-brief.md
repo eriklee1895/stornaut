@@ -42,8 +42,8 @@ post-arm `receiptInvalid/exited-82` failure; a supplemental sudo/PAM observation
 is not campaign-bound. The v14 authorization from `d5a7df3` was superseded
 before launch and remains unconsumed; the preservation prerequisite is complete/
 non-admitting. Fresh v15 from `facf3ea` was stopped before launch by aggregate-
-scope/xattr evidence gaps and is superseded/unconsumed. The fixes require fresh
-authorization after push. Task 40 remains blocked until
+scope/xattr evidence gaps and is superseded/unconsumed. The fixes are pushed at
+`103a4836`; v16 is authorized/pending/unconsumed. Task 40 remains blocked until
 that campaign and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
 Inputs are:
 

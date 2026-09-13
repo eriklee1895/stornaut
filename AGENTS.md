@@ -975,7 +975,8 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   prerequisite 已实现/non-admitting；用户批准基于 `facf3ea` 的 fresh v15，
   但 pre-arm review 发现 aggregate scope enforcement 与 xattr no-mutation
   evidence gaps；未发生 launch/root action，v15 superseded/unconsumed。两项
-  evidence-closure 修复已实现/non-admitting，等待基于新 pushed commit 的授权，
+  evidence-closure 修复已由 `103a4836` 推送并验证/non-admitting；用户已批准
+  基于该 commit 的 fresh v16，当前 authorized/pending/unconsumed，
   L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。

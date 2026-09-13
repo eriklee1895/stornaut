@@ -25,8 +25,9 @@
 > exact v13 preservation P0. It remains unconsumed but is superseded; the
 > preservation prerequisite is complete/non-admitting. One fresh v15 was
 > authorized from `facf3ea`, but pre-arm review found aggregate scope and xattr
-> no-mutation evidence gaps. v15 is superseded/unconsumed; the fixes are
-> implemented/non-admitting and require fresh authorization after push.
+> no-mutation evidence gaps. v15 is superseded/unconsumed; the fixes are pushed
+> at `103a4836` and verified/non-admitting. One fresh v16 is authorized/pending/
+> unconsumed from that exact commit.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -235,8 +236,8 @@
 > `d5a7df3` was stopped before launch, remains unconsumed but is superseded;
 > the exact-v13 preservation prerequisite is complete/non-admitting. Fresh v15
 > from `facf3ea` was stopped before launch by aggregate-scope/xattr evidence
-> gaps and is superseded/unconsumed. The fixes are implemented/non-admitting and
-> require fresh authorization after push. Task 39 is
+> gaps and is superseded/unconsumed. The fixes are pushed at `103a4836` and
+> verified/non-admitting; v16 is authorized/pending/unconsumed. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential

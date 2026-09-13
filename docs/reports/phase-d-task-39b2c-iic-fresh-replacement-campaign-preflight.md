@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c fresh replacement campaign preflight
 
-> Status: v15 superseded before launch / unconsumed / reauthorization required
+> Status: v16 authorized / pending / unconsumed
 >
 > Date: 2026-09-13
 >
@@ -28,11 +28,15 @@ authorized one fresh v15 campaign from pushed prerequisite
 `facf3eae2fbee83056189e2cfd54cf974ae1421b`. Independent pre-arm review then
 found aggregate staged-scope enforcement and xattr no-mutation evidence gaps.
 No launch occurred; v15 is unconsumed but superseded.
+The evidence-closure checkpoint is pushed at
+`103a4836f4aa80c5d3739ca357364ad5c9200cf6`; the user explicitly authorized
+one fresh v16 campaign from that exact commit. No v16 campaign or attempt UUID,
+launch claim, install, sudo invocation or root action exists yet.
 
 ## Read-only machine state
 
-- local `HEAD`, `origin/main` and the authorized prerequisite
-  `facf3eae2fbee83056189e2cfd54cf974ae1421b` are equal;
+- local `HEAD`, `origin/main` and the authorized evidence-closure prerequisite
+  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal;
 - the worktree is clean;
 - the fixed diagnostic App, launchd plist and fixed runtime/lease roots are
   absent;
@@ -51,9 +55,8 @@ No launch occurred; v15 is unconsumed but superseded.
 ## Proposed one-shot authority
 
 The user explicitly approved one fresh privileged replacement campaign based on
-the pushed preservation prerequisite. That authorization is now superseded by
-the required evidence-closure prerequisite and cannot be transferred to changed
-source.
+the pushed evidence-closure checkpoint `103a4836`. This one-shot v16 authority
+does not revive or transfer the superseded v14/v15 authorizations.
 The descendant may change only authorization/status documentation and exact
 status-verifier pins. It must not change Swift production sources, campaign/App/
 helper/driver/Gate/coordinator binaries, the lifecycle script, fixed prompts,
@@ -95,12 +98,13 @@ release/notarization, Task 40, production Deep Dive, L3c3d or L3c4.
 - L3c3d remains the sole real Codex App Server/model step. L3c4 remains the sole
   final readiness and authoritative full-verifier step.
 
-## Authorization requirement
+## Authorization state
 
 The user explicitly approved one fresh privileged replacement machine campaign
 based on pushed preservation prerequisite
 `facf3eae2fbee83056189e2cfd54cf974ae1421b`. It is recorded as v15 to
 distinguish it from consumed v8-v13 and superseded/unconsumed v14. The
 authorization is unconsumed but superseded: no campaign UUID, attempt UUID,
-launch claim, install, sudo invocation or root action exists for v15. A fresh
-authorization must bind the future pushed repair commit.
+launch claim, install, sudo invocation or root action exists for v15. The user
+has now authorized v16 from pushed evidence-closure commit
+`103a4836f4aa80c5d3739ca357364ad5c9200cf6`; it remains pending/unconsumed.

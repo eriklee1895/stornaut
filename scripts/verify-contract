@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=015b4dda68e3a540e9d8f9eb75eb01cb043e1ee3f4cd9ac9ab7c4e58c07bcea8
+# ib2_self_sha=d710afe6802acf97e7b0237a8295ef444a64e7ea7e10b6041dcf293e9dd002d6
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3708,7 +3708,11 @@ function verify_iicc_contract() {
     local release=scripts/verify-app-release-boundaries
     local preserved_scope_mode=--iic-c-preserved-capsule-staged-scope-contract-only
     local evidence_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea
+    local evidence_scope_commit=103a4836f4aa80c5d3739ca357364ad5c9200cf6
+    local evidence_scope_tree=0cfccbf6e8a500365837b4cb9551f6ff70af4bbf
     local evidence_scope_mode=--iic-c-evidence-closure-staged-scope-contract-only
+    local authorization_scope_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6
+    local authorization_scope_mode=--iic-c-v16-authorization-staged-scope-contract-only
     local baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
     local implementation=2a29aff40fb39ec6465f75b2e70d43e3ba42ed4e
     local implementation_tree=b5b4170f942fc92872c2d82f54baf2943f3e176f
@@ -3749,10 +3753,10 @@ function verify_iicc_contract() {
         scripts/verify-investigation-runtime-machine-report
     )
     mkdir -p "$out"
-    [[ "$(git rev-parse HEAD)" == "$evidence_scope_baseline" ]] \
-        || fail_contract "ii-c-c evidence closure requires baseline HEAD"
-    "$gate" "$evidence_scope_mode" "$evidence_scope_baseline" \
-        >"$out/evidence-scope-actual.log"
+    [[ "$(git rev-parse HEAD)" == "$authorization_scope_baseline" ]] \
+        || fail_contract "ii-c-c v16 authorization requires baseline HEAD"
+    "$gate" "$authorization_scope_mode" "$authorization_scope_baseline" \
+        >"$out/authorization-scope-actual.log"
     [[ "$(git show -s --format=%P "$implementation")" == "$baseline" \
         && "$(git show -s --format=%T "$implementation")" == "$implementation_tree" ]] \
         || fail_contract "ii-c-c immutable implementation drifted"
@@ -4125,6 +4129,11 @@ PY
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
         scripts/verify-contract scripts/verify-investigation-boundaries
     )
+    [[ "$(git show -s --format=%P "$evidence_scope_commit")" == \
+        "$evidence_scope_baseline" \
+        && "$(git show -s --format=%T "$evidence_scope_commit")" == \
+        "$evidence_scope_tree" ]] \
+        || fail_contract "ii-c-c evidence scope immutable checkpoint drifted"
     local evidence_scope_index="$out/evidence-scope.index"
     local evidence_scope_worktree="$out/evidence-scope.worktree"
     local evidence_scope_item evidence_scope_entry_mode evidence_scope_blob
@@ -4134,7 +4143,8 @@ PY
         evidence_scope_entry_mode=100644
         [[ $evidence_scope_item == scripts/* ]] \
             && evidence_scope_entry_mode=100755
-        evidence_scope_blob=$(git hash-object -w -- "$evidence_scope_item")
+        evidence_scope_blob=$(git rev-parse \
+            "${evidence_scope_commit}:$evidence_scope_item")
         GIT_INDEX_FILE="$evidence_scope_index" git update-index --add \
             --cacheinfo "$evidence_scope_entry_mode,$evidence_scope_blob,$evidence_scope_item"
     done
@@ -4186,7 +4196,8 @@ PY
                 --cacheinfo "100644,$evidence_scope_blob,${evidence_scope_paths[1]}"
             evidence_scope_expected="ii-c-c evidence-closure binary path rejected";;
           wrong-mode)
-            evidence_scope_blob=$(git hash-object -w -- scripts/verify-contract)
+            evidence_scope_blob=$(git rev-parse \
+                "${evidence_scope_commit}:scripts/verify-contract")
             GIT_INDEX_FILE="$evidence_scope_bad" git update-index \
                 --cacheinfo "100644,$evidence_scope_blob,scripts/verify-contract"
             evidence_scope_expected="ii-c-c evidence-closure staged source drifted: scripts/verify-contract";;
@@ -4279,6 +4290,148 @@ PY
           STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$untracked_worktree" \
           "$gate" \
           "$evidence_scope_mode" "$evidence_scope_baseline" )
+
+    function reject_iicc_authorization_scope() {
+        local label=$1 expected=$2; shift 2
+        local log="$out/authorization-scope-$label.log" scope_rc=0 actual
+        "$@" >"$log" 2>&1 || scope_rc=$?
+        (( scope_rc != 0 )) \
+            || fail_contract "ii-c-c authorization scope accepted: $label"
+        actual=$(<"$log")
+        [[ "$actual" == "$expected" ]] \
+            || fail_contract "ii-c-c authorization scope diagnostic drifted: $label: $actual"
+    }
+    local authorization_scope_index="$out/authorization-scope.index"
+    cp "$(git rev-parse --git-path index)" "$authorization_scope_index"
+    local -a authorization_scope_fixtures=(extra missing binary wrong-mode \
+        over-budget aggregate-budget staged-worktree-divergence wrong-baseline)
+    (( ${#authorization_scope_fixtures} + 1 == 9 )) \
+        || fail_contract "ii-c-c authorization scope negative inventory drifted"
+    local -a authorization_scope_paths=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries
+    )
+    local authorization_scope_fixture authorization_scope_bad
+    local authorization_scope_expected authorization_scope_blob
+    local authorization_scope_baseline_arg authorization_scope_target_worktree
+    local authorization_scope_entry_mode
+    for authorization_scope_fixture in "${authorization_scope_fixtures[@]}"; do
+        authorization_scope_bad="$out/authorization-scope-$authorization_scope_fixture.index"
+        cp "$authorization_scope_index" "$authorization_scope_bad"
+        authorization_scope_baseline_arg=$authorization_scope_baseline
+        authorization_scope_target_worktree="$out/authorization-scope-$authorization_scope_fixture.worktree"
+        case $authorization_scope_fixture in
+          extra)
+            authorization_scope_blob=$(print extra | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$authorization_scope_bad" git update-index --add \
+                --cacheinfo "100644,$authorization_scope_blob,iicc-v16-authorization-extra.swift"
+            authorization_scope_expected="ii-c-c v16 authorization paths drifted";;
+          missing)
+            authorization_scope_blob=$(git rev-parse \
+                "$authorization_scope_baseline:${authorization_scope_paths[1]}")
+            GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
+                --cacheinfo "100644,$authorization_scope_blob,${authorization_scope_paths[1]}"
+            authorization_scope_expected="ii-c-c v16 authorization paths drifted";;
+          binary)
+            authorization_scope_blob=$(printf '\0iicc-authorization\n' \
+                | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
+                --cacheinfo "100644,$authorization_scope_blob,${authorization_scope_paths[1]}"
+            authorization_scope_expected="ii-c-c v16 authorization binary path rejected";;
+          wrong-mode)
+            authorization_scope_blob=$(git hash-object -w -- scripts/verify-contract)
+            GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
+                --cacheinfo "100644,$authorization_scope_blob,scripts/verify-contract"
+            authorization_scope_expected="ii-c-c v16 authorization staged source drifted: scripts/verify-contract";;
+          over-budget)
+            authorization_scope_blob=$( { <"${authorization_scope_paths[1]}";
+                    for item in {1..130}; do print "// iicc-authorization-over-$item"; done; } \
+                | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
+                --cacheinfo "100644,$authorization_scope_blob,${authorization_scope_paths[1]}"
+            authorization_scope_expected="ii-c-c v16 authorization path budget drifted: ${authorization_scope_paths[1]}";;
+          aggregate-budget)
+            local authorization_scope_total authorization_scope_path
+            local authorization_scope_current authorization_scope_capacity
+            local authorization_scope_add authorization_scope_source
+            local authorization_scope_line
+            local -A authorization_scope_ceilings=(
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120
+                scripts/verify-contract 320 scripts/verify-investigation-boundaries 260
+            )
+            authorization_scope_total=$(GIT_INDEX_FILE="$authorization_scope_bad" \
+                git diff --cached --numstat "$authorization_scope_baseline" -- \
+                | awk 'index($3,"docs/")!=1&&$3!="AGENTS.md"&&$3!="README.md"{ total += $1 + $2 } END { print total + 0 }')
+            for authorization_scope_path in "${authorization_scope_paths[@]}"; do
+                (( authorization_scope_total > 600 )) && break
+                authorization_scope_current=$(GIT_INDEX_FILE="$authorization_scope_bad" \
+                    git diff --cached --numstat "$authorization_scope_baseline" \
+                    -- "$authorization_scope_path" | awk '{ print $1 + $2 }')
+                authorization_scope_capacity=$(( \
+                    authorization_scope_ceilings[$authorization_scope_path] \
+                    - authorization_scope_current ))
+                (( authorization_scope_capacity > 0 )) || continue
+                authorization_scope_add=$(( 601 - authorization_scope_total ))
+                (( authorization_scope_add > authorization_scope_capacity )) \
+                    && authorization_scope_add=$authorization_scope_capacity
+                authorization_scope_source="$out/authorization-aggregate-${authorization_scope_path//\//_}"
+                GIT_INDEX_FILE="$authorization_scope_bad" git show \
+                    ":$authorization_scope_path" >"$authorization_scope_source"
+                authorization_scope_line=1
+                while (( authorization_scope_line <= authorization_scope_add )); do
+                    print "// iicc-authorization-aggregate-$authorization_scope_line"
+                    (( authorization_scope_line += 1 ))
+                done >>"$authorization_scope_source"
+                authorization_scope_blob=$(git hash-object -w -- \
+                    "$authorization_scope_source")
+                authorization_scope_entry_mode=100644
+                [[ $authorization_scope_path == scripts/* ]] \
+                    && authorization_scope_entry_mode=100755
+                GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
+                    --cacheinfo "$authorization_scope_entry_mode,$authorization_scope_blob,$authorization_scope_path"
+                (( authorization_scope_total += authorization_scope_add ))
+            done
+            (( authorization_scope_total == 601 )) \
+                || fail_contract "ii-c-c authorization scope aggregate fixture unavailable"
+            authorization_scope_expected="ii-c-c v16 authorization aggregate budget drifted";;
+          staged-worktree-divergence)
+            authorization_scope_blob=$( { <"${authorization_scope_paths[1]}";
+                    print '// iicc-authorization-divergence'; } \
+                | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
+                --cacheinfo "100644,$authorization_scope_blob,${authorization_scope_paths[1]}"
+            authorization_scope_expected="ii-c-c v16 authorization index/worktree drifted";;
+          wrong-baseline)
+            authorization_scope_baseline_arg=$authorization_scope_baseline^
+            authorization_scope_expected="ii-c-c v16 authorization baseline drifted";;
+        esac
+        case $authorization_scope_fixture in
+          staged-worktree-divergence)
+            materialize_iicc_preserved_scope_worktree \
+                "$authorization_scope_index" "$authorization_scope_target_worktree";;
+          *)
+            materialize_iicc_preserved_scope_worktree \
+                "$authorization_scope_bad" "$authorization_scope_target_worktree";;
+        esac
+        reject_iicc_authorization_scope "$authorization_scope_fixture" \
+            "$authorization_scope_expected" env GIT_DIR="$repo_root/.git" \
+            GIT_INDEX_FILE="$authorization_scope_bad" \
+            GIT_WORK_TREE="$authorization_scope_target_worktree" \
+            STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$authorization_scope_target_worktree" \
+            "$gate" "$authorization_scope_mode" \
+            "$authorization_scope_baseline_arg"
+    done
+    ( local untracked_worktree="$out/authorization-scope-untracked.worktree"
+      materialize_iicc_preserved_scope_worktree \
+          "$authorization_scope_index" "$untracked_worktree"
+      print x >"$untracked_worktree/iicc-authorization-untracked.swift"
+      reject_iicc_authorization_scope untracked \
+          "ii-c-c v16 authorization index/worktree drifted" env \
+          GIT_DIR="$repo_root/.git" GIT_INDEX_FILE="$authorization_scope_index" \
+          GIT_WORK_TREE="$untracked_worktree" \
+          STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$untracked_worktree" \
+          "$gate" "$authorization_scope_mode" \
+          "$authorization_scope_baseline" )
     (
         local account_home persistent_base physical_out scratch_parent scratch_base
         account_home=$(/usr/bin/python3 -I - <<'PY'

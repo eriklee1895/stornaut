@@ -19,7 +19,8 @@
 > v13 preservation P0. It is superseded/unconsumed; the prerequisite is complete/
 > non-admitting. Fresh v15 based on `facf3ea` was stopped before launch by
 > aggregate scope/xattr evidence gaps and is superseded/unconsumed. The fixes
-> are implemented/non-admitting and require fresh authorization after push.
+> are pushed at `103a4836` and verified/non-admitting; v16 is authorized/pending/
+> unconsumed from that exact commit.
 > Task 39 remains incomplete
 > and Task 40 remains blocked.
 

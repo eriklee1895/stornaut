@@ -17,7 +17,8 @@
 > preservation prerequisite is complete/non-admitting. The fresh v15 campaign
 > based on `facf3ea` was authorized, but pre-arm review found aggregate scope
 > and xattr no-mutation evidence gaps. It is superseded/unconsumed; the fixes are
-> implemented/non-admitting and require fresh authorization after push.
+> pushed at `103a4836` and verified/non-admitting. One fresh v16 is
+> authorized/pending/unconsumed from that exact commit.
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is
