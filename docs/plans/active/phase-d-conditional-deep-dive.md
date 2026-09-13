@@ -14,8 +14,10 @@
 > complete/non-admitting.
 > The v14 authorization based on `d5a7df3` was stopped before launch by the
 > exact v13 preservation P0. It remains unconsumed but is superseded; the
-> preservation prerequisite is complete/non-admitting and fresh authorization
-> bound to its pushed commit is required.
+> preservation prerequisite is complete/non-admitting. The fresh v15 campaign
+> based on `facf3ea` was authorized, but pre-arm review found aggregate scope
+> and xattr no-mutation evidence gaps. It is superseded/unconsumed; the fixes are
+> implemented/non-admitting and require fresh authorization after push.
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is

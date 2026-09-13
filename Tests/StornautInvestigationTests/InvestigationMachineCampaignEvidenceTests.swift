@@ -3936,12 +3936,62 @@ struct InvestigationMachineCampaignEvidenceTests {
             let digest = (info.st_mode & S_IFMT) == S_IFREG
                 ? InvestigationHandoffSHA256.hashing(
                     try Data(contentsOf: url)).lowercaseHex : "-"
+            let xattrs = try extendedAttributeSnapshot(url.path)
             values.append([relative, String(info.st_dev), String(info.st_ino),
                 String(info.st_mode), String(info.st_nlink), String(info.st_size),
                 String(info.st_mtimespec.tv_sec), String(info.st_mtimespec.tv_nsec),
-                digest].joined(separator: "|"))
+                digest, xattrs].joined(separator: "|"))
         }
         return values.sorted()
+    }
+
+    private static func extendedAttributeSnapshot(_ path: String) throws
+        -> String
+    {
+        let byteCount = listxattr(path, nil, 0, XATTR_NOFOLLOW)
+        try #require(byteCount >= 0)
+        guard byteCount > 0 else { return "-" }
+        var names = [CChar](repeating: 0, count: byteCount)
+        let observed = listxattr(
+            path, &names, names.count, XATTR_NOFOLLOW
+        )
+        try #require(observed == byteCount)
+
+        var result: [String] = []
+        var start = 0
+        for index in names.indices where names[index] == 0 {
+            try #require(index > start)
+            let name = try names.withUnsafeBufferPointer { buffer in
+                try #require(buffer.baseAddress != nil)
+                return try #require(String(
+                    validatingCString: buffer.baseAddress! + start
+                ))
+            }
+            let valueByteCount = getxattr(
+                path, name, nil, 0, 0, XATTR_NOFOLLOW
+            )
+            try #require(valueByteCount >= 0)
+            var value = Data(count: valueByteCount)
+            if valueByteCount > 0 {
+                let read = value.withUnsafeMutableBytes { buffer in
+                    getxattr(
+                        path, name, buffer.baseAddress, buffer.count, 0,
+                        XATTR_NOFOLLOW
+                    )
+                }
+                try #require(read == valueByteCount)
+            }
+            let nameHex = Data(name.utf8).map {
+                String(format: "%02x", $0)
+            }.joined()
+            result.append([
+                nameHex, String(valueByteCount),
+                InvestigationHandoffSHA256.hashing(value).lowercaseHex,
+            ].joined(separator: ":"))
+            start = index + 1
+        }
+        try #require(start == names.count)
+        return result.sorted().joined(separator: ",")
     }
 
     fileprivate static func digest(_ marker: UInt8) -> InvestigationHandoffSHA256 {

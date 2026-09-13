@@ -665,8 +665,72 @@ struct InvestigationMachineTargetBoundaryTests {
             "swift-lock-exclusive-bypass", "verifier-admission-downgrade",
             "verifier-path-regression", "verifier-lock-bypass",
             "verifier-identity-bypass", "verifier-revalidation-bypass",
+            "snapshot-xattr-drop",
         ] {
             #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "preserved_scope_mode=--iic-c-preserved-capsule-staged-scope-contract-only",
+            "preserved_scope_commit=facf3eae2fbee83056189e2cfd54cf974ae1421b",
+            "preserved_scope_tree=a25134f6bcd37852b8ce38502301f95cc7b55d34",
+            "\"$preserved_scope_commit:$preserved_scope_item\"",
+            "STORNAUT_IICC_SCOPE_WORKTREE_ROOT=\"$preserved_scope_worktree\"",
+            "preserved_scope_fixtures=(extra missing binary wrong-mode",
+            "over-budget aggregate-budget staged-worktree-divergence wrong-baseline",
+            "ii-c-c preserved scope negative inventory drifted",
+            "iicc-preserved-untracked.swift",
+            "evidence_scope_mode=--iic-c-evidence-closure-staged-scope-contract-only",
+            "evidence_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea",
+            "ii-c-c evidence closure requires baseline HEAD",
+            "evidence-scope-actual.log",
+            "evidence_scope_fixtures=(extra missing binary wrong-mode",
+            "${#evidence_scope_fixtures} + 1 == 9",
+            "STORNAUT_IICC_SCOPE_WORKTREE_ROOT=\"$evidence_scope_worktree\"",
+            "ii-c-c evidence scope negative inventory drifted",
+            "iicc-evidence-untracked.swift",
+        ] {
+            #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "--iic-c-evidence-closure-staged-scope-contract-only",
+            "function verify_iicc_evidence_closure_staged_scope()",
+            "iicc_evidence_closure_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea",
+            "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 100",
+            "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120",
+            "scripts/verify-contract 420",
+            "scripts/verify-investigation-boundaries 180",
+            "${#expected} == 4 && ${#observed} == 4",
+            "total <= 700",
+            "ii-c-c evidence-closure index/worktree drifted",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        let evidenceScopeStart = try #require(aggregate.range(
+            of: "local -a evidence_scope_fixtures="
+        ))
+        let evidenceScopeEnd = try #require(aggregate.range(
+            of: "ii-c-c evidence scope negative inventory drifted",
+            range: evidenceScopeStart.lowerBound..<aggregate.endIndex
+        ))
+        let evidenceScopeBlock = String(aggregate[
+            evidenceScopeStart.lowerBound..<evidenceScopeEnd.upperBound
+        ])
+        for marker in [
+            "extra", "missing", "binary", "wrong-mode", "over-budget",
+            "aggregate-budget", "staged-worktree-divergence",
+            "wrong-baseline", "${#evidence_scope_fixtures} + 1 == 9",
+        ] {
+            #expect(evidenceScopeBlock.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "private static func extendedAttributeSnapshot(_ path: String) throws",
+            "listxattr(path, nil, 0, XATTR_NOFOLLOW)",
+            "getxattr(", "nameHex",
+            "InvestigationHandoffSHA256.hashing(value).lowercaseHex",
+            "let xattrs = try extendedAttributeSnapshot(url.path)",
+            "digest, xattrs",
+        ] {
+            #expect(evidenceTests.contains(marker), "missing: \(marker)")
         }
         for marker in [
             "os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)",
@@ -893,23 +957,24 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"2ac3cf6080896018a53dcbe4870a423bef83afd6d9309f9f8ae5f752030c9903\")",
-            "(Path(\"README.md\"), \"436c9a02cb477d794ebcf5068a0e7fbb38b7a200f642c1d902ed32e97920cda3\")",
-            "(Path(\"docs/README.md\"), \"8b465ae19e5e3ca46b2e112a744ac67d40afb73450de256165ae0b43063b3429\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"d422b9a47e4bd61496451bf09e13b63c6ba32c5c6ce37a8b72e16e581e6d93df\")",
-            "(Path(\"docs/plans/active/README.md\"), \"db4fd7e70a7c25072cf4573fd501e817358d645db1aed6f3b8c5cf249838bb9a\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"517b84d6daca2aad763dc25bf2bb3f61907a5a2f62f2e627850342cfe93ed7a0\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"6e03dc6529e2ac18e12321773bc9019f65e2ea134c2abb24d70a617f3e51d199\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"32f3f55eccb21df314329e836e72775143f1316b0dfa5940a32579c40a9da222\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"55c065018f6e8f68992f79fc9971a28ec3005dad79e3b9021df0f83a4ba04cc1\")",
+            "(Path(\"AGENTS.md\"), \"aef15f3ae75ed867d45f7acaf69b29f225c0ffc0224c60675f5a5bfe32ded9da\")",
+            "(Path(\"README.md\"), \"7fce881d3a65b4e37824e029d127239a9a4ada16d87c0bb9ffe976ab3a9ac0d4\")",
+            "(Path(\"docs/README.md\"), \"0dcb2b0b61c272507649d79003a29f0cfc56a0400c3c8f81cababf32381339a8\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"0b55b9b6e0893577724bd69d4e8d1ab5a10835f55a680c6a57dd2c18d371f244\")",
+            "(Path(\"docs/plans/active/README.md\"), \"3be897b5981643a475d0cd00deb88542514c06d53c0917c468b386e5c0598195\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"dec28a3c3b8bc7ad7efca2bce4d731632e021cd7d925b753a4cbf3f07e8ceed9\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"b3b41fb3aed1984d47d7042960cd68e9391f95ca4ec727d9819eda8fa74139e5\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"667b7e7658534c846364a578f0491b3a69a92999a18b7f115d4b476392c30bba\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"f307618d4dcfd42fe750e2d7fa99254cb33473582e2f7c8e80e491854452cfdc\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md\"), \"9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"3a000d68ef99c670f5b29f02b5f585f262970e879035b97733efaca41c43dbf4\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"9ebdc0dcfa0f589f5705565d8fb1b0d8e4e736ff1a4d1ecad7f494b957787c39\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md\"), \"e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb\")",
-            "len(active_status_entries) != 16",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md\"), \"499a1086c3a2f4b3307faf6d81937bf46e2649529cc60d393122f895876b464d\")",
+            "len(active_status_entries) != 17",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
             "ii-c-c blocked status docs inventory drifted",
@@ -923,11 +988,15 @@ struct InvestigationMachineTargetBoundaryTests {
             "v13 is consumed/non-admitting/non-retryable",
             "authorization-window/one-attempt EOF repair are\\n> complete/non-admitting",
             "a supplemental sudo/PAM observation\\nis not campaign-bound",
-            "preservation prerequisite complete / fresh reauthorization required",
-            "Remaining order: push preservation prerequisite -> fresh authorization -> one-shot campaign -> L3c3d -> L3c4",
+            "v15 superseded unconsumed",
+            "Remaining order: fresh authorization -> one-shot replacement campaign -> L3c3d -> L3c4",
+            "aggregate scope/xattr no-mutation evidence gaps",
             "Status: superseded before launch / unconsumed / reauthorization required",
             "v14 authorization based on `d5a7df3` was stopped before launch",
-            "fresh authorization > bound to its pushed commit is required",
+            "One fresh v15 was > authorized from `facf3ea`",
+            "v15 is superseded/unconsumed",
+            "Pre-arm suspension",
+            "No campaign UUID",
             "ii-c-c v13 supplemental observation became causal",
             "Task 40 start condition remains blocked",
         ]

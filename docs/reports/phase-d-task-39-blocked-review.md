@@ -17,7 +17,9 @@
 > non-retryable after a closed post-arm failure.
 > The v14 authorization from `d5a7df3` was stopped before launch by the exact
 > v13 preservation P0. It is superseded/unconsumed; the prerequisite is complete/
-> non-admitting and fresh authorization bound to the new pushed commit is required.
+> non-admitting. Fresh v15 based on `facf3ea` was stopped before launch by
+> aggregate scope/xattr evidence gaps and is superseded/unconsumed. The fixes
+> are implemented/non-admitting and require fresh authorization after push.
 > Task 39 remains incomplete
 > and Task 40 remains blocked.
 

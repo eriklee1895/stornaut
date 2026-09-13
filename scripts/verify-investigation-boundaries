@@ -381,6 +381,8 @@ iicc_preserved_capsule_mutation_sha=
 iicc_preserved_capsule_sources=()
 iicc_preserved_capsule_scope_only=false
 iicc_preserved_capsule_scope_baseline=e717b586cb430d1866249ddb13ac2d04e81e6519
+iicc_evidence_closure_scope_only=false
+iicc_evidence_closure_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -1059,6 +1061,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-preserved-capsule-staged-scope-contract-only ]]; then
         iicc_preserved_capsule_scope_only=true
         iicc_preserved_capsule_scope_baseline=${2:-e717b586cb430d1866249ddb13ac2d04e81e6519}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-evidence-closure-staged-scope-contract-only ]]; then
+        iicc_evidence_closure_scope_only=true
+        iicc_evidence_closure_scope_baseline=${2:-03daf8c919bad654143f03b976e74b152d5cd3ea}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -12198,7 +12204,7 @@ function verify_iic_root_driver_lineage_l1_staged_scope() {
         Tests/StornautInvestigationTests/InvestigationResolvedRootDriverLineageContractTests.swift 480
         Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverClaimTests.swift 420
         Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift 600
-        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 80
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120
         scripts/verify-investigation-boundaries 350
         scripts/verify-contract 140
         scripts/verify-app-release-boundaries 80
@@ -13269,22 +13275,23 @@ for marker in (
     if marker not in boundary_source:
         raise SystemExit("ii-c-c v12 external evidence gate drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "2ac3cf6080896018a53dcbe4870a423bef83afd6d9309f9f8ae5f752030c9903"),
-    (Path("README.md"), "436c9a02cb477d794ebcf5068a0e7fbb38b7a200f642c1d902ed32e97920cda3"),
-    (Path("docs/README.md"), "8b465ae19e5e3ca46b2e112a744ac67d40afb73450de256165ae0b43063b3429"),
-    (Path("docs/agent/coding-agent-handoff.md"), "d422b9a47e4bd61496451bf09e13b63c6ba32c5c6ce37a8b72e16e581e6d93df"),
-    (Path("docs/plans/active/README.md"), "db4fd7e70a7c25072cf4573fd501e817358d645db1aed6f3b8c5cf249838bb9a"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "517b84d6daca2aad763dc25bf2bb3f61907a5a2f62f2e627850342cfe93ed7a0"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "6e03dc6529e2ac18e12321773bc9019f65e2ea134c2abb24d70a617f3e51d199"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "32f3f55eccb21df314329e836e72775143f1316b0dfa5940a32579c40a9da222"),
-    (Path("docs/plans/roadmap.md"), "55c065018f6e8f68992f79fc9971a28ec3005dad79e3b9021df0f83a4ba04cc1"),
+    (Path("AGENTS.md"), "aef15f3ae75ed867d45f7acaf69b29f225c0ffc0224c60675f5a5bfe32ded9da"),
+    (Path("README.md"), "7fce881d3a65b4e37824e029d127239a9a4ada16d87c0bb9ffe976ab3a9ac0d4"),
+    (Path("docs/README.md"), "0dcb2b0b61c272507649d79003a29f0cfc56a0400c3c8f81cababf32381339a8"),
+    (Path("docs/agent/coding-agent-handoff.md"), "0b55b9b6e0893577724bd69d4e8d1ab5a10835f55a680c6a57dd2c18d371f244"),
+    (Path("docs/plans/active/README.md"), "3be897b5981643a475d0cd00deb88542514c06d53c0917c468b386e5c0598195"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "dec28a3c3b8bc7ad7efca2bce4d731632e021cd7d925b753a4cbf3f07e8ceed9"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "b3b41fb3aed1984d47d7042960cd68e9391f95ca4ec727d9819eda8fa74139e5"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "667b7e7658534c846364a578f0491b3a69a92999a18b7f115d4b476392c30bba"),
+    (Path("docs/plans/roadmap.md"), "f307618d4dcfd42fe750e2d7fa99254cb33473582e2f7c8e80e491854452cfdc"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"), "a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"), "9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "3a000d68ef99c670f5b29f02b5f585f262970e879035b97733efaca41c43dbf4"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "9ebdc0dcfa0f589f5705565d8fb1b0d8e4e736ff1a4d1ecad7f494b957787c39"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"), "e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md"), "499a1086c3a2f4b3307faf6d81937bf46e2649529cc60d393122f895876b464d"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13303,9 +13310,10 @@ active_status_expected_paths = {
     Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"),
     Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"),
+    Path("docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md"),
 }
 active_status_paths = [path for path, _ in active_status_entries]
-if (len(active_status_entries) != 16
+if (len(active_status_entries) != 17
         or len(set(active_status_paths)) != len(active_status_paths)
         or set(active_status_paths) != active_status_expected_paths):
     raise SystemExit("ii-c-c blocked status docs inventory drifted")
@@ -13323,7 +13331,8 @@ semantic_status = {
         "persistent Gate residue 保留",
         "v14 授权在任何 launch/root action",
         "superseded/unconsumed", "preservation prerequisite",
-        "等待基于新 pushed commit 的 fresh 授权",
+        "fresh v15", "aggregate scope enforcement 与 xattr no-mutation",
+        "superseded/unconsumed", "等待基于新 pushed commit 的授权",
         "Task 40 仍 blocked",
     ),
     Path("docs/plans/active/README.md"): (
@@ -13334,7 +13343,9 @@ semantic_status = {
         "consumed/non-admitting/non-retryable",
         "v14 authorization based on `d5a7df3` was stopped before launch",
         "remains unconsumed", "is superseded",
-        "fresh authorization bound to its pushed commit is required",
+        "fresh v15 campaign based on `facf3ea` was authorized",
+        "aggregate scope and xattr no-mutation evidence gaps",
+        "v15 is superseded", "fresh authorization",
         "blocked on Task 39 under the approved sequential plan",
     ),
     Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
@@ -13344,8 +13355,8 @@ semantic_status = {
         "authorized v13 campaign ran once from descendant `8885161`",
         "consumed/non-admitting/non-retryable",
         "v14 authorization based on `d5a7df3` was stopped before launch",
-        "remains unconsumed but is superseded", "fresh authorization",
-        "bound to its pushed commit is required",
+        "remains unconsumed but is superseded", "fresh v15 campaign",
+        "aggregate scope", "superseded/unconsumed",
         "Task 40 remains blocked",
     ),
     Path("docs/plans/active/task-39-implementation-brief.md"): (
@@ -13354,8 +13365,9 @@ semantic_status = {
         "consumedClosedPostArmFailure",
         "authorization-window/one-attempt EOF repair are\n> complete/non-admitting",
         "v14 authorization based on `d5a7df3` was stopped before launch",
-        "unconsumed but is superseded", "fresh\n> authorization",
-        "bound to its pushed commit is required",
+        "unconsumed but is superseded", "One fresh v15 was",
+        "authorized from `facf3ea`", "aggregate scope",
+        "v15 is superseded/unconsumed",
         "Task 40 start condition remains blocked",
     ),
     Path("docs/plans/active/task-40-implementation-brief.md"): (
@@ -13364,7 +13376,8 @@ semantic_status = {
         "v13 is consumed/non-admitting/non-retryable",
         "a supplemental sudo/PAM observation\nis not campaign-bound",
         "v14 authorization from `d5a7df3` was superseded",
-        "remains unconsumed", "fresh authorization is required",
+        "remains unconsumed", "Fresh v15 from `facf3ea` was stopped before launch",
+        "superseded/unconsumed", "fresh",
         "blocked on pushed Task 39 Ready baseline",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"): (
@@ -13382,15 +13395,24 @@ semantic_status = {
         "Task 40 remains blocked",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"): (
-        "preservation prerequisite complete / fresh reauthorization required",
-        "Remaining order: push preservation prerequisite -> fresh authorization -> one-shot campaign -> L3c3d -> L3c4",
-        "superseded/unconsumed", "fresh authorization against its pushed commit",
+        "v15 superseded unconsumed",
+        "Remaining order: fresh authorization -> one-shot replacement campaign -> L3c3d -> L3c4",
+        "aggregate scope/xattr no-mutation evidence gaps",
+        "v15 is superseded/unconsumed",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"): (
         "Status: superseded before launch / unconsumed / reauthorization required",
         "d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7",
         "one fresh nonzero campaign UUID", "Once v14 durably records",
         "No v8-v13 artifact", "Task 40 remains blocked",
+    ),
+    Path("docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md"): (
+        "Status: superseded before launch / unconsumed / reauthorization required",
+        "facf3eae2fbee83056189e2cfd54cf974ae1421b",
+        "a25134f6bcd37852b8ce38502301f95cc7b55d34",
+        "one fresh nonzero campaign UUID", "Once v15 durably records",
+        "No v8-v14 artifact", "exact v13", "Pre-arm suspension",
+        "No campaign UUID", "Task 40 remains blocked",
     ),
 }
 for active_path, markers in semantic_status.items():
@@ -13407,7 +13429,8 @@ for marker in ("v8 through v13 are conclusive",
                "consumedPostArmAuthorizationDeadlineExhaustion",
                "consumedClosedPostArmFailure",
                "v14 authorization based on `d5a7df3` was stopped before launch",
-               "fresh authorization > bound to its pushed commit is required"):
+               "One fresh v15 was > authorized from `facf3ea`",
+               "v15 is superseded/unconsumed"):
     if marker not in task39_status:
         raise SystemExit("ii-c-c current campaign disposition drifted")
 for stale in (
@@ -13420,6 +13443,10 @@ for stale in (
     "v14 authorized/pending/unconsumed",
     "v14 is pending/unconsumed",
     "frontier 为 v14 campaign",
+    "等待基于新 pushed commit 的 fresh 授权",
+    "fresh authorization bound to its pushed commit is required",
+    "v15 authorized/pending/unconsumed",
+    "v15 is pending/unconsumed",
 ):
     if stale in "\n".join(path.read_text(encoding="utf-8") for path in (
         Path("AGENTS.md"),
@@ -13930,6 +13957,9 @@ mutations = {
     "verifier-revalidation-bypass": ("verifier",
         "revalidate_persistent_preserved_gate(\n"
         "                persistent_preserved_gate, owner)", "pass"),
+    "snapshot-xattr-drop": ("evidence_tests",
+        "let xattrs = try extendedAttributeSnapshot(url.path)",
+        'let xattrs = "-"'),
 }
 if mutation_mode == "true":
     if mutation_name not in mutations or mutation_slot not in slots \
@@ -14038,6 +14068,12 @@ required = {
         "independentVerifierReadsButDoesNotAdmitExactPreservedV11GateWhenOptedIn",
         '"STORNAUT_TASK39_V11_GATE_BASE"',
         '"STORNAUT_TASK39_PERSISTENT_GATE_BASE"',
+        "private static func extendedAttributeSnapshot(_ path: String) throws",
+        "listxattr(path, nil, 0, XATTR_NOFOLLOW)",
+        "getxattr(", "nameHex",
+        "InvestigationHandoffSHA256.hashing(value).lowercaseHex",
+        "let xattrs = try extendedAttributeSnapshot(url.path)",
+        "digest, xattrs",
         "#expect(try Self.treeSnapshot(base) == before)"),
     "boundary_tests": ("iiCCPreservedHistoricalGateCapsuleContractIsClosed",),
     "verifier": ("def parse_projected_input(data):",
@@ -14096,6 +14132,10 @@ PY
 
 function verify_iicc_preserved_capsule_staged_scope() {
     local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local scope_root=${STORNAUT_IICC_SCOPE_WORKTREE_ROOT:-$repo_root}
+    [[ $scope_root == /* && -d $scope_root && ! -L $scope_root ]] || {
+        print -u2 "ii-c-c preserved-capsule scope root invalid"; return 1
+    }
     local baseline=${1:-$iicc_preserved_capsule_scope_baseline}
     local expected_baseline=e717b586cb430d1866249ddb13ac2d04e81e6519
     [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
@@ -14110,7 +14150,7 @@ function verify_iicc_preserved_capsule_staged_scope() {
         Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift 60
         Tests/Fixtures/InvestigationFixedGateHandoff/main.swift 20
         Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift 80
-        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 540
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 600
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 100
         scripts/verify-contract 80
         scripts/verify-investigation-boundaries 220
@@ -14137,7 +14177,7 @@ function verify_iicc_preserved_capsule_staged_scope() {
         }
         (( total += add + delete ))
     done <<< "$(git diff --cached --numstat "$baseline" --)"
-    (( total <= 1800 )) || {
+    (( total <= 1_500 )) || {
         print -u2 "ii-c-c preserved-capsule aggregate budget drifted"; return 1
     }
     [[ -z "$(git diff --name-only --diff-filter=ACMRD -- \
@@ -14151,8 +14191,67 @@ function verify_iicc_preserved_capsule_staged_scope() {
         [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
             "$mode 0 $checkpoint_path" \
             && "$(print -r -- "$entry" | awk '{print $2}')" == \
-            "$(git hash-object -- "$checkpoint_path")" ]] || {
+            "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
             print -u2 "ii-c-c preserved-capsule staged source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+}
+
+function verify_iicc_evidence_closure_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local scope_root=${STORNAUT_IICC_SCOPE_WORKTREE_ROOT:-$repo_root}
+    [[ $scope_root == /* && -d $scope_root && ! -L $scope_root ]] || {
+        print -u2 "ii-c-c evidence-closure scope root invalid"; return 1
+    }
+    local baseline=${1:-$iicc_evidence_closure_scope_baseline}
+    local expected_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        $expected_baseline ]] || {
+        print -u2 "ii-c-c evidence-closure baseline drifted"; return 1
+    }
+    local -A ceilings=(
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 100
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120
+        scripts/verify-contract 420
+        scripts/verify-investigation-boundaries 180
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#expected} == 4 && ${#observed} == 4 )) \
+        && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "ii-c-c evidence-closure paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md \
+            || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || {
+            print -u2 "ii-c-c evidence-closure binary path rejected"; return 1
+        }
+        (( add + delete <= ceilings[$checkpoint_path] )) || {
+            print -u2 "ii-c-c evidence-closure path budget drifted: $checkpoint_path"
+            return 1
+        }
+        (( total += add + delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 700 )) || {
+        print -u2 "ii-c-c evidence-closure aggregate budget drifted"; return 1
+    }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "ii-c-c evidence-closure index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" == \
+            "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
+            print -u2 "ii-c-c evidence-closure staged source drifted: $checkpoint_path"
             return 1
         }
     done
@@ -19065,6 +19164,12 @@ if $iicc_preserved_capsule_scope_only; then
     verify_iicc_preserved_capsule_staged_scope \
         "$iicc_preserved_capsule_scope_baseline"
     print "ii-c-c preserved-capsule staged scope verification passed."
+    exit 0
+fi
+if $iicc_evidence_closure_scope_only; then
+    verify_iicc_evidence_closure_staged_scope \
+        "$iicc_evidence_closure_scope_baseline"
+    print "ii-c-c evidence-closure staged scope verification passed."
     exit 0
 fi
 if $iicc_scope_contract_only; then

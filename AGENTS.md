@@ -972,7 +972,10 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   Gate residue 保留，failure disposition 与 authorization hardening 已完成/
   non-admitting；基于 `d5a7df3` 的 fresh v14 授权在任何 launch/root action
   前因 exact v13 preservation P0 而 superseded/unconsumed；preservation
-  prerequisite 已实现/non-admitting，等待基于新 pushed commit 的 fresh 授权，
+  prerequisite 已实现/non-admitting；用户批准基于 `facf3ea` 的 fresh v15，
+  但 pre-arm review 发现 aggregate scope enforcement 与 xattr no-mutation
+  evidence gaps；未发生 launch/root action，v15 superseded/unconsumed。两项
+  evidence-closure 修复已实现/non-admitting，等待基于新 pushed commit 的授权，
   L3c3d/L3c4 仍未证明；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
