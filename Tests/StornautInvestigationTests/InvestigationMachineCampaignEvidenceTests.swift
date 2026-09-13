@@ -1777,6 +1777,49 @@ struct InvestigationMachineCampaignEvidenceTests {
                 payload, kind: .spawnUncertain, attemptUUID: attempt
             )
         }
+        for reason in [
+            "postArmFailure/receiptInvalid/signaled-15/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-1",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-02/termination-unresolved-posix-1",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-02/termination-unresolved-deadline",
+        ] {
+            let payload = try InvestigationMachineEvidenceJSON.canonicalData([
+                "schemaVersion": 3,
+                "kind": "spawnUncertain",
+                "attemptUUID": attempt.uuidString.lowercased(),
+                "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
+                "reason": reason,
+            ])
+            try InvestigationMachineEvidenceJSON.validateEvent(
+                payload, kind: .spawnUncertain, attemptUUID: attempt
+            )
+        }
+        for reason in [
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-0",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-01",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-open/terminal-eof/cleanup-00/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-01/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-02/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-04/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-08/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-10/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-unresolved-deadline",
+            "postArmFailure/receiptInvalid/wait-unavailable/receipt-eof/terminal-eof/cleanup-00/termination-covered-deadline",
+        ] {
+            let payload = try InvestigationMachineEvidenceJSON.canonicalData([
+                "schemaVersion": 3,
+                "kind": "spawnUncertain",
+                "attemptUUID": attempt.uuidString.lowercased(),
+                "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
+                "reason": reason,
+            ])
+            #expect(throws: (any Error).self) {
+                try InvestigationMachineEvidenceJSON.validateEvent(
+                    payload, kind: .spawnUncertain, attemptUUID: attempt
+                )
+            }
+        }
 
         let generic = try InvestigationMachineEvidenceJSON.canonicalData([
             "schemaVersion": 2,
@@ -1821,6 +1864,13 @@ struct InvestigationMachineCampaignEvidenceTests {
             "postArmFailure/unexpectedResponse/signaled-15/receipt-eof/terminal-eof/cleanup-10",
             "postArmFailure/childTerminated/wait-unavailable/receipt-eof/terminal-eof/cleanup-04",
             "postArmFailure/childTerminated/signaled-15/receipt-eof/terminal-eof/cleanup-04",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-0",
+            "postArmFailure/receiptInvalid/exited-82/receipt-open/terminal-eof/cleanup-00/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-01/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-02/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-04/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-08/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-10/termination-covered-deadline",
         ] {
             var object = try #require(
                 JSONSerialization.jsonObject(with: generic) as? [String: Any]
@@ -3513,7 +3563,9 @@ struct InvestigationMachineCampaignEvidenceTests {
         let impossibleTerminal = try schemaTwoFailureVerifierResult(reason:
             "postArmFailure/transportUncertain/exited-1/receipt-open/terminal-open/cleanup-00")
         #expect(impossibleTerminal.status != 0)
-        #expect(impossibleTerminal.stderr.contains("schema-two terminal-shape binding"))
+        #expect(impossibleTerminal.stderr.contains(
+            "closed failure terminal-shape binding"
+        ))
 
         for reason in [
             "campaign-incomplete",
@@ -3545,8 +3597,48 @@ struct InvestigationMachineCampaignEvidenceTests {
         }
     }
 
+    @Test
+    func independentVerifierAcceptsOnlyClosedSchemaThreeTerminationCoverage()
+        throws
+    {
+        let accepted = try schemaTwoFailureVerifierResult(
+            reason: "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-1",
+            schemaVersion: 3
+        )
+        #expect(accepted.status != 0)
+        #expect(accepted.stderr.contains("consumed failure is non-admitting"))
+        #expect(!accepted.stderr.contains("closed failure projection reason"))
+        let impossibleTerminal = try schemaTwoFailureVerifierResult(
+            reason: "postArmFailure/transportUncertain/exited-1/receipt-open/terminal-open/cleanup-02/termination-unresolved-deadline",
+            schemaVersion: 3
+        )
+        #expect(impossibleTerminal.status != 0)
+        #expect(impossibleTerminal.stderr.contains(
+            "closed failure terminal-shape binding"
+        ))
+
+        for reason in [
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-0",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-posix-01",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-00/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-open/terminal-eof/cleanup-00/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-01/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-02/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-04/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-08/termination-covered-deadline",
+            "postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-10/termination-covered-deadline",
+        ] {
+            let rejected = try schemaTwoFailureVerifierResult(
+                reason: reason, schemaVersion: 3
+            )
+            #expect(rejected.status != 0)
+            #expect(rejected.stderr.contains("closed failure projection reason"))
+        }
+    }
+
     private func schemaTwoFailureVerifierResult(
-        reason: String
+        reason: String, schemaVersion: Int = 2
     ) throws -> CampaignVerifierResult {
         let fixture = try CampaignEvidenceDiskFixture.make()
         defer { fixture.remove() }
@@ -3574,14 +3666,14 @@ struct InvestigationMachineCampaignEvidenceTests {
         }
         try fixture.populatePrivilegedArtifacts(writer, epochCount: 0)
         var seal = try writer.finalize()
-        if reason != acceptedReason {
+        if reason != acceptedReason || schemaVersion != 2 {
             let event3URL = fixture.evidenceRoot.appending(
                 path: "03-authorization/attempt-event-0003.bin")
             let event4URL = fixture.evidenceRoot.appending(
                 path: "03-authorization/attempt-event-0004.bin")
             var event3 = try CampaignWireTranscript(Data(contentsOf: event3URL))
             let payload = try InvestigationMachineEvidenceJSON.canonicalData([
-                "schemaVersion": 2, "kind": "spawnUncertain",
+                "schemaVersion": schemaVersion, "kind": "spawnUncertain",
                 "attemptUUID": fixture.attemptUUID.uuidString.lowercased(),
                 "evidenceSetSHA256": Self.digest(0xd1).lowercaseHex,
                 "reason": reason,

@@ -213,6 +213,50 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func cleanupAttributionPinsSchemaThreeAndAggregateScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let dedicated = try String(contentsOf: root.appending(
+            path: "scripts/verify-iic-cleanup-attribution-contract"),
+            encoding: .utf8)
+        for marker in [
+            "--iic-c-cleanup-attribution-source-contract-only",
+            "--iic-c-cleanup-attribution-mutation-contract-only",
+            "--iic-c-cleanup-attribution-staged-scope-contract-only",
+            "function verify_iicc_cleanup_attribution_source_contract()",
+            "function verify_iicc_cleanup_attribution_staged_scope()",
+            "cleanup attribution aggregate budget drifted",
+            "1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6",
+        ] { #expect(boundary.contains(marker), "missing: (marker)") }
+        for marker in [
+            "--iic-c-cleanup-attribution-contract-only",
+            "function run_iicc_cleanup_attribution_contract()",
+            "cleanup attribution verifier identity drifted",
+            "private let forbiddenAuthority = \"sudo\"",
+        ] { #expect(contract.contains(marker), "missing: (marker)") }
+        #expect(boundary.contains(
+            "if not line.lstrip().startswith(\"//\")"
+        ))
+        for marker in [
+            "schema-selection-drop", "typed-deadline-drop", "typed-errno-drop",
+            "schema-three-drop", "covered-token-drop", "cleanup-zero-drop",
+            "receipt-eof-drop", "terminal-eof-drop", "residue-complete-drop",
+            "other-cleanup-drop", "python-schema-three-drop",
+            "python-covered-token-drop",
+            "cleanup_attribution_self_sha=",
+            "cleanup attribution verifier self-seal drifted",
+            "cleanup attribution unconditional-success replacement accepted",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "aggregate-budget staged-worktree-divergence wrong-baseline",
+            "cleanup attribution scope mutation accepted: untracked",
+        ] { #expect(dedicated.contains(marker), "missing: (marker)") }
+    }
+
+    @Test
     func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let boundary = try String(contentsOf: root.appending(
@@ -380,14 +424,17 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
             "46dc6df47dbb80116dfce4443ec3f3fa6cb696b78404d62549a910610c6d9aca",
+            "1bc1f3ad259aa4d12c8181a2810bf9a669d1ebe4b5613120b6b83aa952c1d940",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
             "6a9dfdc4744e3869b3acee1647d664b748c61e15d96e2eaddcdb81a1805fc0df",
+            "664559633ca2f2b2ea211db2310717c32998ffe2bd351f875ffb6d3516a85198",
             "require_body_digest(",
             "fea0c249566d0f57babb384980713873ed4a303e7943e5490d25d01e1357215c",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
             "67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac",
+            "1a6411186393b37b8339281174ef1d803d9404d762aea161a2e120c160f23b2e",
             "active_executable.count('Self.runLifecycle(') != 3",
             "active_executable.count('runFixed(') != 4",
             "active_executable.count('posix_spawn(') != 1",

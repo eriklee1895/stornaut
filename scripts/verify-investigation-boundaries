@@ -426,6 +426,14 @@ v16_repair_mutation_sha=
 v16_repair_sources=()
 v16_repair_scope_contract_only=false
 v16_repair_scope_baseline=4d71ae29474425b8fedecf6f9ac97517d68fd506
+cleanup_attribution_source_contract_only=false
+cleanup_attribution_mutation_contract_only=false
+cleanup_attribution_mutation_name=
+cleanup_attribution_mutation_slot=
+cleanup_attribution_mutation_sha=
+cleanup_attribution_sources=()
+cleanup_attribution_scope_contract_only=false
+cleanup_attribution_scope_baseline=1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -1064,11 +1072,11 @@ if (( $# > 0 )); then
     elif (( $# == 1 )) \
         && [[ $1 == --iic-c-deadline-budget-contract-only ]]; then
         iicc_deadline_budget_contract_only=true
-    elif (( $# == 1 || $# == 9 )) \
+    elif (( $# == 1 || $# == 12 )) \
         && [[ $1 == --iic-c-preserved-capsule-contract-only ]]; then
         iicc_preserved_capsule_contract_only=true
         iicc_preserved_capsule_sources=("${@:2}")
-    elif (( $# == 12 )) \
+    elif (( $# == 15 )) \
         && [[ $1 == --iic-c-preserved-capsule-mutation-contract-only ]]; then
         iicc_preserved_capsule_mutation_contract_only=true
         iicc_preserved_capsule_mutation_name=$2
@@ -1099,11 +1107,11 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-prearm-failure-staged-scope-contract-only ]]; then
         prearm_failure_scope_contract_only=true
         prearm_failure_scope_baseline=${2:-51ea8c28b9431280bb0e8b7e6373e2e1ad538298}
-    elif (( $# == 1 || $# == 9 )) \
+    elif (( $# == 1 || $# == 12 )) \
         && [[ $1 == --iic-root-driver-lineage-l1-source-contract-only ]]; then
         iic_lineage_l1_source_contract_only=true
         iic_lineage_l1_sources=("${@:2}")
-    elif (( $# == 12 )) \
+    elif (( $# == 15 )) \
         && [[ $1 == --iic-root-driver-lineage-l1-mutation-contract-only ]]; then
         iic_lineage_l1_mutation_contract_only=true
         iic_lineage_l1_mutation_name=$2
@@ -1159,6 +1167,21 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-v16-repair-staged-scope-contract-only ]]; then
         v16_repair_scope_contract_only=true
         v16_repair_scope_baseline=${2:-4d71ae29474425b8fedecf6f9ac97517d68fd506}
+    elif (( $# == 1 || $# == 7 )) \
+        && [[ $1 == --iic-c-cleanup-attribution-source-contract-only ]]; then
+        cleanup_attribution_source_contract_only=true
+        cleanup_attribution_sources=("${@:2}")
+    elif (( $# == 10 )) \
+        && [[ $1 == --iic-c-cleanup-attribution-mutation-contract-only ]]; then
+        cleanup_attribution_mutation_contract_only=true
+        cleanup_attribution_mutation_name=$2
+        cleanup_attribution_mutation_slot=$3
+        cleanup_attribution_mutation_sha=$4
+        cleanup_attribution_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-cleanup-attribution-staged-scope-contract-only ]]; then
+        cleanup_attribution_scope_contract_only=true
+        cleanup_attribution_scope_baseline=${2:-1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -12154,6 +12177,10 @@ for forbidden in ("StornautCore", "StornautExecution",
 
 for slot in ("contract", "claim", "validator"):
     source = sources[slot]
+    active = "\n".join(
+        line for line in source.splitlines()
+        if not line.lstrip().startswith("//")
+    )
     if not source.strip() or "import StornautCore" in source \
             or "import StornautExecution" in source \
             or "import StornautInvestigationMachineCampaignSupport" in source:
@@ -12161,9 +12188,9 @@ for slot in ("contract", "claim", "validator"):
     for forbidden in ("sudo", "launchctl", "URLSession",
                       "NWConnection", "production seam", "SecCode",
                       "SecStaticCode", "kSec", "Authorization"):
-        if forbidden in source:
+        if forbidden in active:
             raise SystemExit("ii-c root-driver lineage production authority drifted: " + slot)
-    if re.search(r"(?<![A-Za-z0-9_])Process\s*\(", source):
+    if re.search(r"(?<![A-Za-z0-9_])Process\s*\(", active):
         raise SystemExit("ii-c root-driver lineage process launch authority drifted: " + slot)
 for slot in ("contract_tests", "claim_tests", "validator_tests"):
     if "@Test" not in sources[slot]:
@@ -12706,6 +12733,143 @@ function verify_iicc_v16_repair_staged_scope() {
     done
 }
 
+function verify_iicc_cleanup_attribution_source_contract() {
+    local -a paths=("${cleanup_attribution_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+        scripts/verify-investigation-runtime-machine-report
+    ); fi
+    /usr/bin/python3 -I - "$cleanup_attribution_mutation_contract_only" \
+        "$cleanup_attribution_mutation_name" "$cleanup_attribution_mutation_slot" \
+        "$cleanup_attribution_mutation_sha" "${paths[@]}" <<'PY'
+from pathlib import Path
+import hashlib,re,sys
+mode,name,slot,sha=sys.argv[1:5]
+slots=("main","evidence","harness","evidence_tests","harness_tests","verifier")
+canonical_args=(
+ "Sources/StornautInvestigationMachineCampaign/main.swift",
+ "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift",
+ "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift",
+ "scripts/verify-investigation-runtime-machine-report")
+args=tuple(sys.argv[5:]); paths=tuple(map(Path,args))
+if len(paths)!=6 or any(p.is_symlink() or not p.is_file() for p in paths):
+    raise SystemExit("cleanup attribution source identity drifted")
+sources=dict(zip(slots,(p.read_text() for p in paths)))
+canonical=dict(zip(slots,(Path(p).read_text() for p in canonical_args)))
+M={
+ "schema-selection-drop":("main","failure.postArmEvidenceSchemaVersion","2"),
+ "typed-deadline-drop":("main","throw InvestigationMachineCampaignTerminationFailure\n                        .deadlineExpired","throw Failure.deadline"),
+ "typed-errno-drop":("main","throw InvestigationMachineCampaignTerminationFailure\n                        .posix(errno)","throw Failure.posix(errno)"),
+ "schema-three-drop":("evidence","&& (payloadSchema == 2 || payloadSchema == 3),","&& payloadSchema == 2,"),
+ "covered-token-drop":("evidence","payloadSchema == 2 || terminationValid == true","true"),
+ "deadline-cover-drop":("evidence","termination.detail != \"deadline\" && cleanupMask == 0","cleanupMask == 0"),
+ "cleanup-zero-drop":("evidence","cleanupMask == 0","true"),
+ "receipt-eof-drop":("harness","&& receiptReachedEOF","&& true"),
+ "terminal-eof-drop":("harness","&& terminalReachedEOF","&& true"),
+ "residue-complete-drop":("harness","&& residue.complete","&& true"),
+ "other-cleanup-drop":("harness","if cleanupIssues.isEmpty,","if true,"),
+ "python-schema-three-drop":("verifier","if kind == 5 and schema in (2, 3):","if kind == 5 and schema == 2:"),
+ "python-covered-token-drop":("verifier","and cleanup_mask == 0 and both_eof","and True and both_eof"),
+ "python-deadline-cover-drop":("verifier","or covered and termination_match.group(2) != \"deadline\"","or covered and True"),
+}
+if mode=="true":
+    if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha):
+        raise SystemExit("cleanup attribution mutation identity drifted")
+    i=slots.index(slot); old,new=M[name][1:]
+    changed=[key for key in slots if sources[key]!=canonical[key]]
+    if changed!=[slot] or args[i]==canonical_args[i] \
+            or any(arg!=canonical_args[j] for j,arg in enumerate(args) if j!=i) \
+            or canonical[slot].count(old)!=1 \
+            or sources[slot]!=canonical[slot].replace(old,new,1):
+        raise SystemExit("cleanup attribution mutation contract drifted")
+    if hashlib.sha256(paths[i].read_bytes()).hexdigest()!=sha:
+        raise SystemExit("cleanup attribution mutation SHA drifted")
+elif mode!="false" or name or slot or sha or args!=canonical_args or sources!=canonical:
+    raise SystemExit("cleanup attribution canonical source drifted")
+for required_slot,old,_ in M.values():
+    if sources[required_slot].count(old)!=canonical[required_slot].count(old):
+        raise SystemExit("cleanup attribution source contract drifted: "+old)
+required={
+ "main":("failure.postArmEvidenceSchemaVersion","eventSchema == 2 || eventSchema == 3",
+         "InvestigationMachineCampaignTerminationFailure"),
+ "evidence":("payloadSchema == 2 || payloadSchema == 3",
+             "terminationReason","termination-covered-",
+             "termination-unresolved-","validTerminationEvidence",
+             "termination.detail != \"deadline\""),
+ "harness":("case deadlineExpired","case posix(Int32)","terminationFailureCovered",
+            "terminationFailureCoveredByTerminalProof","if cleanupIssues.isEmpty,",
+            "&& receiptReachedEOF","&& terminalReachedEOF","&& residue.complete",
+            "residue.processGroupMembers.isEmpty","residue.sessionMembers.isEmpty"),
+ "evidence_tests":("independentVerifierAcceptsOnlyClosedSchemaThreeTerminationCoverage",
+                  '"schemaVersion": 3',"termination-covered-posix-0",
+                  "termination-covered-posix-01"),
+ "harness_tests":("terminalProofSupersedesOnlyTypedTerminateFailure",
+                 "otherCleanupFailureKeepsTypedTerminationUnresolved",
+                 "CampaignHarnessTerminationCoverageMutation.allCases"),
+ "verifier":("schema in (2, 3)","expected_parts = 6 if schema == 2 else 7",
+            "termination-(covered|unresolved)-",
+            "deadline|posix-([1-9][0-9]{0,2})",
+            "cleanup_mask == 0",
+            'termination_match.group(2) != "deadline"',
+            'schemaVersion"] in (2, 3)',
+            "closed failure terminal-shape binding"),
+}
+for key,markers in required.items():
+    for marker in markers:
+        if marker not in sources[key]:
+            raise SystemExit("cleanup attribution source contract drifted: "+marker)
+PY
+}
+
+function verify_iicc_cleanup_attribution_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-$cleanup_attribution_scope_baseline}
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == 1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6 ]] \
+        || { print -u2 "cleanup attribution checkpoint baseline drifted"; return 1; }
+    local -A ceilings=(
+        Sources/StornautInvestigationMachineCampaign/main.swift 120
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift 180
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift 240
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 260
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift 240
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 80
+        scripts/verify-contract 520
+        scripts/verify-iic-cleanup-attribution-contract 220
+        scripts/verify-investigation-boundaries 520
+        scripts/verify-investigation-runtime-machine-report 180
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#observed}==10 )) \
+        && [[ "${(j:,:)${(@on)observed}}" == "${(j:,:)${(@on)expected}}" ]] \
+        || { print -u2 "cleanup attribution checkpoint paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || { print -u2 "cleanup attribution binary checkpoint path rejected"; return 1; }
+        (( add+delete<=ceilings[$checkpoint_path] )) || { print -u2 "cleanup attribution path budget drifted: $checkpoint_path"; return 1; }
+        (( total+=add+delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total<=1800 )) || { print -u2 "cleanup attribution aggregate budget drifted"; return 1; }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "cleanup attribution index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry"|awk '{print $1,$3,$4}')" == "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry"|awk '{print $2}')" == "$(git hash-object -- "$checkpoint_path")" ]] \
+            || { print -u2 "cleanup attribution staged source/mode drifted: $checkpoint_path"; return 1; }
+    done
+}
+
 function verify_root_driver_lineage_cross_uid_staged_scope() {
     local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
     local baseline=${1:-$cross_uid_scope_baseline}
@@ -12865,7 +13029,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     actor_block = main[main.index(actor_marker):
                        main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
     if hashlib.sha256(actor_block.encode()).hexdigest() != \
-            '6a9dfdc4744e3869b3acee1647d664b748c61e15d96e2eaddcdb81a1805fc0df':
+            '664559633ca2f2b2ea211db2310717c32998ffe2bd351f875ffb6d3516a85198':
         raise SystemExit("ii-c-c lifecycle actor drifted")
     def require_body_digest(start, end, expected):
         if main.count(start) != 1 or main.count(end) != 1:
@@ -12886,7 +13050,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     require_body_digest(
         '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
         '\n\n        private func writePostArm',
-        '67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac')
+        '1a6411186393b37b8339281174ef1d803d9404d762aea161a2e120c160f23b2e')
 if (main.count('Self.runLifecycle(') != 3
         or main.count('runLifecycle(') != 4
         or main.count('Self.runFixed(') != 2
@@ -12900,7 +13064,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '46dc6df47dbb80116dfce4443ec3f3fa6cb696b78404d62549a910610c6d9aca':
+            '1bc1f3ad259aa4d12c8181a2810bf9a669d1ebe4b5613120b6b83aa952c1d940':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -19445,6 +19609,18 @@ fi
 if $v16_repair_scope_contract_only; then
     verify_iicc_v16_repair_staged_scope "$v16_repair_scope_baseline"
     print "v16 status-82 identity repair staged scope verification passed."
+    exit 0
+fi
+if $cleanup_attribution_source_contract_only \
+    || $cleanup_attribution_mutation_contract_only; then
+    verify_iicc_cleanup_attribution_source_contract
+    print "ii-c-c cleanup attribution source verification passed."
+    exit 0
+fi
+if $cleanup_attribution_scope_contract_only; then
+    verify_iicc_cleanup_attribution_staged_scope \
+        "$cleanup_attribution_scope_baseline"
+    print "ii-c-c cleanup attribution staged scope verification passed."
     exit 0
 fi
 if $iicc_source_contract_only || $iicc_source_mutation_contract_only; then

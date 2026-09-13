@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=eba0727cdd5f468cec41ffe483f21d7af494d6b21ed7563366676d0e4001cc31
+# ib2_self_sha=5e9e843373ec8d05ee4dc1aaa4084495a77566122b82a9ad29114840e803a406
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -35,6 +35,33 @@ function require_fixed_text() {
     fi
 }
 
+function run_iicc_cleanup_attribution_contract() {
+    local verifier=scripts/verify-iic-cleanup-attribution-contract
+    local expected_sha=77e181892e3f0e9385d5998847606f488d8b34e745cd48a0512c1cff2a48af8e
+    /usr/bin/python3 -I - "$verifier" "$repo_root" "$expected_sha" <<'PY'
+import hashlib, os, stat, subprocess, sys
+path, root, expected = sys.argv[1:]
+fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+try:
+    metadata = os.fstat(fd)
+    chunks = []
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    if (not stat.S_ISREG(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o755
+            or metadata.st_uid != os.getuid() or metadata.st_nlink != 1
+            or hashlib.sha256(b"".join(chunks)).hexdigest() != expected):
+        raise SystemExit("cleanup attribution verifier identity drifted")
+    raise SystemExit(subprocess.run(
+        ["/bin/zsh", "-f", "-s", "--", "--sealed-bytes", root],
+        input=b"".join(chunks), check=False).returncode)
+finally:
+    os.close(fd)
+PY
+}
+
 function replay_historical_contract() (
     local replay_root=$1 commit=$2 expected_tree=$3 mode=$4
     local required_marker=${5:-}
@@ -53,7 +80,10 @@ function replay_historical_contract() (
     }
     trap cleanup_registered_replay EXIT
     trap 'exit 130' INT; trap 'exit 143' TERM; trap 'exit 129' HUP
-    git worktree add --detach --quiet "$replay_root" "$commit"
+    git worktree add --detach --no-checkout --quiet "$replay_root" "$commit"
+    git -C "$replay_root" sparse-checkout set --no-cone \
+        '/*' '!/docs/assets/'
+    git -C "$replay_root" checkout --quiet
     [[ "$(git -C "$replay_root" show -s --format=%T HEAD)" == "$expected_tree" ]] \
         || return 91
     [[ -z $required_marker ]] || require_fixed_text \
@@ -3281,6 +3311,15 @@ function verify_iic_root_driver_lineage_l1_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local run_scope=${2:-true}
     local baseline=0815ee26624f83520e30ce68aa54396761c14566
+    local accepted=83f6271ace2d52cc2ba170aae559a2d1fcc46864
+    local accepted_tree=98289e2b5764571b7a3a8a108d992905da6712ea
+    if [[ $run_scope == true ]]; then
+        replay_historical_contract "$out/historical" \
+            "$accepted" "$accepted_tree" \
+            --iic-root-driver-lineage-l1-contract-only \
+            '--iic-root-driver-lineage-l1-staged-scope-contract-only'
+        return 0
+    fi
     local -a paths=(
         Package.swift
         Sources/StornautInvestigationHandoffContract/InvestigationResolvedRootDriverLineageContract.swift
@@ -3311,9 +3350,9 @@ function verify_iic_root_driver_lineage_l1_contract() {
     local -a slots=(contract contract contract claim claim claim \
         validator validator validator contract claim validator validator validator release)
     local -a payloads=(
-        'import StornautCore' '// sudo' '// URLSession'
-        'import StornautExecution' '// launchctl' '// Process('
-        'import StornautInvestigationMachineCampaignSupport' '// sudo' '// NWConnection'
+        'import StornautCore' 'private let forbiddenAuthority = "sudo"' '// URLSession'
+        'import StornautExecution' 'private let forbiddenAuthority = "launchctl"' '// Process('
+        'import StornautInvestigationMachineCampaignSupport' 'private let forbiddenAuthority = "sudo"' '// NWConnection'
         '// production seam' '// production seam' '// production seam'
         '// installedL2Projections'
         '// SecCodeCopySelf('
@@ -3705,6 +3744,14 @@ fi
 
 function verify_iicc_v16_repair_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
+    local commit=1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6
+    local tree=a60282a3cb5e271e41bcd6d7b57d34f5207b9543
+    if [[ "$(git write-tree)" != "$tree" ]]; then
+        replay_historical_contract "$out/historical" "$commit" "$tree" \
+            --iic-c-v16-repair-contract-only \
+            '--iic-c-v16-repair-staged-scope-contract-only'
+        return 0
+    fi
     local -a paths=(
         Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
         Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
@@ -3915,6 +3962,13 @@ if [[ ${1:-} == --iic-c-v16-repair-contract-only ]]; then
     verify_iicc_v16_repair_contract "$v16_repair_root"
     print "v16 status-82 identity repair contract verification passed."
     exit 0
+fi
+
+if [[ ${1:-} == --iic-c-cleanup-attribution-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-c-cleanup-attribution-contract-only"
+    run_iicc_cleanup_attribution_contract
+    exit $?
 fi
 
 function verify_iicc_contract() {
@@ -4264,8 +4318,8 @@ PY
                 --cacheinfo "100644,$preserved_scope_blob,${preserved_scope_paths[1]}"
             preserved_scope_expected="ii-c-c preserved-capsule binary path rejected";;
           wrong-mode)
-            preserved_scope_blob=$(git hash-object -w -- \
-                scripts/verify-investigation-runtime-machine-report)
+            preserved_scope_blob=$(git rev-parse \
+                "${preserved_scope_commit}:scripts/verify-investigation-runtime-machine-report")
             GIT_INDEX_FILE="$preserved_scope_bad" git update-index \
                 --cacheinfo "100644,$preserved_scope_blob,scripts/verify-investigation-runtime-machine-report"
             preserved_scope_expected="ii-c-c preserved-capsule staged source drifted: scripts/verify-investigation-runtime-machine-report";;
@@ -4581,7 +4635,8 @@ PY
                 --cacheinfo "100644,$authorization_scope_blob,${authorization_scope_paths[1]}"
             authorization_scope_expected="ii-c-c v16 authorization binary path rejected";;
           wrong-mode)
-            authorization_scope_blob=$(git hash-object -w -- scripts/verify-contract)
+            authorization_scope_blob=$(git rev-parse \
+                "${authorization_scope_commit}:scripts/verify-contract")
             GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
                 --cacheinfo "100644,$authorization_scope_blob,scripts/verify-contract"
             authorization_scope_expected="ii-c-c v16 authorization staged source drifted: scripts/verify-contract";;
@@ -5526,7 +5581,7 @@ replacement = '''    static func main() async {
 Path(sys.argv[2]).write_text(source.replace(needle, replacement, 1))
 PY
     reject_iicc_protocol lifecycle-outer-main-spawn-alias \
-        'ii-c-b2b2 debug executable drifted' \
+        'ii-c-b2b2 lifecycle actor drifted' \
         "$gate" --iic-b2b2-source-contract-only \
         Package.swift "$lifecycle_outer_main_spawn_alias" \
         Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \
@@ -7496,6 +7551,7 @@ STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 \
 verify_iic_root_driver_lineage_l1_contract "$contract_root/iic-lineage-l1" false
 verify_iic_root_driver_lineage_l2_contract "$contract_root/iic-lineage-l2"
 verify_iicc_v16_repair_contract "$contract_root/v16-repair"
+run_iicc_cleanup_attribution_contract
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

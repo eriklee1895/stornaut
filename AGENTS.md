@@ -979,8 +979,9 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   基于该 commit 的 fresh v16 已唯一执行并以 closed post-arm
   `receiptInvalid/exited-82/cleanup-02` 失败；schema-v9 checked disposition
   绑定九个 raw artifacts、双 persistent Gate attempt/capsule 与零固定运行时
-  live residue。v16 consumed/non-admitting/non-retryable；当前 frontier 为
-  exact status-82/cleanup-02 root-cause repair，L3c3d/L3c4 仍未证明；
+  live residue。v16 consumed/non-admitting/non-retryable；status-82 identity 与
+  cleanup-02 typed-attribution repairs 已完成/non-admitting；当前 frontier 为
+  fresh campaign authorization → green campaign → L3c3d → L3c4；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

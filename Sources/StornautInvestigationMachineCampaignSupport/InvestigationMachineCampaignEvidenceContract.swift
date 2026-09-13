@@ -1041,7 +1041,8 @@ package enum InvestigationMachineEvidenceJSON {
         try exact(object, keys)
         let payloadSchema = integer(object, "schemaVersion")
         guard payloadSchema == schemaVersion
-                || kind == .spawnUncertain && payloadSchema == 2,
+                || kind == .spawnUncertain
+                    && (payloadSchema == 2 || payloadSchema == 3),
               string(object, "kind") == eventName(kind),
               uuid(object, "attemptUUID") == attemptUUID,
               digest(object, "evidenceSetSHA256") != nil
@@ -1054,8 +1055,9 @@ package enum InvestigationMachineEvidenceJSON {
         }
         if kind == .cancelledBeforeArm || kind == .spawnUncertain {
             guard let reason = string(object, "reason"), !reason.isEmpty,
-                  reason.utf8.count <= 96 else { throw invalid() }
-            if kind == .spawnUncertain, payloadSchema == 2 {
+                  reason.utf8.count <= (payloadSchema == 3 ? 128 : 96)
+            else { throw invalid() }
+            if kind == .spawnUncertain, payloadSchema == 2 || payloadSchema == 3 {
                 let fields = reason.split(
                     separator: "/", omittingEmptySubsequences: false
                 ).map(String.init)
@@ -1066,7 +1068,16 @@ package enum InvestigationMachineEvidenceJSON {
                     "exactReapUncertain", "residueUncertain",
                     "transportUncertain", "cancelled", "unexpectedResponse",
                 ])
-                guard fields.count == 6,
+                let termination = fields.count == 7
+                    ? terminationReason(fields[6]) : nil
+                let terminationValid = termination.map {
+                    validTerminationEvidence(
+                        $0, wait: fields[2], receipt: fields[3],
+                        terminal: fields[4], cleanupMask:
+                            cleanupReason(fields[5]) ?? UInt8.max
+                    )
+                }
+                guard fields.count == (payloadSchema == 2 ? 6 : 7),
                       fields[0] == "postArmFailure",
                       primary.contains(fields[1]),
                       validWaitReason(fields[2]),
@@ -1077,7 +1088,8 @@ package enum InvestigationMachineEvidenceJSON {
                         primary: fields[1], wait: fields[2],
                         receipt: fields[3], terminal: fields[4],
                         cleanupMask: cleanupMask
-                      )
+                      ),
+                      payloadSchema == 2 || terminationValid == true
                 else { throw invalid() }
             }
         }
@@ -1109,6 +1121,39 @@ package enum InvestigationMachineEvidenceJSON {
         }), let mask = UInt8(value.dropFirst(8), radix: 16)
         else { return nil }
         return mask & ~0x1f == 0 ? mask : nil
+    }
+
+    private static func terminationReason(
+        _ value: String
+    ) -> (covered: Bool, detail: String)? {
+        let variants = ["termination-covered-", "termination-unresolved-"]
+        guard let prefix = variants.first(where: { value.hasPrefix($0) })
+        else { return nil }
+        let detail = String(value.dropFirst(prefix.count))
+        if detail == "deadline" {
+            return (prefix == variants[0], detail)
+        }
+        let posix = "posix-"
+        guard detail.hasPrefix(posix) else { return nil }
+        let suffix = detail.dropFirst(posix.count)
+        guard !suffix.isEmpty,
+              suffix.utf8.allSatisfy({ (48...57).contains($0) }),
+              let error = Int(suffix), (1...255).contains(error)
+        else { return nil }
+        guard String(error) == suffix else { return nil }
+        return (prefix == variants[0], detail)
+    }
+
+    private static func validTerminationEvidence(
+        _ termination: (covered: Bool, detail: String), wait: String,
+        receipt: String, terminal: String, cleanupMask: UInt8
+    ) -> Bool {
+        if termination.covered {
+            return termination.detail != "deadline" && cleanupMask == 0
+                && (wait.hasPrefix("exited-") || wait.hasPrefix("signaled-"))
+                && receipt == "receipt-eof" && terminal == "terminal-eof"
+        }
+        return cleanupMask & 0x02 != 0
     }
 
     private static func produciblePostArmFailure(
@@ -1174,15 +1219,18 @@ package enum InvestigationMachineEvidenceJSON {
         return true
     }
 
-    fileprivate static func schemaTwoPostArmFailurePrimary(
+    fileprivate static func closedPostArmFailurePrimary(
         _ payload: Data
     ) throws -> String? {
         let value = try object(payload)
-        guard integer(value, "schemaVersion") == 2 else { return nil }
+        guard let schema = integer(value, "schemaVersion"),
+              schema == 2 || schema == 3
+        else { return nil }
         let fields = string(value, "reason")?.split(
             separator: "/", omittingEmptySubsequences: false
         ).map(String.init)
-        guard let fields, fields.count == 6 else { throw invalid() }
+        guard let fields, fields.count == (schema == 2 ? 6 : 7)
+        else { throw invalid() }
         return fields[1]
     }
 
@@ -1371,7 +1419,7 @@ package enum InvestigationMachineAttemptEventChain {
         if mode == .privileged, events.count >= 3,
            events[2].kind == .spawnUncertain,
            let primary = try InvestigationMachineEvidenceJSON
-            .schemaTwoPostArmFailurePrimary(events[2].payload)
+            .closedPostArmFailurePrimary(events[2].payload)
         {
             let terminalWasPublished = events.last?.kind == .terminal
             guard (primary == "transportUncertain") != terminalWasPublished

@@ -144,8 +144,9 @@ launch/root action，v15 superseded/unconsumed。修复已由 `103a4836` 推送�
 验证/non-admitting；fresh v16 随后唯一执行并以 closed post-arm
 `receiptInvalid/exited-82/cleanup-02` 失败，现 consumed/non-admitting/
 non-retryable。schema-v9 disposition 已绑定九个 raw artifacts、双 persistent
-Gate 与零固定运行时 live residue；status-82/cleanup-02 root-cause repair
-尚未完成，L3c3d/L3c4 仍未证明，最终 authoritative full 未运行；Task 40 仍受批准计划的顺序前置
+Gate 与零固定运行时 live residue；status-82 identity 与 cleanup-02 typed
+attribution repairs 已完成/non-admitting，等待 fresh campaign 授权；L3c3d/L3c4
+仍未证明，最终 authoritative full 未运行；Task 40 仍受批准计划的顺序前置
 条件阻塞，production Deep Dive 仍 unavailable。
 见文档：
 
@@ -161,7 +162,7 @@ Gate 与零固定运行时 live residue；status-82/cleanup-02 root-cause repair
 | [docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md](docs/assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md) | 权限受限、安全阻断、部分结果、stale preflight 与历史保留的恢复状态契约 |
 | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) | Phase B domain/persistence、真实 Quick Scan benchmark、accounting、UI 与 scope gate |
 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) | 已归档的 Phase B Tasks 9–26 计划与逐 Task 证据 |
-| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete；Task 39 active after consumed v8–v13/v16 no-go；v14/v15 superseded/unconsumed；status-82/cleanup-02 repair pending；Task 40 remains blocked |
+| [docs/plans/active/README.md](docs/plans/active/README.md) | Phase D approved；Tasks 36–38 complete；Task 39 active after consumed v8–v13/v16 no-go；v14/v15 superseded/unconsumed；status-82/cleanup-02 repair complete，fresh campaign authorization required；Task 40 remains blocked |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) | v1 capsule bytes preserved；frozen enclosing projected-cohort binary contract、8-path/2,600-line ceiling and corrected remaining order |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) | ii-c0a exact 8-path / 1,863-line completion、90 focused、536 affected、1,418-test serial、boundary gates 与 independent review |
 | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) | c0b-i semantic producer completion audit；exact 7 paths / 1,900 lines、95 tests / 5 suites；complete/non-admitting |

@@ -622,6 +622,22 @@ package enum InvestigationMachineCampaignCleanupIssue:
     case residueObservationFailed
 }
 
+package enum InvestigationMachineCampaignTerminationFailure:
+    Error, Sendable, Equatable
+{
+    case deadlineExpired
+    case posix(Int32)
+
+    fileprivate var evidenceName: String {
+        switch self {
+        case .deadlineExpired:
+            "deadline"
+        case .posix(let error):
+            "posix-" + String(error)
+        }
+    }
+}
+
 package struct InvestigationMachineCampaignHarnessFailureResult:
     Sendable, Equatable
 {
@@ -632,6 +648,9 @@ package struct InvestigationMachineCampaignHarnessFailureResult:
     package let exactWait: InvestigationMachineCampaignExactWait?
     package let receiptReachedEOF: Bool
     package let terminalReachedEOF: Bool
+    package let terminationFailure:
+        InvestigationMachineCampaignTerminationFailure?
+    package let terminationFailureCovered: Bool
 
     package init(
         primary: InvestigationMachineCampaignHarnessFailure,
@@ -640,7 +659,10 @@ package struct InvestigationMachineCampaignHarnessFailureResult:
             InvestigationMachineCampaignPreArmFailureFrame? = nil,
         exactWait: InvestigationMachineCampaignExactWait? = nil,
         receiptReachedEOF: Bool = false,
-        terminalReachedEOF: Bool = false
+        terminalReachedEOF: Bool = false,
+        terminationFailure:
+            InvestigationMachineCampaignTerminationFailure? = nil,
+        terminationFailureCovered: Bool = false
     ) {
         self.primary = primary
         self.cleanupIssues = cleanupIssues
@@ -648,15 +670,25 @@ package struct InvestigationMachineCampaignHarnessFailureResult:
         self.exactWait = exactWait
         self.receiptReachedEOF = receiptReachedEOF
         self.terminalReachedEOF = terminalReachedEOF
+        self.terminationFailure = terminationFailure
+        self.terminationFailureCovered = terminationFailureCovered
+    }
+
+    package var postArmEvidenceSchemaVersion: Int {
+        terminationFailure == nil ? 2 : 3
     }
 
     package var postArmEvidenceReason: String {
-        Self.postArmEvidenceReason(
+        let base = Self.postArmEvidenceReason(
             primary: primary, exactWait: exactWait,
             receiptReachedEOF: receiptReachedEOF,
             terminalReachedEOF: terminalReachedEOF,
             cleanupIssues: cleanupIssues
         )
+        guard let terminationFailure else { return base }
+        return base + "/termination-"
+            + (terminationFailureCovered ? "covered-" : "unresolved-")
+            + terminationFailure.evidenceName
     }
 
     package static func postArmEvidenceReason(
@@ -703,6 +735,32 @@ package struct InvestigationMachineCampaignHarnessFailureResult:
             terminalReachedEOF ? "terminal-eof" : "terminal-open",
             String(format: "cleanup-%02x", cleanupMask),
         ].joined(separator: "/")
+    }
+
+    package static func terminationFailureCoveredByTerminalProof(
+        _ failure: InvestigationMachineCampaignTerminationFailure,
+        exactWait: InvestigationMachineCampaignExactWait?,
+        receiptReachedEOF: Bool, terminalReachedEOF: Bool,
+        residue: InvestigationMachineCampaignResidueObservation?
+    ) -> Bool {
+        let terminalWait: Bool = switch exactWait {
+        case .exited, .signaled: true
+        case .stopped, nil: false
+        }
+        guard let residue else { return false }
+        let encodableFailure: Bool = switch failure {
+        case .deadlineExpired:
+            false
+        case .posix(let error):
+            (1...255).contains(error)
+        }
+        return encodableFailure
+            && terminalWait
+            && receiptReachedEOF
+            && terminalReachedEOF
+            && residue.complete
+            && residue.processGroupMembers.isEmpty
+            && residue.sessionMembers.isEmpty
     }
 }
 
@@ -992,6 +1050,8 @@ package actor InvestigationMachineCampaignHarness {
         var primary = initialPrimary
         var cleanupIssues: [InvestigationMachineCampaignCleanupIssue] = []
         var terminationAttempted = false
+        var typedTerminationFailure:
+            InvestigationMachineCampaignTerminationFailure?
         if primary != nil {
             terminationAttempted = true
             do {
@@ -1002,6 +1062,8 @@ package actor InvestigationMachineCampaignHarness {
                         absoluteDeadlineNanoseconds: deadline
                     )
                 ) else { throw HarnessInternalError.unexpectedResponse }
+            } catch let error as InvestigationMachineCampaignTerminationFailure {
+                typedTerminationFailure = error
             } catch { cleanupIssues.append(.terminateFailed) }
         }
 
@@ -1046,6 +1108,8 @@ package actor InvestigationMachineCampaignHarness {
                             absoluteDeadlineNanoseconds: deadline
                         )
                     ) else { throw HarnessInternalError.unexpectedResponse }
+                } catch let error as InvestigationMachineCampaignTerminationFailure {
+                    typedTerminationFailure = error
                 } catch { cleanupIssues.append(.terminateFailed) }
             }
             do {
@@ -1067,7 +1131,8 @@ package actor InvestigationMachineCampaignHarness {
             preArmFailure: preArmFailure,
             rawGateReceipt: rawGateReceipt, diagnosticBytes: diagnosticBytes,
             receiptEOF: receiptEOF,
-            terminalEOF: terminalEOF, exactWait: exactWait
+            terminalEOF: terminalEOF, exactWait: exactWait,
+            typedTerminationFailure: typedTerminationFailure
         )
     }
 
@@ -1156,7 +1221,9 @@ package actor InvestigationMachineCampaignHarness {
         preArmFailure: InvestigationMachineCampaignPreArmFailureFrame?,
         rawGateReceipt: Data,
         diagnosticBytes: Data, receiptEOF: Bool, terminalEOF: Bool,
-        exactWait: InvestigationMachineCampaignExactWait?
+        exactWait: InvestigationMachineCampaignExactWait?,
+        typedTerminationFailure:
+            InvestigationMachineCampaignTerminationFailure?
     ) async -> InvestigationMachineCampaignHarnessOutcome {
         var primary = initialPrimary
         var cleanupIssues = initialCleanupIssues
@@ -1194,11 +1261,29 @@ package actor InvestigationMachineCampaignHarness {
             if primary == nil { primary = .residueUncertain }
         }
 
+        var terminationFailureCovered = false
+        if let typedTerminationFailure {
+            if cleanupIssues.isEmpty,
+               InvestigationMachineCampaignHarnessFailureResult
+                .terminationFailureCoveredByTerminalProof(
+                    typedTerminationFailure, exactWait: exactWait,
+                    receiptReachedEOF: receiptEOF,
+                    terminalReachedEOF: terminalEOF, residue: residue
+                )
+            {
+                terminationFailureCovered = true
+            } else {
+                cleanupIssues.append(.terminateFailed)
+            }
+        }
+
         if let primary {
             return .failed(.init(
                 primary: primary, cleanupIssues: cleanupIssues,
                 exactWait: exactWait, receiptReachedEOF: receiptEOF,
-                terminalReachedEOF: terminalEOF
+                terminalReachedEOF: terminalEOF,
+                terminationFailure: typedTerminationFailure,
+                terminationFailureCovered: terminationFailureCovered
             ))
         }
         if let preArmFailure {

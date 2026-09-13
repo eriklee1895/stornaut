@@ -911,22 +911,29 @@ package enum InvestigationMachineCampaignExecutable {
                                 observedAt: try nextEvidenceTime())
                             admitting = true
                         } else {
-                            let reason = switch outcome {
+                            let failureProjection = switch outcome {
                             case .failed(let failure):
-                                failure.postArmEvidenceReason
+                                (
+                                    failure.postArmEvidenceReason,
+                                    failure.postArmEvidenceSchemaVersion
+                                )
                             case .completed(let result):
-                                InvestigationMachineCampaignHarnessFailureResult
+                                (
+                                    InvestigationMachineCampaignHarnessFailureResult
                                     .postArmEvidenceReason(
                                         primary: .unexpectedResponse,
                                         exactWait: result.exactWait,
                                         receiptReachedEOF: result.receiptReachedEOF,
                                         terminalReachedEOF: result.terminalReachedEOF,
                                         cleanupIssues: []
-                                    )
+                                    ),
+                                    2
+                                )
                             }
                             _ = try writer.appendAttemptEvent(kind: .spawnUncertain,
                                 payload: try event(.spawnUncertain, preArm: preArm,
-                                    reason: reason),
+                                    reason: failureProjection.0,
+                                    schemaVersion: failureProjection.1),
                                 observedAt: try nextEvidenceTime())
                         }
                         if !transportLoss {
@@ -1363,9 +1370,15 @@ package enum InvestigationMachineCampaignExecutable {
         }
         private func event(_ kind: InvestigationMachineAttemptEventKind,
             preArm: InvestigationMachineCampaignPreArmFrame,
-            reason: String? = nil) throws -> Data {
+            reason: String? = nil, schemaVersion: Int? = nil) throws -> Data {
+            let eventSchema = schemaVersion
+                ?? (kind == .spawnUncertain ? 2 : 1)
+            guard eventSchema == 1
+                    || kind == .spawnUncertain
+                        && (eventSchema == 2 || eventSchema == 3)
+            else { throw Failure.invalid }
             var value: [String: Any] = [
-                "schemaVersion": kind == .spawnUncertain ? 2 : 1,
+                "schemaVersion": eventSchema,
                 "kind":eventName(kind),
                 "attemptUUID":preArm.outerAttemptUUID.uuidString.lowercased(),
                 "evidenceSetSHA256":preArm.frameSHA256.lowercaseHex]
@@ -2021,11 +2034,16 @@ package enum InvestigationMachineCampaignExecutable {
                 }
             case .terminateOwnedGroup(
                 let processID, let groupID, let value):
-                try check(value)
                 guard processID == spawned?.processID, groupID == processID
                 else { throw Failure.invalid }
+                guard value == deadline else { throw Failure.invalid }
+                guard DispatchTime.now().uptimeNanoseconds < value else {
+                    throw InvestigationMachineCampaignTerminationFailure
+                        .deadlineExpired
+                }
                 if kill(-groupID, SIGKILL) != 0, errno != ESRCH {
-                    throw Failure.posix(errno)
+                    throw InvestigationMachineCampaignTerminationFailure
+                        .posix(errno)
                 }
                 return .completed
             case .waitExact(let processID, let value):

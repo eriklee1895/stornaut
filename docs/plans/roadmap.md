@@ -577,7 +577,8 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    获批后因 aggregate scope/xattr evidence gaps 停在 pre-arm，仍
    unconsumed 但已 superseded；修复已由 `103a4836` 推送并验证/non-admitting；
    fresh v16 随后唯一执行并以 closed post-arm failure 消费；当前
-   non-admitting/non-retryable，status-82/cleanup-02 repair pending。
+   non-admitting/non-retryable；status-82/cleanup-02 repair 已完成且保持
+   non-admitting，下一步需要绑定新提交的 fresh campaign 授权。
    Task 39 当前
    active/incomplete，L3c3d/L3c4 未证明，
    L3c4 的 final admission/full

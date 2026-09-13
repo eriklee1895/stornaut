@@ -28,6 +28,111 @@ struct InvestigationMachineCampaignHarnessTests {
     }
 
     @Test
+    func terminalProofSupersedesOnlyTypedTerminateFailure() async throws {
+        let fixture = try CampaignHarnessFixture(
+            receiptMutation: .trailing, terminateFailure: .posix(EPERM)
+        )
+        let outcome = await InvestigationMachineCampaignHarness(
+            system: fixture.system
+        ).run(expected: fixture.binding)
+        let failure = try #require(outcome.failure)
+
+        #expect(failure.primary == .receiptInvalid)
+        #expect(failure.exactWait == .exited(status: 0))
+        #expect(failure.receiptReachedEOF)
+        #expect(failure.terminalReachedEOF)
+        #expect(failure.cleanupIssues.isEmpty)
+        #expect(failure.terminationFailure == .posix(EPERM))
+        #expect(failure.terminationFailureCovered)
+        #expect(failure.postArmEvidenceSchemaVersion == 3)
+        #expect(failure.postArmEvidenceReason.hasSuffix(
+            "cleanup-00/termination-covered-posix-1"
+        ))
+    }
+
+    @Test
+    func expiredSharedDeadlineCannotBeCoveredByLaterCleanup() async throws {
+        let fixture = try CampaignHarnessFixture(
+            receiptMutation: .trailing, terminateFailure: .deadlineExpired
+        )
+        let outcome = await InvestigationMachineCampaignHarness(
+            system: fixture.system
+        ).run(expected: fixture.binding)
+        let failure = try #require(outcome.failure)
+
+        #expect(failure.cleanupIssues == [.terminateFailed])
+        #expect(failure.terminationFailure == .deadlineExpired)
+        #expect(!failure.terminationFailureCovered)
+        #expect(failure.postArmEvidenceReason.hasSuffix(
+            "cleanup-02/termination-unresolved-deadline"
+        ))
+    }
+
+    @Test
+    func otherCleanupFailureKeepsTypedTerminationUnresolved() async throws {
+        let fixture = try CampaignHarnessFixture(
+            receiptMutation: .trailing,
+            residueMutation: .closeWithPrimaryFailure,
+            terminateFailure: .posix(EPERM)
+        )
+        let outcome = await InvestigationMachineCampaignHarness(
+            system: fixture.system
+        ).run(expected: fixture.binding)
+        let failure = try #require(outcome.failure)
+
+        #expect(failure.cleanupIssues == [.closeFailed, .terminateFailed])
+        #expect(failure.terminationFailure == .posix(EPERM))
+        #expect(!failure.terminationFailureCovered)
+        #expect(failure.postArmEvidenceSchemaVersion == 3)
+        #expect(failure.postArmEvidenceReason.hasSuffix(
+            "cleanup-0a/termination-unresolved-posix-1"
+        ))
+    }
+
+    @Test(arguments: CampaignHarnessTerminationCoverageMutation.allCases)
+    fileprivate func terminateFailureNeedsCompleteTerminalProof(
+        _ mutation: CampaignHarnessTerminationCoverageMutation
+    ) {
+        var wait: InvestigationMachineCampaignExactWait? = .exited(status: 82)
+        var receiptEOF = true, terminalEOF = true
+        var residue = InvestigationMachineCampaignResidueObservation(
+            processGroupMembers: [], sessionMembers: [], complete: true
+        )
+        switch mutation {
+        case .missingWait: wait = nil
+        case .stoppedWait: wait = .stopped(signal: SIGSTOP)
+        case .missingReceiptEOF: receiptEOF = false
+        case .missingTerminalEOF: terminalEOF = false
+        case .incompleteResidue:
+            residue = .init(processGroupMembers: [], sessionMembers: [], complete: false)
+        case .processGroupResidue:
+            residue = .init(processGroupMembers: [200], sessionMembers: [], complete: true)
+        case .sessionResidue:
+            residue = .init(processGroupMembers: [], sessionMembers: [200], complete: true)
+        case .invalidErrno:
+            #expect(!InvestigationMachineCampaignHarnessFailureResult
+                .terminationFailureCoveredByTerminalProof(
+                    .posix(0), exactWait: wait,
+                    receiptReachedEOF: receiptEOF,
+                    terminalReachedEOF: terminalEOF, residue: residue
+                ))
+            return
+        }
+        #expect(!InvestigationMachineCampaignHarnessFailureResult
+            .terminationFailureCoveredByTerminalProof(
+                .deadlineExpired, exactWait: wait,
+                receiptReachedEOF: receiptEOF,
+                terminalReachedEOF: terminalEOF, residue: residue
+            ))
+        #expect(!InvestigationMachineCampaignHarnessFailureResult
+            .terminationFailureCoveredByTerminalProof(
+                .posix(EPERM), exactWait: wait,
+                receiptReachedEOF: receiptEOF,
+                terminalReachedEOF: terminalEOF, residue: residue
+            ))
+    }
+
+    @Test
     func physicalExecutableUsesControllingPTYAndExactFD3() async throws {
         let fixture = try CampaignPhysicalFixture.make(mode: .success)
         defer { fixture.remove() }
@@ -240,6 +345,11 @@ private enum CampaignHarnessResidueMutation: CaseIterable {
     }
 }
 
+private enum CampaignHarnessTerminationCoverageMutation: CaseIterable {
+    case missingWait, stoppedWait, missingReceiptEOF, missingTerminalEOF
+    case incompleteResidue, processGroupResidue, sessionResidue, invalidErrno
+}
+
 private actor CampaignHarnessSystemRecorder:
     InvestigationMachineCampaignHarnessSystem
 {
@@ -253,6 +363,7 @@ private actor CampaignHarnessSystemRecorder:
     private let waitMutation: CampaignHarnessWaitMutation?
     private let invalidSpawnDescriptors: Bool
     private let residueMutation: CampaignHarnessResidueMutation?
+    private let terminateFailure: InvestigationMachineCampaignTerminationFailure?
     private let blockSpawn: Bool
     private var reads: [InvestigationMachineCampaignChannel: [InvestigationMachineCampaignReadObservation]]
     private var outerObservationCount = 0
@@ -268,13 +379,16 @@ private actor CampaignHarnessSystemRecorder:
         residueMutation: CampaignHarnessResidueMutation?,
         bootstrapMutation: CampaignHarnessBootstrapMutation?,
         waitMutation: CampaignHarnessWaitMutation?,
-        invalidSpawnDescriptors: Bool, blockSpawn: Bool
+        invalidSpawnDescriptors: Bool,
+        terminateFailure: InvestigationMachineCampaignTerminationFailure?,
+        blockSpawn: Bool
     ) {
         deadlineValue = deadline; spawnedValue = spawned; outerValue = outer
         self.identityMutation = identityMutation
         self.bootstrapMutation = bootstrapMutation
         self.waitMutation = waitMutation
         self.invalidSpawnDescriptors = invalidSpawnDescriptors
+        self.terminateFailure = terminateFailure
         self.residueMutation = residueMutation; self.blockSpawn = blockSpawn
         let effectiveReceiptMutation = receiptMutation
             ?? (residueMutation == .closeWithPrimaryFailure ? .trailing : nil)
@@ -366,6 +480,7 @@ private actor CampaignHarnessSystemRecorder:
             }
             return .residue(residue)
         case .terminateOwnedGroup:
+            if let terminateFailure { throw terminateFailure }
             return .completed
         case .closeParentChannels:
             if invalidSpawnDescriptors { throw FixtureError.failed }
@@ -396,6 +511,7 @@ private struct CampaignHarnessFixture {
         bootstrapMutation: CampaignHarnessBootstrapMutation? = nil,
         waitMutation: CampaignHarnessWaitMutation? = nil,
         invalidSpawnDescriptors: Bool = false,
+        terminateFailure: InvestigationMachineCampaignTerminationFailure? = nil,
         blockSpawn: Bool = false
     ) throws {
         let attempt = Self.uuid(0x41)
@@ -437,6 +553,7 @@ private struct CampaignHarnessFixture {
             identityMutation: identityMutation, residueMutation: residueMutation,
             bootstrapMutation: bootstrapMutation, waitMutation: waitMutation,
             invalidSpawnDescriptors: invalidSpawnDescriptors,
+            terminateFailure: terminateFailure,
             blockSpawn: blockSpawn)
     }
 

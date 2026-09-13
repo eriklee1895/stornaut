@@ -1,0 +1,194 @@
+#!/bin/zsh -f
+
+set -euo pipefail
+self=$0:A
+# cleanup_attribution_self_sha=ce909600bc73011f49cafce7c97cc5be35cf62e275e70a0179cace4a268d5990
+if [[ $0 != /bin/zsh || ${1:-} != --sealed-bytes ]]; then
+    repo_root=$self:h:h
+    exec /usr/bin/python3 -I - "$self" "$repo_root" <<'PY'
+import hashlib, os, re, stat, subprocess, sys
+path, root = sys.argv[1:]
+fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+try:
+    metadata = os.fstat(fd)
+    chunks = []
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    source = b"".join(chunks)
+    normalized, count = re.subn(
+        rb"(?m)^# cleanup_attribution_self_sha=[0-9a-f]{64}$",
+        b"# cleanup_attribution_self_sha=SELF", source)
+    match = re.search(
+        rb"(?m)^# cleanup_attribution_self_sha=([0-9a-f]{64})$", source)
+    if (not stat.S_ISREG(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o755
+            or metadata.st_uid != os.getuid() or metadata.st_nlink != 1
+            or count != 1 or match is None
+            or hashlib.sha256(normalized).hexdigest().encode() != match.group(1)):
+        raise SystemExit("cleanup attribution verifier self-seal drifted")
+    raise SystemExit(subprocess.run(
+        ["/bin/zsh", "-f", "-s", "--", "--sealed-bytes", root],
+        input=source, check=False).returncode)
+finally:
+    os.close(fd)
+PY
+else
+    (( $# == 2 )) || { print -u2 "cleanup attribution verifier root missing"; exit 1; }
+    repo_root=$2
+fi
+[[ $repo_root == /* && -d $repo_root && ! -L $repo_root ]] \
+    || { print -u2 "cleanup attribution verifier root invalid"; exit 1; }
+cd "$repo_root"
+function fail() { print -u2 -- "$1"; exit 1 }
+
+gate=scripts/verify-investigation-boundaries
+baseline=1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6
+out=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-cleanup-attribution.XXXXXX")
+trap 'rm -rf "$out"' EXIT
+replacement="$out/unconditional-success"
+print '#!/bin/zsh -f' >"$replacement"
+print 'exit 0' >>"$replacement"
+chmod 755 "$replacement"
+if source="$replacement" /bin/zsh -f <<'SH'
+candidate=$source
+expected=fd44cbb03d2884d317df429db4a751708c7d85fe30f1ee8a94316153037e967e
+[[ -f $candidate && ! -L $candidate \
+    && "$(/usr/bin/stat -f '%Lp' "$candidate")" == 755 \
+    && "$(shasum -a 256 "$candidate" | awk '{ print $1 }')" == $expected ]]
+SH
+then fail "cleanup attribution unconditional-success replacement accepted"
+fi
+trusted="$out/fd-race-verifier"
+replacement="$out/fd-race-replacement"
+print '#!/bin/zsh -f' >"$trusted"; print 'print trusted-fd' >>"$trusted"
+print '#!/bin/zsh -f' >"$replacement"; print 'print replaced-path' >>"$replacement"
+chmod 755 "$trusted" "$replacement"
+/usr/bin/python3 -I - "$trusted" "$replacement" <<'PY'
+import os, subprocess, sys
+trusted, replacement = sys.argv[1:]
+fd = os.open(trusted, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+try:
+    source = os.read(fd, 4096)
+    os.replace(replacement, trusted)
+    result = subprocess.run(
+        ["/bin/zsh", "-f", "-s"], input=source, check=False,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0 or result.stdout != b"trusted-fd\n":
+        raise SystemExit("cleanup attribution descriptor execution drifted")
+finally:
+    os.close(fd)
+PY
+in_place="$out/in-place-race-verifier"
+print '#!/bin/zsh -f' >"$in_place"; print 'print trusted-bytes' >>"$in_place"
+chmod 755 "$in_place"
+/usr/bin/python3 -I - "$in_place" <<'PY'
+import os, subprocess, sys
+path = sys.argv[1]
+fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+try:
+    source = os.read(fd, 4096)
+    with open(path, "wb") as changed:
+        changed.write(b"#!/bin/zsh -f\nprint mutated-inode\n")
+    result = subprocess.run(
+        ["/bin/zsh", "-f", "-s"], input=source, check=False,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0 or result.stdout != b"trusted-bytes\n":
+        raise SystemExit("cleanup attribution in-place execution drifted")
+finally:
+    os.close(fd)
+PY
+typeset -a paths=(
+    Sources/StornautInvestigationMachineCampaign/main.swift
+    Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+    Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift
+    Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+    Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift
+    scripts/verify-investigation-runtime-machine-report
+)
+"$gate" --iic-c-cleanup-attribution-source-contract-only $paths
+"$gate" --iic-c-cleanup-attribution-staged-scope-contract-only "$baseline"
+
+typeset -a names=(schema-selection-drop typed-deadline-drop typed-errno-drop
+    schema-three-drop covered-token-drop deadline-cover-drop cleanup-zero-drop receipt-eof-drop
+    terminal-eof-drop residue-complete-drop other-cleanup-drop
+    python-schema-three-drop python-covered-token-drop python-deadline-cover-drop)
+typeset -a slots=(main main main evidence evidence evidence evidence harness harness
+    harness harness verifier verifier verifier)
+typeset -a olds=('failure.postArmEvidenceSchemaVersion'
+    "throw InvestigationMachineCampaignTerminationFailure"$'\n'"                        .deadlineExpired"
+    "throw InvestigationMachineCampaignTerminationFailure"$'\n'"                        .posix(errno)"
+    '&& (payloadSchema == 2 || payloadSchema == 3),'
+    'payloadSchema == 2 || terminationValid == true'
+    'termination.detail != "deadline" && cleanupMask == 0' 'cleanupMask == 0'
+    '&& receiptReachedEOF' '&& terminalReachedEOF' '&& residue.complete'
+    'if cleanupIssues.isEmpty,' 'if kind == 5 and schema in (2, 3):'
+    'and cleanup_mask == 0 and both_eof'
+    'or covered and termination_match.group(2) != "deadline"')
+typeset -a news=('2' 'throw Failure.deadline' 'throw Failure.posix(errno)'
+    '&& payloadSchema == 2,' 'true' 'cleanupMask == 0' 'true' '&& true' '&& true' '&& true'
+    'if true,' 'if kind == 5 and schema == 2:'
+    'and True and both_eof' 'or covered and True')
+(( $#names == 14 && $#slots == 14 && $#olds == 14 && $#news == 14 )) \
+    || fail "cleanup attribution mutation inventory drifted"
+
+for ordinal in {1..14}; do
+    case $slots[$ordinal] in
+        main) index=1 ;; evidence) index=2 ;; harness) index=3 ;;
+        evidence_tests) index=4 ;; harness_tests) index=5 ;; verifier) index=6 ;;
+    esac
+    source=$paths[$index]; target="$out/$names[$ordinal]"
+    OLD=$olds[$ordinal] NEW=$news[$ordinal] \
+        /usr/bin/python3 -I - "$source" "$target" <<'PY'
+from pathlib import Path
+import os
+import sys
+source = Path(sys.argv[1]).read_text()
+old, new = os.environ["OLD"], os.environ["NEW"]
+if source.count(old) != 1:
+    raise SystemExit("cleanup attribution mutation fixture is vacuous")
+Path(sys.argv[2]).write_text(source.replace(old, new, 1))
+PY
+    typeset -a args=($paths); args[$index]=$target
+    sha=$(shasum -a 256 "$target" | awk '{print $1}'); rc=0
+    "$gate" --iic-c-cleanup-attribution-mutation-contract-only \
+        "$names[$ordinal]" "$slots[$ordinal]" "$sha" $args \
+        >"$out/$names[$ordinal].log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail "cleanup attribution mutation accepted: $names[$ordinal]"
+done
+
+active_index=$(git rev-parse --git-path index)
+for fixture in extra missing binary wrong-mode over-budget \
+    aggregate-budget staged-worktree-divergence wrong-baseline; do
+    bad="$out/scope-$fixture.index"; cp "$active_index" "$bad"
+    scope_target=$baseline
+    case $fixture in
+        extra) blob=$(print extra | git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --add --cacheinfo "100644,$blob,cleanup-attribution-extra.swift" ;;
+        missing) blob=$(git rev-parse "$baseline:Sources/StornautInvestigationMachineCampaign/main.swift"); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,Sources/StornautInvestigationMachineCampaign/main.swift" ;;
+        binary) blob=$(printf '\0cleanup-attribution\n' | git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift" ;;
+        wrong-mode) blob=$(git hash-object -- scripts/verify-contract); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,scripts/verify-contract" ;;
+        over-budget) blob=$( { <Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift; for line in {1..81}; do print "// cleanup-attribution-budget-$line"; done; } | git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift" ;;
+        aggregate-budget) blob=$( { <scripts/verify-investigation-boundaries; for line in {1..521}; do print "# cleanup-attribution-aggregate-$line"; done; } | git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100755,$blob,scripts/verify-investigation-boundaries" ;;
+        staged-worktree-divergence) blob=$( { <Sources/StornautInvestigationMachineCampaign/main.swift; print '// staged-only drift'; } | git hash-object -w --stdin); GIT_INDEX_FILE=$bad git update-index --cacheinfo "100644,$blob,Sources/StornautInvestigationMachineCampaign/main.swift" ;;
+        wrong-baseline) scope_target=$baseline^ ;;
+    esac
+    rc=0
+    GIT_INDEX_FILE=$bad "$gate" \
+        --iic-c-cleanup-attribution-staged-scope-contract-only "$scope_target" \
+        >"$out/scope-$fixture.log" 2>&1 || rc=$?
+    (( rc != 0 )) || fail "cleanup attribution scope mutation accepted: $fixture"
+done
+
+(
+    untracked_probe=$(mktemp \
+        "$repo_root/.stornaut-cleanup-attribution-untracked.XXXXXX.swift")
+    trap 'rm -f -- "$untracked_probe"' EXIT
+    print untracked >"$untracked_probe"
+    rc=0
+    "$gate" --iic-c-cleanup-attribution-staged-scope-contract-only "$baseline" \
+        >"$out/scope-untracked.log" 2>&1 || rc=$?
+    (( rc != 0 )) \
+        || fail "cleanup attribution scope mutation accepted: untracked"
+)
+print "ii-c-c cleanup attribution contract verification passed."
