@@ -40,7 +40,11 @@ but is superseded; the preservation prerequisite is complete/non-admitting and
 a fresh v15 campaign based on `facf3ea` was authorized. Pre-arm review found
 aggregate scope and xattr no-mutation evidence gaps; v15 is superseded/
 unconsumed. The fixes are pushed at `103a4836` and verified/non-admitting. One
-fresh v16 is authorized/pending/unconsumed from that exact commit.
+fresh v16 then ran exactly once and closed as
+`receiptInvalid/exited-82/cleanup-02`; it is consumed/non-admitting/non-retryable.
+Its schema-v9 disposition binds the nine raw artifacts, both persistent Gate
+attempts/capsules and zero fixed-runtime live residue. The current frontier is a
+tests-first status-82/cleanup-02 repair; no replacement campaign is authorized.
 Checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
@@ -492,7 +496,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8–v13 consumed/no-go; v14/v15 superseded/unconsumed; v16 authorized/pending/unconsumed; L3c3d/L3c4 unproven |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8–v13/v16 consumed/no-go; v14/v15 superseded/unconsumed; status-82/cleanup-02 repair pending; L3c3d/L3c4 unproven |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

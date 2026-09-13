@@ -2524,8 +2524,10 @@ struct InvestigationMachineCampaignEvidenceTests {
     @Test(.enabled(
         if: ProcessInfo.processInfo.environment[
             "STORNAUT_TASK39_V13_EVIDENCE_ROOT"
+        ] != nil && ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"
         ] != nil,
-        "Opt in to the read-only frozen v13 failure-evidence verification"
+        "Opt in to the read-only frozen v13 to v16 joint failure-evidence verification"
     ))
     func checkedV13FailureDispositionBindsPersistentEvidenceWhenAvailable() throws {
         let repository = URL(filePath: #filePath).deletingLastPathComponent()
@@ -2534,10 +2536,15 @@ struct InvestigationMachineCampaignEvidenceTests {
             path: "docs/reports/evidence/task-39-iic-v13-failure-disposition.json")
         let root = try #require(ProcessInfo.processInfo.environment[
             "STORNAUT_TASK39_V13_EVIDENCE_ROOT"])
+        let v16Root = URL(filePath: try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"]))
+        let v16Report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v16-failure-disposition.json")
         try #require(FileManager.default.fileExists(atPath: root))
 
         let before = try Self.treeSnapshot(URL(filePath: root))
-        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let result = try Self.runFailureVerifier(
+            URL(filePath: root), report, successor: (v16Root, v16Report))
         let after = try Self.treeSnapshot(URL(filePath: root))
         #expect(result.status == 0, Comment(rawValue: result.stderr))
         #expect(before == after)
@@ -2623,6 +2630,358 @@ struct InvestigationMachineCampaignEvidenceTests {
             supplemental["binding"] = "campaignArtifactBound"
             value["supplementalSystemObservation"] = supplemental; return value
         }
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v16 failure-evidence verification"
+    ))
+    func checkedV16FailureDispositionBindsDualPersistentGateEvidenceWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v16-failure-disposition.json")
+        let root = try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"])
+        try #require(FileManager.default.fileExists(atPath: root))
+
+        let before = try Self.treeSnapshot(URL(filePath: root))
+        let result = try Self.runFailureVerifier(URL(filePath: root), report)
+        let after = try Self.treeSnapshot(URL(filePath: root))
+        #expect(result.status == 0, Comment(rawValue: result.stderr))
+        #expect(before == after)
+        let disposition = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: report)) as? [String: Any])
+        #expect(disposition["schemaVersion"] as? Int == 9)
+        #expect(disposition["classification"] as? String
+            == "consumedClosedPostArmFailure")
+        #expect(disposition["admission"] as? String == "rejected")
+        #expect(disposition["retry"] as? String == "forbidden")
+        let cause = try #require(
+            disposition["rootCauseObservation"] as? [String: Any])
+        #expect(cause["reason"] as? String
+            == "closedPostArmReceiptInvalidExit82")
+        #expect(cause["elapsedAfterArmMicroseconds"] as? String
+            == "31123738")
+        #expect(cause["cleanupIssueMask"] as? String == "02")
+        #expect(cause["credentialRetainedByteCount"] as? Int == 0)
+        let system = try #require(
+            disposition["systemObservation"] as? [String: Any])
+        #expect(system["gateBaseState"] as? String
+            == "persistentOwnAndPriorConsumedAttemptsPresent")
+        let prior = try #require(
+            disposition["priorPersistentGateObservation"] as? [String: Any])
+        #expect(prior["attemptUUID"] as? String
+            == "a77c4d21-9bba-46f6-b694-3d1d1e55209d")
+        #expect(prior["gateCapsuleSHA256"] as? String
+            == "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17")
+        let supplemental = try #require(
+            disposition["supplementalSystemObservation"] as? [String: Any])
+        #expect(supplemental["errorCode"] as? Int == -423)
+        #expect(supplemental["binding"] as? String
+            == "notCampaignArtifactBound")
+        #expect(supplemental["nonClaim"] as? String
+            == "notUsedForCredentialValidityOrAdmission")
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v16 forgery-rejection verification"
+    ))
+    func checkedV16FailureDispositionRejectsSchemaNineForgeryWhenAvailable() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v16-failure-disposition.json")
+        let root = try #require(ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"])
+        let original = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: source)) as? [String: Any])
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+
+        func reject(_ name: String, _ mutation: ([String: Any]) -> [String: Any])
+            throws
+        {
+            let report = reportParent.appending(path: name + ".json")
+            try Self.writeCanonicalReport(mutation(original), to: report)
+            let result = try Self.runFailureVerifier(URL(filePath: root), report)
+            #expect(result.status != 0, Comment(rawValue: name))
+        }
+        try reject("current-gate") { value in
+            var value = value
+            var system = value["systemObservation"] as! [String: Any]
+            system["gateCapsuleSHA256"] = String(repeating: "a", count: 64)
+            value["systemObservation"] = system; return value
+        }
+        try reject("prior-gate") { value in
+            var value = value
+            var prior = value["priorPersistentGateObservation"]
+                as! [String: Any]
+            prior["gateCapsuleSHA256"] = String(repeating: "b", count: 64)
+            value["priorPersistentGateObservation"] = prior; return value
+        }
+        try reject("amfi-binding") { value in
+            var value = value
+            var supplemental = value["supplementalSystemObservation"]
+                as! [String: Any]
+            supplemental["binding"] = "campaignArtifactBound"
+            value["supplementalSystemObservation"] = supplemental; return value
+        }
+        try reject("credential-claim") { value in
+            var value = value
+            var supplemental = value["supplementalSystemObservation"]
+                as! [String: Any]
+            supplemental["nonClaim"] = "credentialAccepted"
+            value["supplementalSystemObservation"] = supplemental; return value
+        }
+        try reject("timing") { value in
+            var value = value
+            var cause = value["rootCauseObservation"] as! [String: Any]
+            cause["elapsedAfterArmMicroseconds"] = "31123739"
+            value["rootCauseObservation"] = cause; return value
+        }
+    }
+
+    @Test(.enabled(
+        if: ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V13_EVIDENCE_ROOT"
+        ] != nil && ProcessInfo.processInfo.environment[
+            "STORNAUT_TASK39_V16_EVIDENCE_ROOT"
+        ] != nil,
+        "Opt in to the read-only frozen v13 to v16 joint replay"
+    ))
+    func checkedV13ToV16JointReplayRequiresDeclaredSuccessorLineage() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let v13Root = URL(filePath: try #require(
+            ProcessInfo.processInfo.environment["STORNAUT_TASK39_V13_EVIDENCE_ROOT"]))
+        let v16Root = URL(filePath: try #require(
+            ProcessInfo.processInfo.environment["STORNAUT_TASK39_V16_EVIDENCE_ROOT"]))
+        let v13Report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v13-failure-disposition.json")
+        let v16Report = repository.appending(
+            path: "docs/reports/evidence/task-39-iic-v16-failure-disposition.json")
+
+        let v13Before = try Self.treeSnapshot(v13Root)
+        let v16Before = try Self.treeSnapshot(v16Root)
+        let joint = try Self.runFailureVerifier(
+            v13Root, v13Report, successor: (v16Root, v16Report))
+        #expect(joint.status == 0, Comment(rawValue: joint.stderr))
+        #expect(try Self.treeSnapshot(v13Root) == v13Before)
+        #expect(try Self.treeSnapshot(v16Root) == v16Before)
+
+        let v13Alone = try Self.runFailureVerifier(v13Root, v13Report)
+        #expect(v13Alone.status != 0)
+        #expect(v13Alone.stderr.contains("consumed Gate successor inventory"))
+        let v16Alone = try Self.runFailureVerifier(v16Root, v16Report)
+        #expect(v16Alone.status == 0, Comment(rawValue: v16Alone.stderr))
+
+        let original = try #require(JSONSerialization.jsonObject(
+            with: Data(contentsOf: v16Report)) as? [String: Any])
+        let reportParent = try Self.makeFailureReportParent()
+        defer { try? FileManager.default.removeItem(at: reportParent) }
+        let mutations: [(String, ([String: Any]) -> [String: Any])] = [
+            ("prior-disposition", { value in
+                var value = value
+                var prior = value["priorPersistentGateObservation"]
+                    as! [String: Any]
+                prior["priorDispositionSHA256"] = String(
+                    repeating: "d", count: 64)
+                value["priorPersistentGateObservation"] = prior; return value
+            }),
+            ("prior-uuid", { value in
+                var value = value
+                var prior = value["priorPersistentGateObservation"]
+                    as! [String: Any]
+                prior["attemptUUID"] = "11111111-1111-4111-8111-111111111111"
+                value["priorPersistentGateObservation"] = prior; return value
+            }),
+            ("prior-capsule", { value in
+                var value = value
+                var prior = value["priorPersistentGateObservation"]
+                    as! [String: Any]
+                prior["gateCapsuleSHA256"] = String(repeating: "c", count: 64)
+                value["priorPersistentGateObservation"] = prior; return value
+            }),
+            ("prior-base", { value in
+                var value = value
+                var prior = value["priorPersistentGateObservation"]
+                    as! [String: Any]
+                prior["gateBaseInode"] = "1"
+                value["priorPersistentGateObservation"] = prior; return value
+            }),
+            ("prior-lock", { value in
+                var value = value
+                var prior = value["priorPersistentGateObservation"]
+                    as! [String: Any]
+                prior["ownerLockInode"] = "1"
+                value["priorPersistentGateObservation"] = prior; return value
+            }),
+            ("ctime-order", { value in
+                var value = value
+                var prior = value["priorPersistentGateObservation"]
+                    as! [String: Any]
+                let current = value["systemObservation"] as! [String: Any]
+                prior["gateBaseChangeTimeNanoseconds"] =
+                    current["gateBaseChangeTimeNanoseconds"]
+                value["priorPersistentGateObservation"] = prior; return value
+            }),
+        ]
+        for (name, mutate) in mutations {
+            let candidate = reportParent.appending(path: name + ".json")
+            try Self.writeCanonicalReport(mutate(original), to: candidate)
+            let rejected = try Self.runFailureVerifier(
+                v13Root, v13Report, successor: (v16Root, candidate))
+            #expect(rejected.status != 0, Comment(rawValue: name))
+        }
+        let reversed = try Self.runFailureVerifier(
+            v16Root, v16Report, successor: (v13Root, v13Report))
+        #expect(reversed.status != 0)
+        #expect(reversed.stderr.contains("joint disposition profile order"))
+    }
+
+    @Test
+    func failureDispositionJointInventoryRejectsAdditionalAttempt() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure")
+        let harness = #"""
+        import ast
+        import sys
+        source = open(sys.argv[1], "r", encoding="utf-8").read()
+        python_source = source.split("<<'PY'\n", 1)[1].rsplit("\nPY\n", 1)[0]
+        tree = ast.parse(python_source)
+        function = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "require_joint_gate_inventory")
+        def require(condition, message):
+            if not condition:
+                raise RuntimeError(message)
+        namespace = {"require": require}
+        exec(compile(ast.Module(body=[function], type_ignores=[]),
+                     "<joint-inventory>", "exec"), namespace)
+        expected = [".owner-lock-v1", "attempt-prior", "attempt-current"]
+        namespace["require_joint_gate_inventory"](
+            expected, "attempt-prior", "attempt-current")
+        try:
+            namespace["require_joint_gate_inventory"](
+                expected + ["attempt-third"],
+                "attempt-prior", "attempt-current")
+        except RuntimeError as error:
+            if str(error) != "joint exact dual-attempt Gate inventory":
+                raise
+        else:
+            raise RuntimeError("third persistent attempt was accepted")
+        """#
+        let process = Process(), output = Pipe()
+        process.executableURL = URL(filePath: "/usr/bin/python3")
+        process.arguments = ["-I", "-c", harness, verifier.path]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        let bytes = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0,
+            Comment(rawValue: String(decoding: bytes, as: UTF8.self)))
+    }
+
+    @Test
+    func failureDispositionHeldContextsRejectInPlaceMutationBeforeVerdict() throws {
+        let repository = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = repository.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure")
+        let harness = #"""
+        import ast
+        import hashlib
+        import os
+        import stat
+        import tempfile
+        import sys
+        source = open(sys.argv[1], "r", encoding="utf-8").read()
+        python_source = source.split("<<'PY'\n", 1)[1].rsplit("\nPY\n", 1)[0]
+        tree = ast.parse(python_source)
+        names = {
+            "file_identity", "node_identity", "path_component_identity",
+            "inventory", "revalidate_file", "revalidate_v16_launcher",
+        }
+        selected = [
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name in names
+        ]
+        class Rejected(Exception): pass
+        def require(condition, message):
+            if not condition: raise Rejected(message)
+        namespace = {
+            "os": os, "stat": stat, "hashlib": hashlib,
+            "require": require,
+            "validate_descriptor": lambda descriptor, named, modes, regular:
+                os.fstat(descriptor),
+            "revalidate_walk": lambda walk: None,
+        }
+        exec(compile(ast.Module(body=selected, type_ignores=[]),
+                     "<held-contexts>", "exec"), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            parent = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                path = os.path.join(directory, "artifact.bin")
+                with open(path, "wb") as stream: stream.write(b"original")
+                descriptor = os.open(path, os.O_RDONLY)
+                try:
+                    status = os.fstat(descriptor)
+                    record = (
+                        parent, "artifact.bin", descriptor,
+                        namespace["file_identity"](status),
+                        hashlib.sha256(b"original").digest(),
+                    )
+                    with open(path, "r+b") as stream:
+                        stream.seek(0); stream.write(b"mutated!"); stream.flush()
+                    try: namespace["revalidate_file"](record)
+                    except Rejected: pass
+                    else: raise RuntimeError("mutated raw artifact was accepted")
+                finally:
+                    os.close(descriptor)
+
+                sidecar = os.path.join(directory, "status.txt")
+                with open(sidecar, "wb") as stream: stream.write(b"70\n")
+                descriptor = os.open(sidecar, os.O_RDONLY)
+                try:
+                    identity = namespace["file_identity"](os.fstat(descriptor))
+                    walk = {"nodes": [(
+                        parent, "status.txt", descriptor, identity, True
+                    )]}
+                    with open(sidecar, "r+b") as stream:
+                        stream.seek(0); stream.write(b"71\n"); stream.flush()
+                    try:
+                        namespace["revalidate_v16_launcher"]([
+                            [descriptor, walk, b"70\n"]
+                        ])
+                    except Rejected: pass
+                    else: raise RuntimeError("mutated launcher sidecar was accepted")
+                finally:
+                    os.close(descriptor)
+            finally:
+                os.close(parent)
+        """#
+        let process = Process(), output = Pipe()
+        process.executableURL = URL(filePath: "/usr/bin/python3")
+        process.arguments = ["-I", "-c", harness, verifier.path]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        let bytes = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0,
+            Comment(rawValue: String(decoding: bytes, as: UTF8.self)))
     }
 
     @Test
@@ -3816,6 +4175,7 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     private static func runFailureVerifier(
         _ evidenceRoot: URL, _ report: URL,
+        successor: (root: URL, report: URL)? = nil,
         environment: [String: String]? = nil
     ) throws -> CampaignVerifierResult {
         let repository = URL(filePath: #filePath).deletingLastPathComponent()
@@ -3824,6 +4184,7 @@ struct InvestigationMachineCampaignEvidenceTests {
         process.executableURL = repository.appending(
             path: "scripts/verify-investigation-runtime-machine-failure")
         process.arguments = [evidenceRoot.path, report.path]
+            + (successor.map { [$0.root.path, $0.report.path] } ?? [])
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = output
         process.standardError = errors

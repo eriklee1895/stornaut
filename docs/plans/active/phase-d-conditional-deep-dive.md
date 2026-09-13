@@ -17,8 +17,11 @@
 > preservation prerequisite is complete/non-admitting. The fresh v15 campaign
 > based on `facf3ea` was authorized, but pre-arm review found aggregate scope
 > and xattr no-mutation evidence gaps. It is superseded/unconsumed; the fixes are
-> pushed at `103a4836` and verified/non-admitting. One fresh v16 is
-> authorized/pending/unconsumed from that exact commit.
+> pushed at `103a4836` and verified/non-admitting. One fresh v16 then ran exactly
+> once and closed as `receiptInvalid/exited-82/cleanup-02`; it is consumed/
+> non-admitting/non-retryable. Its checked schema-v9 disposition binds both
+> persistent Gate attempts/capsules. Status-82/cleanup-02 repair is pending; no
+> replacement campaign is authorized.
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is

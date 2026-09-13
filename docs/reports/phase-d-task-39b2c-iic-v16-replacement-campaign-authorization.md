@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c-c v16 replacement campaign authorization
 
-> Status: authorized / pending / unconsumed
+> Status: consumed / non-admitting / non-retryable
 >
 > Authorized source baseline: `103a4836f4aa80c5d3739ca357364ad5c9200cf6`
 >
@@ -13,6 +13,12 @@ machine campaign based on the pushed evidence-closure checkpoint above. This
 one-shot authorization is named v16. Campaigns v8 through v13 are consumed and
 non-retryable; v14 and v15 were superseded before launch and remain
 unconsumed, but neither authorization can be reused or transferred.
+
+The authorized invocation subsequently ran exactly once. It durably recorded
+`armedConsumed` and then the closed failure
+`postArmFailure/receiptInvalid/exited-82/receipt-eof/terminal-eof/cleanup-02`.
+The checked [v16 failure disposition](phase-d-task-39b2c-iic-v16-failure-disposition.md)
+is authoritative: v16 is consumed, rejected and non-retryable.
 
 The authorization permits the sealed zero-argument campaign executable to
 generate one fresh nonzero campaign UUID, one fresh nonzero attempt UUID and

@@ -1,6 +1,6 @@
 # Phase D Task 39B2c ii-c fresh replacement campaign preflight
 
-> Status: v16 authorized / pending / unconsumed
+> Status: v16 consumed / non-admitting / non-retryable
 >
 > Date: 2026-09-13
 >
@@ -30,8 +30,9 @@ found aggregate staged-scope enforcement and xattr no-mutation evidence gaps.
 No launch occurred; v15 is unconsumed but superseded.
 The evidence-closure checkpoint is pushed at
 `103a4836f4aa80c5d3739ca357364ad5c9200cf6`; the user explicitly authorized
-one fresh v16 campaign from that exact commit. No v16 campaign or attempt UUID,
-launch claim, install, sudo invocation or root action exists yet.
+one fresh v16 campaign from that exact commit. That campaign subsequently ran
+once, durably armed and closed as `receiptInvalid/exited-82/cleanup-02`; the
+checked failure disposition supersedes this pre-launch statement.
 
 ## Read-only machine state
 
@@ -107,4 +108,5 @@ distinguish it from consumed v8-v13 and superseded/unconsumed v14. The
 authorization is unconsumed but superseded: no campaign UUID, attempt UUID,
 launch claim, install, sudo invocation or root action exists for v15. The user
 has now authorized v16 from pushed evidence-closure commit
-`103a4836f4aa80c5d3739ca357364ad5c9200cf6`; it remains pending/unconsumed.
+`103a4836f4aa80c5d3739ca357364ad5c9200cf6`; that one-shot authority is now
+consumed/non-admitting/non-retryable.

@@ -26,8 +26,11 @@
 > preservation prerequisite is complete/non-admitting. One fresh v15 was
 > authorized from `facf3ea`, but pre-arm review found aggregate scope and xattr
 > no-mutation evidence gaps. v15 is superseded/unconsumed; the fixes are pushed
-> at `103a4836` and verified/non-admitting. One fresh v16 is authorized/pending/
-> unconsumed from that exact commit.
+> at `103a4836` and verified/non-admitting. One fresh v16 then ran exactly once
+> and closed as `receiptInvalid/exited-82/cleanup-02`; it is consumed/non-admitting/
+> non-retryable. Schema-v9 binds the nine raw artifacts and both persistent Gate
+> attempts/capsules. Status-82/cleanup-02 repair is pending; no replacement
+> campaign is authorized.
 > 39A contract/facade foundation, 39B1a exact
 > Store/async-lifecycle prerequisite closure and 39B1b-i package-closed
 > transport/composition plus 39B1b-ii strict DEBUG App leaf are complete and
@@ -237,7 +240,8 @@
 > the exact-v13 preservation prerequisite is complete/non-admitting. Fresh v15
 > from `facf3ea` was stopped before launch by aggregate-scope/xattr evidence
 > gaps and is superseded/unconsumed. The fixes are pushed at `103a4836` and
-> verified/non-admitting; v16 is authorized/pending/unconsumed. Task 39 is
+> verified/non-admitting; v16 is consumed/non-admitting/non-retryable after the
+> checked closed failure. Status-82/cleanup-02 repair is pending. Task 39 is
 > active/incomplete and not Ready; L3c3d
 > cannot legally run before a green ii-c cohort and L3c4 cannot create an
 > admission receipt or run the reserved full without that cohort. The sequential

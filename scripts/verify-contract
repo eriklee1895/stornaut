@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=d710afe6802acf97e7b0237a8295ef444a64e7ea7e10b6041dcf293e9dd002d6
+# ib2_self_sha=8cdc54f9919331ffce7c29db720f99714e8a6ccf5da611daf794392ae99f5d57
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3712,7 +3712,13 @@ function verify_iicc_contract() {
     local evidence_scope_tree=0cfccbf6e8a500365837b4cb9551f6ff70af4bbf
     local evidence_scope_mode=--iic-c-evidence-closure-staged-scope-contract-only
     local authorization_scope_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6
+    local authorization_scope_commit=9bc6d8d879bcae500137879b8ad5080d72f136ca
+    local authorization_scope_tree=5512a8adab652c41693f1b9a8870c3132ee63765
     local authorization_scope_mode=--iic-c-v16-authorization-staged-scope-contract-only
+    local -a authorization_scope_paths=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries
+    )
     local baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
     local implementation=2a29aff40fb39ec6465f75b2e70d43e3ba42ed4e
     local implementation_tree=b5b4170f942fc92872c2d82f54baf2943f3e176f
@@ -3753,9 +3759,35 @@ function verify_iicc_contract() {
         scripts/verify-investigation-runtime-machine-report
     )
     mkdir -p "$out"
-    [[ "$(git rev-parse HEAD)" == "$authorization_scope_baseline" ]] \
-        || fail_contract "ii-c-c v16 authorization requires baseline HEAD"
-    "$gate" "$authorization_scope_mode" "$authorization_scope_baseline" \
+    [[ "$(git show -s --format=%P "$authorization_scope_commit")" == \
+        "$authorization_scope_baseline" \
+        && "$(git show -s --format=%T "$authorization_scope_commit")" == \
+        "$authorization_scope_tree" ]] \
+        || fail_contract "ii-c-c immutable v16 authorization checkpoint drifted"
+    local authorization_scope_index="$out/authorization-scope.index"
+    local authorization_scope_worktree="$out/authorization-scope.worktree"
+    local authorization_scope_item authorization_scope_entry_mode
+    local authorization_scope_blob
+    GIT_INDEX_FILE="$authorization_scope_index" git read-tree \
+        "$authorization_scope_baseline^{tree}"
+    for authorization_scope_item in "${authorization_scope_paths[@]}"; do
+        authorization_scope_entry_mode=100644
+        [[ $authorization_scope_item == scripts/* ]] \
+            && authorization_scope_entry_mode=100755
+        authorization_scope_blob=$(git rev-parse \
+            "${authorization_scope_commit}:$authorization_scope_item")
+        GIT_INDEX_FILE="$authorization_scope_index" git update-index --add \
+            --cacheinfo "$authorization_scope_entry_mode,$authorization_scope_blob,$authorization_scope_item"
+    done
+    /bin/mkdir -p "$authorization_scope_worktree"
+    GIT_INDEX_FILE="$authorization_scope_index" \
+        GIT_WORK_TREE="$authorization_scope_worktree" git checkout-index -a
+    env GIT_DIR="$repo_root/.git" \
+        GIT_INDEX_FILE="$authorization_scope_index" \
+        GIT_WORK_TREE="$authorization_scope_worktree" \
+        STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$authorization_scope_worktree" \
+        "$authorization_scope_worktree/$gate" \
+        "$authorization_scope_mode" "$authorization_scope_baseline" \
         >"$out/authorization-scope-actual.log"
     [[ "$(git show -s --format=%P "$implementation")" == "$baseline" \
         && "$(git show -s --format=%T "$implementation")" == "$implementation_tree" ]] \
@@ -4253,7 +4285,8 @@ PY
                 || fail_contract "ii-c-c evidence scope aggregate fixture unavailable"
             evidence_scope_expected="ii-c-c evidence-closure aggregate budget drifted";;
           staged-worktree-divergence)
-            evidence_scope_blob=$( { <"${evidence_scope_paths[1]}";
+            evidence_scope_blob=$( { GIT_INDEX_FILE="$evidence_scope_index" \
+                    git show ":${evidence_scope_paths[1]}";
                     print '// iicc-evidence-divergence'; } \
                 | git hash-object -w --stdin)
             GIT_INDEX_FILE="$evidence_scope_bad" git update-index \
@@ -4301,16 +4334,10 @@ PY
         [[ "$actual" == "$expected" ]] \
             || fail_contract "ii-c-c authorization scope diagnostic drifted: $label: $actual"
     }
-    local authorization_scope_index="$out/authorization-scope.index"
-    cp "$(git rev-parse --git-path index)" "$authorization_scope_index"
     local -a authorization_scope_fixtures=(extra missing binary wrong-mode \
         over-budget aggregate-budget staged-worktree-divergence wrong-baseline)
     (( ${#authorization_scope_fixtures} + 1 == 9 )) \
         || fail_contract "ii-c-c authorization scope negative inventory drifted"
-    local -a authorization_scope_paths=(
-        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
-        scripts/verify-contract scripts/verify-investigation-boundaries
-    )
     local authorization_scope_fixture authorization_scope_bad
     local authorization_scope_expected authorization_scope_blob
     local authorization_scope_baseline_arg authorization_scope_target_worktree
@@ -4395,7 +4422,8 @@ PY
                 || fail_contract "ii-c-c authorization scope aggregate fixture unavailable"
             authorization_scope_expected="ii-c-c v16 authorization aggregate budget drifted";;
           staged-worktree-divergence)
-            authorization_scope_blob=$( { <"${authorization_scope_paths[1]}";
+            authorization_scope_blob=$( { GIT_INDEX_FILE="$authorization_scope_index" \
+                    git show ":${authorization_scope_paths[1]}";
                     print '// iicc-authorization-divergence'; } \
                 | git hash-object -w --stdin)
             GIT_INDEX_FILE="$authorization_scope_bad" git update-index \
@@ -4607,6 +4635,32 @@ PY
             STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
                 /usr/bin/swift test --no-parallel \
                 --filter InvestigationMachineCampaignEvidenceTests.independentVerifierAdmitsOnlySchemaFourWithExactPreservedV13Gate \
+                >"$out/persistent-gate-positive.log" || exit $?
+        elif [[ $persistent_inventory == $'.owner-lock-v1\nattempt-a77c4d21-9bba-46f6-b694-3d1d1e55209d\nattempt-fa83c861-a7e2-4903-bf64-9eb08c757f74' ]]; then
+            local v13_root v16_root
+            read -r v13_root v16_root < <(/usr/bin/python3 -I - <<'PY'
+import os
+import tempfile
+temporary = os.path.realpath(tempfile.gettempdir())
+campaigns = (
+    "864065f6-8c9e-48e1-bedf-b0f6becd7b21",
+    "469fd1d1-f9fd-4a3c-a0e6-f72f586f5e72",
+)
+print(*(os.path.join(temporary, "stornaut-iic-evidence-" + campaign,
+                    "stornaut-task39-iic-" + campaign)
+        for campaign in campaigns))
+PY
+            ) || exit $?
+            scripts/verify-investigation-runtime-machine-failure \
+                "$v13_root" \
+                "$PWD/docs/reports/evidence/task-39-iic-v13-failure-disposition.json" \
+                "$v16_root" \
+                "$PWD/docs/reports/evidence/task-39-iic-v16-failure-disposition.json" \
+                >"$out/persistent-gate-v13-v16-joint-failure.log" || exit $?
+            STORNAUT_TASK39_V13_EVIDENCE_ROOT="$v13_root" \
+            STORNAUT_TASK39_V16_EVIDENCE_ROOT="$v16_root" \
+                /usr/bin/swift test --no-parallel \
+                --filter InvestigationMachineCampaignEvidenceTests.checkedV13ToV16JointReplayRequiresDeclaredSuccessorLineage \
                 >"$out/persistent-gate-positive.log" || exit $?
         else
             print -u2 "ii-c-c persistent Gate current-state verification unavailable"

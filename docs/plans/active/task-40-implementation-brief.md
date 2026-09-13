@@ -43,8 +43,10 @@ is not campaign-bound. The v14 authorization from `d5a7df3` was superseded
 before launch and remains unconsumed; the preservation prerequisite is complete/
 non-admitting. Fresh v15 from `facf3ea` was stopped before launch by aggregate-
 scope/xattr evidence gaps and is superseded/unconsumed. The fixes are pushed at
-`103a4836`; v16 is authorized/pending/unconsumed. Task 40 remains blocked until
-that campaign and L3c3d/L3c4 produce and push a Task 39 Ready baseline.
+`103a4836`; v16 then ran once and is consumed/non-admitting/non-retryable after
+`receiptInvalid/exited-82/cleanup-02`. Task 40 remains blocked until a repaired,
+separately authorized campaign and L3c3d/L3c4 produce and push a Task 39 Ready
+baseline.
 Inputs are:
 
 - one persisted Task 37 immutable partial/final Investigation report;

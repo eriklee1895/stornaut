@@ -360,6 +360,9 @@ iicc_v12_external_evidence_only=false
 iicc_v12_external_evidence_root=
 iicc_v13_external_evidence_only=false
 iicc_v13_external_evidence_root=
+iicc_v16_external_evidence_only=false
+iicc_v16_external_evidence_root=
+iicc_v16_predecessor_evidence_root=
 iicc_persistent_gate_contract_only=false
 iicc_persistent_gate_mutation_contract_only=false
 iicc_persistent_gate_mutation_name=
@@ -1023,6 +1026,11 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-v13-external-evidence-only ]]; then
         iicc_v13_external_evidence_only=true
         iicc_v13_external_evidence_root=$2
+    elif (( $# == 3 )) \
+        && [[ $1 == --iic-c-v16-external-evidence-only ]]; then
+        iicc_v16_external_evidence_only=true
+        iicc_v16_predecessor_evidence_root=$2
+        iicc_v16_external_evidence_root=$3
     elif (( $# == 1 || $# == 6 )) \
         && [[ $1 == --iic-c-persistent-gate-contract-only ]]; then
         iicc_persistent_gate_contract_only=true
@@ -13003,6 +13011,7 @@ function verify_iicc_failure_disposition_contract() {
     local v11_evidence=docs/reports/evidence/task-39-iic-v11-failure-disposition.json
     local v12_evidence=docs/reports/evidence/task-39-iic-v12-failure-disposition.json
     local v13_evidence=docs/reports/evidence/task-39-iic-v13-failure-disposition.json
+    local v16_evidence=docs/reports/evidence/task-39-iic-v16-failure-disposition.json
     local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
     local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
@@ -13011,11 +13020,12 @@ function verify_iicc_failure_disposition_contract() {
     local v11_report=docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md
     local v12_report=docs/reports/phase-d-task-39b2c-iic-v12-failure-disposition.md
     local v13_report=docs/reports/phase-d-task-39b2c-iic-v13-failure-disposition.md
+    local v16_report=docs/reports/phase-d-task-39b2c-iic-v16-failure-disposition.md
     local path
     for path in $verifier $evidence $v9_evidence $v9_prior $v9_before_v10 \
         $v9_before_v11 $v10_evidence $v10_before_v11 $v11_evidence \
-        $v12_evidence $v13_evidence $tests $boundary $report $v9_report \
-        $v10_report $v11_report $v12_report $v13_report; do
+        $v12_evidence $v13_evidence $v16_evidence $tests $boundary $report $v9_report \
+        $v10_report $v11_report $v12_report $v13_report $v16_report; do
         [[ -f $path && ! -L $path ]] || {
             print -u2 "ii-c-c failure disposition source unavailable: $path"
             return 1
@@ -13028,8 +13038,8 @@ function verify_iicc_failure_disposition_contract() {
     /bin/zsh -n $verifier || return $?
     /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior \
         $v9_before_v10 $v9_before_v11 $v10_evidence $v10_before_v11 \
-        $v11_evidence $v12_evidence $v13_evidence $tests $boundary $report \
-        $v9_report $v10_report $v11_report $v12_report $v13_report <<'PY'
+        $v11_evidence $v12_evidence $v13_evidence $v16_evidence $tests $boundary $report \
+        $v9_report $v10_report $v11_report $v12_report $v13_report $v16_report <<'PY'
 from pathlib import Path
 import hashlib
 import json
@@ -13037,8 +13047,9 @@ import re
 import sys
 
 verifier, evidence, v9_evidence, v9_prior, v9_before_v10, v9_before_v11, \
-v10_evidence, v10_before_v11, v11_evidence, v12_evidence, v13_evidence, tests, \
-boundary, report, v9_report, v10_report, v11_report, v12_report, v13_report = (
+v10_evidence, v10_before_v11, v11_evidence, v12_evidence, v13_evidence, \
+v16_evidence, tests, boundary, report, v9_report, v10_report, v11_report, \
+v12_report, v13_report, v16_report = (
     Path(value) for value in sys.argv[1:])
 source = verifier.read_text(encoding="utf-8")
 test_source = tests.read_text(encoding="utf-8")
@@ -13049,6 +13060,7 @@ v10_report_source = v10_report.read_text(encoding="utf-8")
 v11_report_source = v11_report.read_text(encoding="utf-8")
 v12_report_source = v12_report.read_text(encoding="utf-8")
 v13_report_source = v13_report.read_text(encoding="utf-8")
+v16_report_source = v16_report.read_text(encoding="utf-8")
 match = re.fullmatch(
     r"([0-9a-f]{64})",
     re.search(
@@ -13080,6 +13092,9 @@ required = (
     "consumedClosedPostArmFailure",
     "notCampaignArtifactBound",
     "persistentOwnConsumedAttemptPresent",
+    "persistentOwnAndPriorConsumedAttemptsPresent",
+    "verify_joint_successor", "joint predecessor Gate binding",
+    "joint exact dual-attempt Gate inventory",
     "gateBaseAbsentAfterObservedResidueLoss",
     "externalGateCacheResidueLost", "unattributedExternalRemoval",
     "closed failure projection reason",
@@ -13091,6 +13106,7 @@ required = (
     "testFixtureStaleRecoveryRemovedConsumedGateResidue",
     "exactCapsuleBytesUnavailable",
     "AMFI root-cause observation", 'label + " capsule binding"',
+    "AMFI supplemental observation",
 )
 for marker in required:
     if marker not in source:
@@ -13116,6 +13132,8 @@ checked = (
      ["prepared", "armedConsumed", "spawnUncertain"]),
     (v13_evidence, "consumedClosedPostArmFailure",
      ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
+    (v16_evidence, "consumedClosedPostArmFailure",
+     ["prepared", "armedConsumed", "spawnUncertain", "terminal"]),
 )
 checked_digests = {
     evidence: "7351c8312315b5673c7610a3421a20eb14fdb53fb6bdd181abfde4732d16b072",
@@ -13124,6 +13142,7 @@ checked_digests = {
     v11_evidence: "c70594ea5bd6d7ee3acc53f45e7f7e803e762c33cc01570cc48f098b89f96d48",
     v12_evidence: "27a20d6cb5350ba2c0f7d70c9cbf1f4787eb811fecec2a19476fb225f814c139",
     v13_evidence: "09c62579bf4a78ce00f491993ccfbeb5f4cd22ed11e0e8744f1e52922080bafd",
+    v16_evidence: "9705e4d659cd316a74aefbc5510a66af942e6e024763baeb52c5d192e37e08f6",
 }
 
 for checked_path, classification, events in checked:
@@ -13194,9 +13213,15 @@ for marker in (
     "Opt in to the read-only frozen v12 forgery-rejection verification",
     "checkedV13FailureDispositionBindsPersistentEvidenceWhenAvailable",
     '"STORNAUT_TASK39_V13_EVIDENCE_ROOT"',
-    "Opt in to the read-only frozen v13 failure-evidence verification",
+    "Opt in to the read-only frozen v13 to v16 joint failure-evidence verification",
     "checkedV13FailureDispositionRejectsSchemaEightForgeryWhenAvailable",
     "Opt in to the read-only frozen v13 forgery-rejection verification",
+    "checkedV16FailureDispositionBindsDualPersistentGateEvidenceWhenAvailable",
+    '"STORNAUT_TASK39_V16_EVIDENCE_ROOT"',
+    "checkedV16FailureDispositionRejectsSchemaNineForgeryWhenAvailable",
+    "checkedV13ToV16JointReplayRequiresDeclaredSuccessorLineage",
+    "failureDispositionJointInventoryRejectsAdditionalAttempt",
+    "failureDispositionHeldContextsRejectInPlaceMutationBeforeVerdict",
 ):
     if marker not in test_source:
         raise SystemExit("ii-c-c failure disposition tests drifted: " + marker)
@@ -13274,32 +13299,52 @@ for forbidden in ("therefore exhausted", "system-rejected credential attempt"):
         raise SystemExit(
             "ii-c-c v13 supplemental observation became causal: " + forbidden)
 for marker in (
+    "consumedClosedPostArmFailure", "31,123,738", "cleanup-02",
+    "AMFI error `-423`", "does not by itself\nprove that AMFI denied `exec`",
+    "zero fixed process/service/runtime residue", "non-admitting",
+    "non-retryable", "no valid code-signing identities",
+):
+    if marker not in v16_report_source:
+        raise SystemExit("ii-c-c v16 failure disposition report drifted: " + marker)
+for forbidden in ("`EPERM`", "deadline precheck failure",
+                  "signal failure across the root transition"):
+    if forbidden in v16_report_source:
+        raise SystemExit(
+            "ii-c-c v16 cleanup mechanism overclaimed: " + forbidden)
+for marker in (
     "--iic-c-v12-external-evidence-only",
     "function verify_iicc_v12_external_evidence() {",
     "ii-c-c frozen v12 evidence root unavailable or noncanonical",
 ):
     if marker not in boundary_source:
         raise SystemExit("ii-c-c v12 external evidence gate drifted: " + marker)
+for marker in (
+    "--iic-c-v16-external-evidence-only",
+    "function verify_iicc_v16_external_evidence() {",
+    "ii-c-c frozen v13/v16 evidence roots unavailable or noncanonical",
+):
+    if marker not in boundary_source:
+        raise SystemExit("ii-c-c v16 external evidence gate drifted: " + marker)
 active_status_entries = (
-    (Path("AGENTS.md"), "0833c2db702cf50014c159eba9cce0d33c9a8b7009532d34a0b529515bb028a0"),
-    (Path("README.md"), "24e2a49461530edfb9684b06edc13a0612a2701842a869f188280eae03e3cef9"),
-    (Path("docs/README.md"), "4b487b1e385215c83eabaa35936c464581f411f77c3c9fec5573d068b4a952c8"),
-    (Path("docs/agent/coding-agent-handoff.md"), "d1c4c5ca00716448d8f8195027222f94d0df5715a5e0076bc126d3b054c4ea5a"),
-    (Path("docs/plans/active/README.md"), "cff6c60a681e0722ae3ddd2fb6783b3f8af58de4cdf03698a1486804fefa4fd1"),
-    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "63167b91c05615528754c6d3cfaf95ff36fc16c44abcc415d82db061dcf7da7b"),
-    (Path("docs/plans/active/task-39-implementation-brief.md"), "77d12b1cc05ac7b6d6891648d21dedf651dfa2df8d0cee3084332d5380963d22"),
-    (Path("docs/plans/active/task-40-implementation-brief.md"), "8b01bfa2b686368bee08cbed08cd901df7ac7bed815b7a49c1c79f0c450a2d3d"),
-    (Path("docs/plans/roadmap.md"), "af838348bce58b00c62452a5e0cab53b31872eb79d537175299888e5e4ae9007"),
+    (Path("AGENTS.md"), "5e5a80028e8d7ecf6809e417f89b314977e581f9a2f89d341fde6147c28f9595"),
+    (Path("README.md"), "161d2f87126ca534b1b8e0be8c91a65bd464a310800e5bc531a78940341e3d9c"),
+    (Path("docs/README.md"), "f39f7cff2f509ccc18d78f8afbe03094d37fd80ec454b69007520c237026cb29"),
+    (Path("docs/agent/coding-agent-handoff.md"), "3332dc96c0aaadeded1ec5ee24df3d998e7370034ea6f539fd729a28be4bb82c"),
+    (Path("docs/plans/active/README.md"), "bd4ba98c608e18628ac5bd284e21f440ccc75a584a3bd16b857a6ef1e9c66f30"),
+    (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "064dd5f690062d4caf82507758967d7ce4338071afbe0f5c1adc090690059b88"),
+    (Path("docs/plans/active/task-39-implementation-brief.md"), "9a504720942a083dbba22c5d98104f7bcf00b69cbc162fb614bc72e26cd51e4e"),
+    (Path("docs/plans/active/task-40-implementation-brief.md"), "051dc7bdc1ecee8913f3bf916a29dbe3f55d4934aee8a42a2d461534ad901432"),
+    (Path("docs/plans/roadmap.md"), "3f2e7b995b2bf55da407944f68f521bb1731e6be1ea1335e40523e6770bc8481"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md"), "dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md"), "2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md"), "3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"), "a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md"), "9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"), "a5fd99b48b31228385db121489a99343c855dba3c876309558e6ec0b5ae7eb52"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "d160e898a8ca407f6ec5024c34fe11b1d30b4f9d50124177028bdd7490559414"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"), "6103985f4ba4e42fec28600b0589d6fef2356f70ce9fe78e9be8f72451a4bcb9"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"), "fb3663b21e163c2b462456f2b00ee3118b0bed6cba4b2c001fb0754aa121f042"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md"), "e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb"),
     (Path("docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md"), "499a1086c3a2f4b3307faf6d81937bf46e2649529cc60d393122f895876b464d"),
-    (Path("docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md"), "11d7089c2d62d4d97e0cc962f1578451a75e016b24cf76ce739b20cf4f0b3f15"),
+    (Path("docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md"), "2504457bd050c2599d3e9d10a0eb0874a05a778b823f3c5995af8b0b803321ec"),
 )
 active_status_expected_paths = {
     Path("AGENTS.md"),
@@ -13343,7 +13388,7 @@ semantic_status = {
         "superseded/unconsumed", "preservation prerequisite",
         "fresh v15", "aggregate scope enforcement 与 xattr no-mutation",
         "superseded/unconsumed", "103a4836", "fresh v16",
-        "authorized/pending/unconsumed",
+        "receiptInvalid/exited-82/cleanup-02", "schema-v9 checked disposition",
         "Task 40 仍 blocked",
     ),
     Path("docs/plans/active/README.md"): (
@@ -13357,7 +13402,7 @@ semantic_status = {
         "fresh v15 campaign based on `facf3ea` was authorized",
         "aggregate scope and xattr no-mutation evidence gaps",
         "v15 is superseded", "103a4836", "fresh v16",
-        "authorized/pending/unconsumed",
+        "consumed/non-admitting/non-retryable", "status-82/cleanup-02 repair",
         "blocked on Task 39 under the approved sequential plan",
     ),
     Path("docs/plans/active/phase-d-conditional-deep-dive.md"): (
@@ -13369,7 +13414,7 @@ semantic_status = {
         "v14 authorization based on `d5a7df3` was stopped before launch",
         "remains unconsumed but is superseded", "fresh v15 campaign",
         "aggregate scope", "superseded/unconsumed", "103a4836",
-        "fresh v16", "authorized/pending/unconsumed",
+        "fresh v16", "non-admitting/non-retryable",
         "Task 40 remains blocked",
     ),
     Path("docs/plans/active/task-39-implementation-brief.md"): (
@@ -13381,7 +13426,7 @@ semantic_status = {
         "unconsumed but is superseded", "One fresh v15 was",
         "authorized from `facf3ea`", "aggregate scope",
         "v15 is superseded/unconsumed", "103a4836",
-        "v16 is authorized/pending/unconsumed",
+        "v16 is consumed/non-admitting/non-retryable",
         "Task 40 start condition remains blocked",
     ),
     Path("docs/plans/active/task-40-implementation-brief.md"): (
@@ -13392,7 +13437,7 @@ semantic_status = {
         "v14 authorization from `d5a7df3` was superseded",
         "remains unconsumed", "Fresh v15 from `facf3ea` was stopped before launch",
         "superseded/unconsumed", "103a4836",
-        "v16 is authorized/pending/unconsumed",
+        "v16 then ran once and is consumed/non-admitting/non-retryable",
         "blocked on pushed Task 39 Ready baseline",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md"): (
@@ -13410,14 +13455,14 @@ semantic_status = {
         "Task 40 remains blocked",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"): (
-        "Status: v16 authorized / pending / unconsumed",
+        "Status: v16 consumed / non-admitting / non-retryable",
         "authorized evidence-closure prerequisite\n  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal",
-        "No v16 campaign or attempt UUID",
+        "checked failure disposition supersedes this pre-launch statement",
         "operator personally enters administrator credentials",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"): (
-        "v14-v15 superseded", "v16 authorized pending unconsumed",
-        "Remaining order: pushed authorization-only seal -> one-shot v16 campaign -> L3c3d -> L3c4",
+        "v8-v13 and v16 consumed", "repair pending",
+        "status-82/cleanup-02 repair -> new authorization -> green campaign -> L3c3d -> L3c4",
         "aggregate scope/xattr no-mutation evidence gaps",
         "v15 is superseded/unconsumed",
     ),
@@ -13436,10 +13481,11 @@ semantic_status = {
         "No campaign UUID", "Task 40 remains blocked",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md"): (
-        "Status: authorized / pending / unconsumed",
+        "Status: consumed / non-admitting / non-retryable",
         "103a4836f4aa80c5d3739ca357364ad5c9200cf6",
         "0cfccbf6e8a500365837b4cb9551f6ff70af4bbf",
-        "one fresh nonzero campaign UUID", "Once v16 durably records",
+        "one fresh nonzero campaign UUID",
+        "The authorized invocation subsequently ran exactly once",
         "No v8-v15 artifact", "exact v13",
         "No such identity or\nroot exists at authorization time",
         "Task 40 remains blocked",
@@ -13461,7 +13507,7 @@ for marker in ("v8 through v13 are conclusive",
                "v14 authorization based on `d5a7df3` was stopped before launch",
                "One fresh v15 was > authorized from `facf3ea`",
                "v15 is superseded/unconsumed",
-               "103a4836", "v16 is authorized/pending/unconsumed"):
+               "103a4836", "v16 is consumed/non-admitting/non-retryable"):
     if marker not in task39_status:
         raise SystemExit("ii-c-c current campaign disposition drifted")
 for stale in (
@@ -13476,8 +13522,8 @@ for stale in (
     "frontier 为 v14 campaign",
     "等待基于新 pushed commit 的 fresh 授权",
     "fresh authorization bound to its pushed commit is required",
-    "v16 consumed",
-    "v16 is consumed",
+    "v16 authorized/pending/unconsumed",
+    "v16 is authorized/pending/unconsumed",
 ):
     if stale in "\n".join(path.read_text(encoding="utf-8") for path in (
         Path("AGENTS.md"),
@@ -13510,6 +13556,24 @@ function verify_iicc_v13_external_evidence() {
         return 1
     }
     "$verifier" "$iicc_v13_external_evidence_root" "$PWD/$disposition"
+}
+
+function verify_iicc_v16_external_evidence() {
+    local verifier=scripts/verify-investigation-runtime-machine-failure
+    local v13_disposition=docs/reports/evidence/task-39-iic-v13-failure-disposition.json
+    local v16_disposition=docs/reports/evidence/task-39-iic-v16-failure-disposition.json
+    [[ $iicc_v16_predecessor_evidence_root == /* \
+        && -d $iicc_v16_predecessor_evidence_root \
+        && ! -L $iicc_v16_predecessor_evidence_root \
+        && $iicc_v16_external_evidence_root == /* \
+        && -d $iicc_v16_external_evidence_root \
+        && ! -L $iicc_v16_external_evidence_root ]] || {
+        print -u2 "ii-c-c frozen v13/v16 evidence roots unavailable or noncanonical"
+        return 1
+    }
+    "$verifier" \
+        "$iicc_v16_predecessor_evidence_root" "$PWD/$v13_disposition" \
+        "$iicc_v16_external_evidence_root" "$PWD/$v16_disposition"
 }
 
 function verify_iicc_persistent_gate_contract() {
@@ -19224,6 +19288,11 @@ fi
 if $iicc_v13_external_evidence_only; then
     verify_iicc_v13_external_evidence
     print "ii-c-c frozen v13 external evidence verification passed."
+    exit 0
+fi
+if $iicc_v16_external_evidence_only; then
+    verify_iicc_v16_external_evidence
+    print "ii-c-c frozen v13 to v16 joint external evidence verification passed."
     exit 0
 fi
 if $iicc_persistent_gate_contract_only \
