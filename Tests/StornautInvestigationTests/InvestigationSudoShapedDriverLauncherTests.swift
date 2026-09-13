@@ -370,6 +370,13 @@ struct InvestigationSudoShapedDriverLauncherTests {
             ),
             encoding: .utf8
         )
+        let cIdentity = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/CInvestigationIdentitySupport/"
+                    + "CInvestigationIdentitySupport.c"
+            ),
+            encoding: .utf8
+        )
         let gateSource = support + system
 
         for forbidden in [
@@ -382,12 +389,34 @@ struct InvestigationSudoShapedDriverLauncherTests {
             #expect(!gateSource.contains(forbidden), "forbidden: \(forbidden)")
         }
         #expect(gateSource.contains(
-            "stornaut_investigation_process_snapshot_for_pid"
+            "stornaut_investigation_cross_uid_process_snapshot_for_pid"
+        ))
+        #expect(!gateSource.contains(
+            "stornaut_investigation_process_snapshot_for_pid("
         ))
         #expect(gateSource.contains("proc_pidpath(processID"))
         #expect(gateSource.contains(
             "kSecGuestAttributePid: NSNumber(value: processID)"
         ))
+        #expect(gateSource.contains("gateAuditSessionAnchor()"))
+        let crossUIDStart = try #require(cIdentity.range(
+            of: "stornaut_investigation_cross_uid_process_snapshot_for_pid("
+        ))
+        let selfAuditStart = try #require(cIdentity.range(
+            of: "stornaut_investigation_current_audit_identity_read("
+        ))
+        let crossUIDBody = cIdentity[
+            crossUIDStart.lowerBound..<selfAuditStart.lowerBound
+        ]
+        #expect(crossUIDBody.contains(
+            "stornaut_investigation_read_kernel_information"
+        ))
+        #expect(cIdentity.contains("KERN_PROC_PID"))
+        #expect(crossUIDBody.contains("getsid(process_id)"))
+        #expect(!crossUIDBody.contains("audit_get_pinfo_addr"))
+        let selfAuditBody = cIdentity[selfAuditStart.lowerBound...]
+        #expect(selfAuditBody.contains("getaudit_addr"))
+        #expect(!selfAuditBody.contains("process_id"))
     }
 
     @Test
@@ -1466,6 +1495,10 @@ private func sampleResolvedRootDriverValidationInput() throws
         initialLaunch: try sampleInitialLaunch(),
         recoveryProcessGroupID: 41,
         coordinatorSessionID: 40,
+        gateAuditSessionAnchor: try .init(
+            auditUserID: initial.auditTokenWords[0],
+            auditSessionID: initial.auditSessionID
+        ),
         lineageEdges: [.init(parent: initialObserved, child: driverObserved)],
         firstProcessSample: .init(
             identity: driverObserved,
@@ -1494,8 +1527,7 @@ private func gateObserved(
         startMicroseconds: claimed.startMicroseconds,
         parentProcessID: claimed.parentProcessID,
         processGroupID: claimed.processGroupID, sessionID: claimed.sessionID,
-        auditUserID: claimed.auditTokenWords[0],
-        auditSessionID: claimed.auditSessionID, realUserID: claimed.realUserID,
+        realUserID: claimed.realUserID,
         effectiveUserID: claimed.effectiveUserID,
         savedUserID: claimed.savedUserID, realGroupID: claimed.realGroupID,
         effectiveGroupID: claimed.effectiveGroupID,

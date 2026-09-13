@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=8cdc54f9919331ffce7c29db720f99714e8a6ccf5da611daf794392ae99f5d57
+# ib2_self_sha=eba0727cdd5f468cec41ffe483f21d7af494d6b21ed7563366676d0e4001cc31
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3703,6 +3703,220 @@ if [[ ${1:-} == --root-driver-lineage-cross-uid-contract-only ]]; then
     exit 0
 fi
 
+function verify_iicc_v16_repair_contract() {
+    local out=$1 gate=scripts/verify-investigation-boundaries
+    local -a paths=(
+        Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
+        Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+    )
+    mkdir -p "$out"
+    "$gate" --iic-c-v16-repair-source-contract-only "${paths[@]}" \
+        >"$out/source.log"
+    "$gate" --iic-c-v16-repair-staged-scope-contract-only \
+        4d71ae29474425b8fedecf6f9ac97517d68fd506 >"$out/scope.log"
+    local -a names=(
+        child-bsm-return kernel-resample-drop self-audit-pid-substitution
+        old-snapshot-return audit-anchor-resample-drop audit-anchor-join-drop
+        root-observation-drop
+    )
+    local -a slots=(
+        c c c transport darwin validator validator
+    )
+    local -a olds=(
+        'pid_t first_session_id = getsid(process_id);'
+        $'result = stornaut_investigation_read_kernel_information(\n        process_id,\n        &second\n    );'
+        'getaudit_addr(&information, sizeof(information))'
+        'stornaut_investigation_cross_uid_process_snapshot_for_pid('
+        'firstGateAuditAnchor == secondGateAuditAnchor,'
+        $'claim.process.auditSessionID\n                == input.gateAuditSessionAnchor.auditSessionID,'
+        'resolved.realUserID == 0, resolved.effectiveUserID == 0,'
+    )
+    local -a news=(
+        'auditpinfo_addr_t child_audit = {0}; child_audit.ap_pid = process_id; (void)audit_get_pinfo_addr(&child_audit, sizeof(child_audit)); pid_t first_session_id = getsid(process_id);'
+        'result = 0;'
+        'audit_get_pinfo_addr((auditpinfo_addr_t *)&information, sizeof(information))'
+        'stornaut_investigation_process_snapshot_for_pid('
+        'true,' 'true,' 'true,'
+    )
+    (( ${#names} == 7 && ${#slots} == 7 \
+        && ${#olds} == 7 && ${#news} == 7 )) \
+        || fail_contract "v16 repair mutation inventory drifted"
+    local ordinal index source target sha rc
+    for ordinal in {1..7}; do
+        case ${slots[$ordinal]} in
+            c) index=1;; header) index=2;; darwin) index=3;;
+            transport) index=4;; validator) index=5;; physical_tests) index=6;;
+            validator_tests) index=7;; launcher_tests) index=8;;
+        esac
+        source=${paths[$index]}
+        target="$out/${names[$ordinal]}"
+        OLD=${olds[$ordinal]} NEW=${news[$ordinal]} \
+            /usr/bin/python3 -I - "$source" "$target" <<'PY'
+from pathlib import Path
+import os,sys
+source=Path(sys.argv[1]).read_text(); old=os.environ["OLD"]; new=os.environ["NEW"]
+if source.count(old)!=1: raise SystemExit("v16 repair mutation fixture is vacuous")
+Path(sys.argv[2]).write_text(source.replace(old,new,1))
+PY
+        local -a args=("${paths[@]}")
+        args[$index]=$target
+        sha=$(shasum -a 256 "$target" | awk '{print $1}')
+        rc=0
+        "$gate" --iic-c-v16-repair-mutation-contract-only \
+            "${names[$ordinal]}" "${slots[$ordinal]}" "$sha" \
+            "${args[@]}" >"$out/${names[$ordinal]}.log" 2>&1 || rc=$?
+        (( rc != 0 )) \
+            || fail_contract "v16 repair mutation accepted: ${names[$ordinal]}"
+    done
+    function reject_v16_repair_protocol() {
+        local label=$1; shift
+        local log="$out/protocol-$label.log" protocol_rc=0
+        "$@" >"$log" 2>&1 || protocol_rc=$?
+        (( protocol_rc != 0 )) \
+            || fail_contract "v16 repair protocol mutation accepted: $label"
+    }
+    local mutation="$out/child-bsm-return"
+    local mutation_sha=$(shasum -a 256 "$mutation" | awk '{print $1}')
+    local -a mutation_args=("${paths[@]}")
+    mutation_args[1]=$mutation
+    reject_v16_repair_protocol unknown-name "$gate" \
+        --iic-c-v16-repair-mutation-contract-only unknown c \
+        "$mutation_sha" "${mutation_args[@]}"
+    reject_v16_repair_protocol wrong-slot "$gate" \
+        --iic-c-v16-repair-mutation-contract-only child-bsm-return harness \
+        "$mutation_sha" "${mutation_args[@]}"
+    reject_v16_repair_protocol malformed-sha "$gate" \
+        --iic-c-v16-repair-mutation-contract-only child-bsm-return c bad \
+        "${mutation_args[@]}"
+    reject_v16_repair_protocol wrong-sha "$gate" \
+        --iic-c-v16-repair-mutation-contract-only child-bsm-return c \
+        0000000000000000000000000000000000000000000000000000000000000000 \
+        "${mutation_args[@]}"
+
+    local active_index=${GIT_INDEX_FILE:-$(git rev-parse --git-path index)}
+    local baseline=4d71ae29474425b8fedecf6f9ac97517d68fd506
+    local fixture bad blob scope_target expected log
+    for fixture in extra missing binary wrong-mode over-budget \
+        aggregate-budget staged-worktree-divergence wrong-baseline; do
+        bad="$out/scope-$fixture.index"
+        cp "$active_index" "$bad"
+        scope_target=$baseline
+        case $fixture in
+            extra)
+                blob=$(print 'extra' | git hash-object -w --stdin)
+                GIT_INDEX_FILE=$bad git update-index --add --cacheinfo \
+                    "100644,$blob,v16-repair-extra.swift"
+                expected='v16 repair checkpoint paths drifted'
+                ;;
+            missing)
+                blob=$(git rev-parse \
+                    "$baseline:Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h")
+                GIT_INDEX_FILE=$bad git update-index --cacheinfo \
+                    "100644,$blob,Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h"
+                expected='v16 repair checkpoint paths drifted'
+                ;;
+            binary)
+                blob=$(printf '\0v16-repair\n' | git hash-object -w --stdin)
+                GIT_INDEX_FILE=$bad git update-index --cacheinfo \
+                    "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"
+                expected='v16 repair binary checkpoint path rejected'
+                ;;
+            wrong-mode)
+                blob=$(git hash-object -- scripts/verify-contract)
+                GIT_INDEX_FILE=$bad git update-index --cacheinfo \
+                    "100644,$blob,scripts/verify-contract"
+                expected='v16 repair index/worktree drifted'
+                ;;
+            over-budget)
+                blob=$( {
+                    <Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+                    for line in {1..101}; do
+                        print "// v16-repair-path-budget-$line"
+                    done
+                } | git hash-object -w --stdin)
+                GIT_INDEX_FILE=$bad git update-index --cacheinfo \
+                    "100644,$blob,Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift"
+                expected='v16 repair path budget drifted'
+                ;;
+            aggregate-budget)
+                local -a additions=(
+                    'Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c:70'
+                    'Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h:39'
+                    'Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift:82'
+                    'scripts/verify-contract:270'
+                    'scripts/verify-investigation-boundaries:430'
+                )
+                local addition checkpoint_path count
+                for addition in "${additions[@]}"; do
+                    checkpoint_path=${addition%:*}
+                    count=${addition##*:}
+                    blob=$( {
+                        <"$checkpoint_path"
+                        for line in {1..$count}; do
+                            print "// v16-repair-aggregate-budget-$line"
+                        done
+                    } | git hash-object -w --stdin)
+                    GIT_INDEX_FILE=$bad git update-index --cacheinfo \
+                        "$(git ls-files -s -- "$checkpoint_path" | awk '{print $1}'),$blob,$checkpoint_path"
+                done
+                expected='v16 repair aggregate budget drifted'
+                ;;
+            staged-worktree-divergence)
+                blob=$( {
+                    <Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+                    print '/* staged-only drift */'
+                } | git hash-object -w --stdin)
+                GIT_INDEX_FILE=$bad git update-index --cacheinfo \
+                    "100644,$blob,Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h"
+                expected='v16 repair index/worktree drifted'
+                ;;
+            wrong-baseline)
+                scope_target=$baseline^
+                expected='v16 repair checkpoint baseline drifted'
+                ;;
+        esac
+        log="$out/scope-$fixture.log"
+        rc=0
+        GIT_INDEX_FILE=$bad "$gate" \
+            --iic-c-v16-repair-staged-scope-contract-only "$scope_target" \
+            >"$log" 2>&1 || rc=$?
+        (( rc != 0 )) \
+            || fail_contract "v16 repair scope mutation accepted: $fixture"
+        [[ "$(<"$log")" == *"$expected"* ]] \
+            || fail_contract "v16 repair scope diagnostic drifted: $fixture"
+    done
+    (
+        local untracked=v16-repair-untracked.swift
+        trap 'rm -f "$untracked"' EXIT
+        print 'untracked' >"$untracked"
+        log="$out/scope-untracked.log"
+        rc=0
+        "$gate" --iic-c-v16-repair-staged-scope-contract-only "$baseline" \
+            >"$log" 2>&1 || rc=$?
+        (( rc != 0 )) \
+            || fail_contract "v16 repair scope mutation accepted: untracked"
+        [[ "$(<"$log")" == *"v16 repair index/worktree drifted"* ]] \
+            || fail_contract "v16 repair scope diagnostic drifted: untracked"
+    )
+}
+
+if [[ ${1:-} == --iic-c-v16-repair-contract-only ]]; then
+    (( $# == 1 )) || fail_contract \
+        "Usage: scripts/verify-contract --iic-c-v16-repair-contract-only"
+    v16_repair_root=$(mktemp -d \
+        "${TMPDIR:-/tmp}/stornaut-v16-repair-contract.XXXXXX")
+    trap 'rm -rf "$v16_repair_root"' EXIT
+    verify_iicc_v16_repair_contract "$v16_repair_root"
+    print "v16 status-82 identity repair contract verification passed."
+    exit 0
+fi
+
 function verify_iicc_contract() {
     local out=$1 gate=scripts/verify-investigation-boundaries
     local release=scripts/verify-app-release-boundaries
@@ -3859,7 +4073,8 @@ function verify_iicc_contract() {
     "$gate" --iic-evidence-verification-source-contract-only >"$out/current-evidence.log"
     "$gate" --iic-root-driver-lineage-l1-source-contract-only >"$out/current-lineage-l1.log"
     "$gate" --iic-root-driver-lineage-l2-source-contract-only >"$out/current-lineage-l2.log"
-    "$gate" --root-driver-lineage-cross-uid-source-contract-only >"$out/current-cross-uid.log"
+    "$gate" --iic-c-v16-repair-source-contract-only \
+        >"$out/current-v16-repair.log"
     "$gate" --iic-c-preserved-capsule-contract-only \
         "${preserved_paths[@]}" >"$out/preserved-capsule.log"
     /usr/bin/python3 -I - "$out" "${preserved_paths[@]}" <<'PY'
@@ -7280,7 +7495,7 @@ STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 \
     verify_iicc_contract "$contract_root/iicc"
 verify_iic_root_driver_lineage_l1_contract "$contract_root/iic-lineage-l1" false
 verify_iic_root_driver_lineage_l2_contract "$contract_root/iic-lineage-l2"
-verify_root_driver_lineage_cross_uid_contract "$contract_root/cross-uid"
+verify_iicc_v16_repair_contract "$contract_root/v16-repair"
 verify_iic0bivb2_contract "$contract_root/iic0bivb2" false
 verify_shared_deadline_repair_contract "$contract_root/shared-deadline"
 verify_fixed_gate_deadline_cleanup_contract "$contract_root/fixed-gate-cleanup"

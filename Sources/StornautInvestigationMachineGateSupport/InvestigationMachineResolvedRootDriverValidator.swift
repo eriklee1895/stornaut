@@ -40,10 +40,10 @@ package struct InvestigationMachineInitialSudoLaunchIdentity:
     }
 }
 
-/// Identity fields the unprivileged Gate can independently observe through
-/// public Darwin process APIs. The driver claim's pidversion and audit-token
-/// words deliberately do not appear here: those remain sealed, self-reported
-/// compatibility fields in the fixed 1,006-byte claim.
+/// Process identity fields the unprivileged Gate can independently observe
+/// through public Darwin kernel process APIs. The driver claim's pidversion,
+/// audit token and audit identity deliberately do not appear here: per-PID BSM
+/// observation is denied across the UID boundary while the driver is stopped.
 package struct InvestigationMachineGateObservedProcessIdentity:
     Sendable, Equatable
 {
@@ -53,8 +53,6 @@ package struct InvestigationMachineGateObservedProcessIdentity:
     package let parentProcessID: UInt32
     package let processGroupID: UInt32
     package let sessionID: UInt32
-    package let auditUserID: UInt32
-    package let auditSessionID: UInt32
     package let realUserID: UInt32
     package let effectiveUserID: UInt32
     package let savedUserID: UInt32
@@ -66,7 +64,7 @@ package struct InvestigationMachineGateObservedProcessIdentity:
     package init(
         processID: UInt32, startSeconds: Int64, startMicroseconds: Int32,
         parentProcessID: UInt32, processGroupID: UInt32, sessionID: UInt32,
-        auditUserID: UInt32, auditSessionID: UInt32, realUserID: UInt32,
+        realUserID: UInt32,
         effectiveUserID: UInt32,
         savedUserID: UInt32, realGroupID: UInt32, effectiveGroupID: UInt32,
         savedGroupID: UInt32, supplementaryGroups: [UInt32]
@@ -74,7 +72,7 @@ package struct InvestigationMachineGateObservedProcessIdentity:
         guard
             processID > 1, startSeconds > 0,
             (0...999_999).contains(startMicroseconds), parentProcessID > 0,
-            processGroupID > 1, sessionID > 0, auditSessionID > 0,
+            processGroupID > 1, sessionID > 0,
             (1...InvestigationGeneralProcessIdentityV1.supplementaryGroupCapacity)
                 .contains(supplementaryGroups.count),
             supplementaryGroups == supplementaryGroups.sorted(),
@@ -90,8 +88,6 @@ package struct InvestigationMachineGateObservedProcessIdentity:
         self.parentProcessID = parentProcessID
         self.processGroupID = processGroupID
         self.sessionID = sessionID
-        self.auditUserID = auditUserID
-        self.auditSessionID = auditSessionID
         self.realUserID = realUserID
         self.effectiveUserID = effectiveUserID
         self.savedUserID = savedUserID
@@ -99,6 +95,25 @@ package struct InvestigationMachineGateObservedProcessIdentity:
         self.effectiveGroupID = effectiveGroupID
         self.savedGroupID = savedGroupID
         self.supplementaryGroups = supplementaryGroups
+    }
+}
+
+/// Audit identity independently read from the Gate itself. `/usr/bin/sudo`
+/// descendants inherit this audit session; the sealed driver claim must name
+/// this exact anchor even though the Gate cannot query the stopped root child.
+package struct InvestigationMachineGateAuditSessionAnchor:
+    Sendable, Equatable
+{
+    package let auditUserID: UInt32
+    package let auditSessionID: UInt32
+
+    package init(auditUserID: UInt32, auditSessionID: UInt32) throws {
+        guard auditUserID != UInt32.max, auditSessionID > 0 else {
+            throw InvestigationMachineResolvedRootDriverValidationError
+                .invalidInput
+        }
+        self.auditUserID = auditUserID
+        self.auditSessionID = auditSessionID
     }
 }
 
@@ -143,6 +158,8 @@ package struct InvestigationMachineResolvedRootDriverValidationInput:
     package var initialLaunch: InvestigationMachineInitialSudoLaunchIdentity
     package var recoveryProcessGroupID: UInt32
     package var coordinatorSessionID: UInt32
+    package var gateAuditSessionAnchor:
+        InvestigationMachineGateAuditSessionAnchor
     package var lineageEdges: [InvestigationMachineResolvedRootDriverLineageEdge]
     package var firstProcessSample:
         InvestigationMachineResolvedRootDriverProcessSample
@@ -162,6 +179,7 @@ package struct InvestigationMachineResolvedRootDriverValidationInput:
         expectedWholeInputSHA256: InvestigationHandoffSHA256,
         initialLaunch: InvestigationMachineInitialSudoLaunchIdentity,
         recoveryProcessGroupID: UInt32, coordinatorSessionID: UInt32,
+        gateAuditSessionAnchor: InvestigationMachineGateAuditSessionAnchor,
         lineageEdges: [InvestigationMachineResolvedRootDriverLineageEdge],
         firstProcessSample: InvestigationMachineResolvedRootDriverProcessSample,
         secondProcessSample: InvestigationMachineResolvedRootDriverProcessSample,
@@ -178,6 +196,7 @@ package struct InvestigationMachineResolvedRootDriverValidationInput:
         self.initialLaunch = initialLaunch
         self.recoveryProcessGroupID = recoveryProcessGroupID
         self.coordinatorSessionID = coordinatorSessionID
+        self.gateAuditSessionAnchor = gateAuditSessionAnchor
         self.lineageEdges = lineageEdges
         self.firstProcessSample = firstProcessSample
         self.secondProcessSample = secondProcessSample
@@ -276,7 +295,13 @@ package enum InvestigationMachineResolvedRootDriverValidator {
             input.recoveryProcessGroupID > 1,
             input.coordinatorSessionID > 0,
             input.initialLaunch.processGroupID == input.recoveryProcessGroupID,
-            input.initialLaunch.sessionID == input.coordinatorSessionID
+            input.initialLaunch.sessionID == input.coordinatorSessionID,
+            claim.process.auditTokenWords[0]
+                == input.gateAuditSessionAnchor.auditUserID,
+            claim.process.auditSessionID
+                == input.gateAuditSessionAnchor.auditSessionID,
+            claim.process.auditTokenWords[6]
+                == input.gateAuditSessionAnchor.auditSessionID
         else { throw Error.processIdentityMismatch }
 
         let lineage = try resolveLineage(input)
@@ -292,7 +317,11 @@ package enum InvestigationMachineResolvedRootDriverValidator {
                 < input.secondProcessSample.observedAtContinuousNanoseconds,
             resolved.processGroupID == input.recoveryProcessGroupID,
             resolved.sessionID == input.coordinatorSessionID,
-            resolved.processID == input.liveSigningProcessID
+            resolved.processID == input.liveSigningProcessID,
+            resolved.realUserID == 0, resolved.effectiveUserID == 0,
+            resolved.savedUserID == 0, resolved.realGroupID == 0,
+            resolved.effectiveGroupID == 0, resolved.savedGroupID == 0,
+            resolved.supplementaryGroups.contains(0)
         else { throw Error.processIdentityMismatch }
 
         try validateExecutable(input)
@@ -381,9 +410,6 @@ package enum InvestigationMachineResolvedRootDriverValidator {
             lineage.count <= maximumLineageNodeCount,
             Set(keys).count == keys.count,
             Set(lineage.map(\.processID)).count == lineage.count,
-            lineage.allSatisfy({ identity in
-                identity.auditSessionID == input.claim.process.auditSessionID
-            }),
             lineage.last == input.firstProcessSample.identity
         else { throw Error.lineageUnproved }
         return lineage
@@ -436,13 +462,11 @@ package enum InvestigationMachineResolvedRootDriverValidator {
         observed: InvestigationMachineGateObservedProcessIdentity
     ) -> Bool {
         claim.processID == observed.processID
-            && claim.auditTokenWords[0] == observed.auditUserID
             && claim.startSeconds == observed.startSeconds
             && claim.startMicroseconds == observed.startMicroseconds
             && claim.parentProcessID == observed.parentProcessID
             && claim.processGroupID == observed.processGroupID
             && claim.sessionID == observed.sessionID
-            && claim.auditSessionID == observed.auditSessionID
             && claim.realUserID == observed.realUserID
             && claim.effectiveUserID == observed.effectiveUserID
             && claim.savedUserID == observed.savedUserID

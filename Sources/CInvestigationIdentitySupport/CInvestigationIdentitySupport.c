@@ -11,6 +11,7 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
+#include <unistd.h>
 
 _Static_assert(
     NGROUPS == STORNAUT_INVESTIGATION_MAX_SUPPLEMENTARY_GROUPS,
@@ -62,6 +63,79 @@ stornaut_investigation_bsd_identity_matches(
         first->pbi_svgid == second->pbi_svgid &&
         first->pbi_start_tvsec == second->pbi_start_tvsec &&
         first->pbi_start_tvusec == second->pbi_start_tvusec;
+}
+
+static int
+stornaut_investigation_read_kernel_information(
+    pid_t process_id,
+    struct kinfo_proc *information
+)
+{
+    memset(information, 0, sizeof(*information));
+    size_t information_size = sizeof(*information);
+    int process_mib[] = {
+        CTL_KERN,
+        KERN_PROC,
+        KERN_PROC_PID,
+        process_id,
+    };
+    errno = 0;
+    if (sysctl(
+            process_mib,
+            sizeof(process_mib) / sizeof(process_mib[0]),
+            information,
+            &information_size,
+            NULL,
+            0
+        ) != 0) {
+        int error = errno;
+        return error != 0 ? error : EIO;
+    }
+    if (information_size == 0) {
+        return ESRCH;
+    }
+    if (information_size != sizeof(*information)) {
+        return EIO;
+    }
+    if (information->kp_proc.p_pid != process_id) {
+        return ESRCH;
+    }
+    return 0;
+}
+
+static int
+stornaut_investigation_kernel_identity_matches(
+    const struct kinfo_proc *first,
+    const struct kinfo_proc *second
+)
+{
+    int first_group_count = first->kp_eproc.e_ucred.cr_ngroups;
+    int second_group_count = second->kp_eproc.e_ucred.cr_ngroups;
+    if (first_group_count < 1 ||
+        first_group_count > STORNAUT_INVESTIGATION_MAX_SUPPLEMENTARY_GROUPS ||
+        first_group_count != second_group_count) {
+        return 0;
+    }
+    return first->kp_proc.p_pid == second->kp_proc.p_pid &&
+        first->kp_eproc.e_ppid == second->kp_eproc.e_ppid &&
+        first->kp_eproc.e_pgid == second->kp_eproc.e_pgid &&
+        first->kp_eproc.e_pcred.p_ruid == second->kp_eproc.e_pcred.p_ruid &&
+        first->kp_eproc.e_ucred.cr_uid == second->kp_eproc.e_ucred.cr_uid &&
+        first->kp_eproc.e_pcred.p_svuid == second->kp_eproc.e_pcred.p_svuid &&
+        first->kp_eproc.e_pcred.p_rgid == second->kp_eproc.e_pcred.p_rgid &&
+        first->kp_eproc.e_ucred.cr_groups[0]
+            == second->kp_eproc.e_ucred.cr_groups[0] &&
+        first->kp_eproc.e_pcred.p_svgid == second->kp_eproc.e_pcred.p_svgid &&
+        first->kp_proc.p_starttime.tv_sec
+            == second->kp_proc.p_starttime.tv_sec &&
+        first->kp_proc.p_starttime.tv_usec
+            == second->kp_proc.p_starttime.tv_usec &&
+        memcmp(
+            first->kp_eproc.e_ucred.cr_groups,
+            second->kp_eproc.e_ucred.cr_groups,
+            (size_t)first_group_count *
+                sizeof(first->kp_eproc.e_ucred.cr_groups[0])
+        ) == 0;
 }
 
 static int
@@ -303,5 +377,105 @@ stornaut_investigation_process_snapshot_for_pid(
     );
 
     *snapshot = completed_snapshot;
+    return 0;
+}
+
+int
+stornaut_investigation_cross_uid_process_snapshot_for_pid(
+    pid_t process_id,
+    stornaut_investigation_cross_uid_process_snapshot *snapshot
+)
+{
+    if (snapshot == NULL) {
+        return EINVAL;
+    }
+    memset(snapshot, 0, sizeof(*snapshot));
+    if (process_id <= 1) {
+        return EINVAL;
+    }
+
+    struct kinfo_proc first = {0};
+    int result = stornaut_investigation_read_kernel_information(
+        process_id,
+        &first
+    );
+    if (result != 0) {
+        return result;
+    }
+    int group_count = first.kp_eproc.e_ucred.cr_ngroups;
+    if (group_count < 1 ||
+        group_count > STORNAUT_INVESTIGATION_MAX_SUPPLEMENTARY_GROUPS ||
+        first.kp_proc.p_starttime.tv_sec <= 0 ||
+        first.kp_proc.p_starttime.tv_usec < 0 ||
+        first.kp_proc.p_starttime.tv_usec >= 1000000) {
+        return EIO;
+    }
+
+    errno = 0;
+    pid_t first_session_id = getsid(process_id);
+    if (first_session_id <= 0) {
+        int error = errno;
+        return error != 0 ? error : EIO;
+    }
+
+    struct kinfo_proc second = {0};
+    result = stornaut_investigation_read_kernel_information(
+        process_id,
+        &second
+    );
+    if (result != 0) {
+        return result;
+    }
+    if (!stornaut_investigation_kernel_identity_matches(&first, &second)) {
+        return STORNAUT_INVESTIGATION_IDENTITY_MISMATCH;
+    }
+    stornaut_investigation_cross_uid_process_snapshot completed_snapshot = {0};
+    completed_snapshot.process_id = process_id;
+    completed_snapshot.parent_process_id = first.kp_eproc.e_ppid;
+    completed_snapshot.process_group_id = first.kp_eproc.e_pgid;
+    completed_snapshot.session_id = first_session_id;
+    completed_snapshot.start_time_seconds = first.kp_proc.p_starttime.tv_sec;
+    completed_snapshot.start_time_microseconds = first.kp_proc.p_starttime.tv_usec;
+    completed_snapshot.real_user_id = first.kp_eproc.e_pcred.p_ruid;
+    completed_snapshot.effective_user_id = first.kp_eproc.e_ucred.cr_uid;
+    completed_snapshot.saved_user_id = first.kp_eproc.e_pcred.p_svuid;
+    completed_snapshot.real_group_id = first.kp_eproc.e_pcred.p_rgid;
+    completed_snapshot.effective_group_id = first.kp_eproc.e_ucred.cr_groups[0];
+    completed_snapshot.saved_group_id = first.kp_eproc.e_pcred.p_svgid;
+    completed_snapshot.supplementary_group_count = (uint32_t)group_count;
+    memcpy(
+        completed_snapshot.supplementary_groups,
+        first.kp_eproc.e_ucred.cr_groups,
+        (size_t)group_count *
+            sizeof(completed_snapshot.supplementary_groups[0])
+    );
+    *snapshot = completed_snapshot;
+    return 0;
+}
+
+int
+stornaut_investigation_current_audit_identity_read(
+    stornaut_investigation_current_audit_identity *identity
+)
+{
+    if (identity == NULL) {
+        return EINVAL;
+    }
+    memset(identity, 0, sizeof(*identity));
+
+    auditinfo_addr_t information = {0};
+    errno = 0;
+    if (getaudit_addr(&information, sizeof(information)) != 0) {
+        int error = errno;
+        return error != 0 ? error : EIO;
+    }
+    if (information.ai_auid == AU_DEFAUDITID || information.ai_asid <= 0) {
+        return STORNAUT_INVESTIGATION_IDENTITY_MISMATCH;
+    }
+
+    stornaut_investigation_current_audit_identity completed_identity = {0};
+    completed_identity.audit_user_id = information.ai_auid;
+    completed_identity.audit_session_id = information.ai_asid;
+    *identity = completed_identity;
     return 0;
 }

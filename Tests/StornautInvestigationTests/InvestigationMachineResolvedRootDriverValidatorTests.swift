@@ -97,9 +97,8 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
         case .session:
             input.coordinatorSessionID &+= 1
         case .auditSession:
-            input.secondProcessSample = fixture.sample(
-                fixture.process(fixture.driver.processID, parent: 101, auditSessionID: 61),
-                at: 1_001
+            input.gateAuditSessionAnchor = try .init(
+                auditUserID: 501, auditSessionID: 61
             )
         case .start:
             input.secondProcessSample = fixture.sample(
@@ -111,6 +110,26 @@ struct InvestigationMachineResolvedRootDriverValidatorTests {
         }
         #expect(throws: (any Error).self) {
             _ = try InvestigationMachineResolvedRootDriverValidator.validate(input)
+        }
+    }
+
+    @Test
+    func resolvedDriverRequiresIndependentlyObservedRootCredentials() throws {
+        let fixture = try ValidatorFixture(monitorCount: 1)
+        var input = fixture.input()
+        let nonRoot = fixture.process(
+            fixture.driver.processID, parent: 101, effectiveUserID: 501
+        )
+        input.lineageEdges[1] = .init(
+            parent: input.lineageEdges[1].parent, child: nonRoot
+        )
+        input.firstProcessSample = fixture.sample(nonRoot, at: 1_001)
+        input.secondProcessSample = fixture.sample(nonRoot, at: 1_002)
+
+        #expect(throws: InvestigationMachineResolvedRootDriverValidationError
+            .processIdentityMismatch) {
+            _ = try InvestigationMachineResolvedRootDriverValidator
+                .validate(input)
         }
     }
 
@@ -339,6 +358,9 @@ private struct ValidatorFixture {
             claim: claim, expectedOuterAttemptUUID: attempt,
             expectedWholeInputSHA256: wholeInput, initialLaunch: initialLaunch,
             recoveryProcessGroupID: 80, coordinatorSessionID: 70,
+            gateAuditSessionAnchor: try! .init(
+                auditUserID: 501, auditSessionID: 60
+            ),
             lineageEdges: edges, firstProcessSample: sample(driver, at: 1_001),
             secondProcessSample: sample(driver, at: 1_002),
             fixedExecutableNode: claim.executable.node,
@@ -358,14 +380,13 @@ private struct ValidatorFixture {
 
     func process(
         _ pid: UInt32, parent: UInt32, processGroupID: UInt32 = 80,
-        sessionID: UInt32 = 70, auditSessionID: UInt32 = 60,
-        startSeconds: Int64 = 1_000
+        sessionID: UInt32 = 70, startSeconds: Int64 = 1_000,
+        effectiveUserID: UInt32 = 0
     ) -> InvestigationMachineGateObservedProcessIdentity {
         try! Self.makeProcess(
             pid, parent: parent, processGroupID: processGroupID,
-            sessionID: sessionID, auditUserID: 501,
-            auditSessionID: auditSessionID,
-            startSeconds: startSeconds
+            sessionID: sessionID, startSeconds: startSeconds,
+            effectiveUserID: effectiveUserID
         )
     }
 
@@ -431,16 +452,14 @@ private struct ValidatorFixture {
 
     private static func makeProcess(
         _ pid: UInt32, parent: UInt32, processGroupID: UInt32 = 80,
-        sessionID: UInt32 = 70, auditUserID: UInt32 = 501,
-        auditSessionID: UInt32 = 60,
-        startSeconds: Int64 = 1_000
+        sessionID: UInt32 = 70, startSeconds: Int64 = 1_000,
+        effectiveUserID: UInt32 = 0
     ) throws -> InvestigationMachineGateObservedProcessIdentity {
         try .init(
             processID: pid, startSeconds: startSeconds, startMicroseconds: 123,
             parentProcessID: parent, processGroupID: processGroupID,
-            sessionID: sessionID, auditUserID: auditUserID,
-            auditSessionID: auditSessionID,
-            realUserID: 0, effectiveUserID: 0, savedUserID: 0,
+            sessionID: sessionID,
+            realUserID: 0, effectiveUserID: effectiveUserID, savedUserID: 0,
             realGroupID: 0, effectiveGroupID: 0, savedGroupID: 0,
             supplementaryGroups: [0]
         )
@@ -458,12 +477,12 @@ private struct ValidatorFixture {
             parentProcessID: observed.parentProcessID,
             processGroupID: observed.processGroupID,
             sessionID: observed.sessionID,
-            auditSessionID: observed.auditSessionID,
+            auditSessionID: 60,
             auditTokenWords: [
-                auditUserID ?? observed.auditUserID, observed.effectiveUserID,
+                auditUserID ?? 501, observed.effectiveUserID,
                 observed.effectiveGroupID,
                 observed.realUserID, observed.realGroupID, observed.processID,
-                observed.auditSessionID, processIDVersion,
+                60, processIDVersion,
             ],
             realUserID: observed.realUserID,
             effectiveUserID: observed.effectiveUserID,

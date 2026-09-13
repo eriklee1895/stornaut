@@ -175,6 +175,44 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func v16RepairPinsKernelAndAuditAnchorJoin() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-c-v16-repair-source-contract-only",
+            "--iic-c-v16-repair-mutation-contract-only",
+            "--iic-c-v16-repair-staged-scope-contract-only",
+            "function verify_iicc_v16_repair_source_contract()",
+            "function verify_iicc_v16_repair_staged_scope()",
+            "child-bsm-return", "kernel-resample-drop",
+            "self-audit-pid-substitution", "audit-anchor-join-drop",
+            "root-observation-drop",
+            "v16 repair aggregate budget drifted",
+            "4d71ae29474425b8fedecf6f9ac97517d68fd506",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "--iic-c-v16-repair-contract-only",
+            "v16 repair mutation accepted:",
+            "v16 repair protocol mutation accepted:",
+            "verify_iicc_v16_repair_contract",
+            "--iic-c-v16-repair-staged-scope-contract-only",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "aggregate-budget staged-worktree-divergence wrong-baseline",
+            "v16 repair scope mutation accepted:",
+            "v16 repair scope diagnostic drifted:",
+            "v16 repair scope mutation accepted: untracked",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
     func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let boundary = try String(contentsOf: root.appending(

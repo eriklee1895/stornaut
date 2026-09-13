@@ -1,4 +1,5 @@
 import CryptoKit
+import CInvestigationIdentitySupport
 import Darwin
 import Foundation
 import Testing
@@ -48,7 +49,24 @@ struct InvestigationMachineGatePhysicalTests {
         try #require(geteuid() != 0)
         let observation = try ProductionKernelChildIdentityProbe.run()
         #expect(observation.procPIDInfoErrno == EPERM)
+        #expect(observation.crossUIDSnapshotStatus == 0)
         #expect(observation.first == observation.second)
+        let firstResolved = try #require(observation.firstResolved)
+        let secondResolved = try #require(observation.secondResolved)
+        #expect(firstResolved == secondResolved)
+        #expect(firstResolved.processID
+            == UInt32(observation.childProcessID))
+        #expect(firstResolved.parentProcessID == UInt32(getpid()))
+        #expect(firstResolved.processGroupID == UInt32(getpgrp()))
+        #expect(firstResolved.sessionID == UInt32(getsid(0)))
+        #expect(firstResolved.effectiveUserID == 0)
+        #expect(firstResolved.supplementaryGroups.contains(
+            firstResolved.effectiveGroupID
+        ))
+        #expect(observation.firstGateAuditAnchor
+            == observation.secondGateAuditAnchor)
+        #expect(observation.firstGateAuditAnchor.auditUserID != UInt32.max)
+        #expect(observation.firstGateAuditAnchor.auditSessionID > 0)
         #expect(observation.first.processID == observation.childProcessID)
         #expect(observation.first.parentProcessID == getpid())
         #expect(observation.first.processGroupID == getpgrp())
@@ -443,8 +461,13 @@ private enum SuspendedSudoProbe {
 private struct ProductionKernelChildIdentityObservation {
     let childProcessID: pid_t
     let procPIDInfoErrno: Int32
+    let crossUIDSnapshotStatus: Int32
     let first: InvestigationMachineKernelChildIdentity
     let second: InvestigationMachineKernelChildIdentity
+    let firstResolved: InvestigationMachineGateObservedProcessIdentity?
+    let secondResolved: InvestigationMachineGateObservedProcessIdentity?
+    let firstGateAuditAnchor: InvestigationMachineGateAuditSessionAnchor
+    let secondGateAuditAnchor: InvestigationMachineGateAuditSessionAnchor
     let rawInitialWaitStatus: Int32
     let exactReapStatus: Int32?
 }
@@ -535,12 +558,42 @@ private enum ProductionKernelChildIdentityProbe {
             Int32(MemoryLayout<proc_bsdinfo>.size)
         )
         let restrictedErrno = restrictedBytes == 0 ? errno : 0
+        var crossUIDSnapshot =
+            stornaut_investigation_cross_uid_process_snapshot()
+        let firstGateAuditAnchor =
+            try InvestigationMachineResolvedRootDriverSupport
+            .gateAuditSessionAnchor()
+        let crossUIDSnapshotStatus =
+            stornaut_investigation_cross_uid_process_snapshot_for_pid(
+                child, &crossUIDSnapshot
+            )
+        guard crossUIDSnapshotStatus == 0 else {
+            return .init(
+                childProcessID: child, procPIDInfoErrno: restrictedErrno,
+                crossUIDSnapshotStatus: crossUIDSnapshotStatus,
+                first: try InvestigationMachineKernelChildIdentityReader.read(
+                    processID: child),
+                second: try InvestigationMachineKernelChildIdentityReader.read(
+                    processID: child),
+                firstResolved: nil, secondResolved: nil,
+                firstGateAuditAnchor: firstGateAuditAnchor,
+                secondGateAuditAnchor: firstGateAuditAnchor,
+                rawInitialWaitStatus: 0, exactReapStatus: nil
+            )
+        }
         let first = try InvestigationMachineKernelChildIdentityReader.read(
             processID: child
         )
         let second = try InvestigationMachineKernelChildIdentityReader.read(
             processID: child
         )
+        let firstResolved = try InvestigationMachineResolvedRootDriverSupport
+            .gateObservedProcessIdentity(processID: child)
+        let secondResolved = try InvestigationMachineResolvedRootDriverSupport
+            .gateObservedProcessIdentity(processID: child)
+        let secondGateAuditAnchor =
+            try InvestigationMachineResolvedRootDriverSupport
+            .gateAuditSessionAnchor()
         let deadline = try add(try now(), 2_000_000_000)
         var initialStatus: Int32 = 0
         while true {
@@ -562,7 +615,11 @@ private enum ProductionKernelChildIdentityProbe {
         reaped = true
         return .init(
             childProcessID: child, procPIDInfoErrno: restrictedErrno,
-            first: first, second: second,
+            crossUIDSnapshotStatus: crossUIDSnapshotStatus,
+            first: first, second: second, firstResolved: firstResolved,
+            secondResolved: secondResolved,
+            firstGateAuditAnchor: firstGateAuditAnchor,
+            secondGateAuditAnchor: secondGateAuditAnchor,
             rawInitialWaitStatus: initialStatus,
             exactReapStatus: terminalStatus
         )

@@ -246,7 +246,8 @@ Final review of the first L2 implementation commit `474f63455f7f962f5537fdd9f6d7
 identified a deterministic fail-closed blocker: the UID-501 Gate attempted to
 obtain the UID-0 driver's audit token through `task_name_for_pid`. This conflicts
 with the already measured platform behavior and ADR 0018, which require the
-cross-UID boundary to use public libproc, BSM and PID-based Security queries.
+cross-UID boundary to use public kernel process and PID-based Security queries,
+with audit identity joined separately to the Gate's inherited audit anchor.
 
 The repair is a separate, bounded five-path implementation checkpoint:
 
@@ -261,18 +262,24 @@ audit-token words remain canonical driver-reported fields, internally
 consistent and sealed by the claim hash, completion-v3 hash and raw Gate output
 digest. The Gate does not claim to observe those two fields independently. It
 instead samples PID/start/parent/group/session/credentials/groups through
-libproc and sysctl, audit UID/session through BSM, executable path through
-`proc_pidpath`, and live code identity through `kSecGuestAttributePid`; the
-stopped process must remain identical across the observation sandwich. Lineage
+sysctl, joins the self-sealed claim AUID/ASID to two stable Gate-self
+`getaudit_addr` samples, reads executable path through `proc_pidpath`, and
+observes live code identity through `kSecGuestAttributePid`; the stopped process
+and Gate audit anchor must remain identical across the observation sandwich.
+Direct per-PID BSM reads of the stopped root child are no longer relied on; the
+v16 physical fixture directly proves only the `PROC_PIDTBSDINFO == EPERM`
+boundary. Lineage
 and retirement instance identity use PID plus start time, preserving direct-exec
 and one/two-monitor topologies without inventing audit-token data for ancestors.
 
-A narrow verifier-closure commit may subsequently touch only the existing L2
+As recorded at the time of original L2, a narrow verifier-closure commit could
+subsequently touch only the existing L2
 boundary test and two verifier scripts to freeze this correction and replay the
-first implementation tree. Neither commit runs sudo/root, installs a service,
-launches the real campaign, calls a model/network, or consumes the final full
-verifier. Together they remain the same L2 delivery and must be accepted before
-the unique `ii-c-c` machine campaign begins.
+first implementation tree. Those original L2 commits did not run sudo/root,
+install a service, launch the real campaign, call a model/network, or consume
+the final full verifier. Later v8-v16 campaigns supersede that historical
+frontier; v16 is consumed/non-admitting and this repair uses only a non-privileged
+suspended-sudo physical fixture.
 
 ## L2 Completion Update — 2026-09-03
 
@@ -287,6 +294,8 @@ invocation failed with 27 issues under broad timing/process pressure; seven
 exact low-load target reruns passed 109/109, so no serial pass is claimed. See the
 [L2 completion audit](phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md).
 
-L2 is complete/non-privileged/non-admitting. The unique privileged attempt
-remains unconsumed. The current and only frontier is the `ii-c-c` unique real machine campaign, followed
-strictly by `L3c3d -> L3c4`.
+L2 itself completed as non-privileged/non-admitting evidence. That status was a
+2026-09-03 snapshot: later v8-v16 privileged attempts were consumed and
+non-admitting. The current frontier is v16 status-82/cleanup attribution repair,
+then a separately authorized replacement campaign, followed by
+`L3c3d -> L3c4`.

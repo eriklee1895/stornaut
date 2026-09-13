@@ -418,6 +418,14 @@ cross_uid_mutation_sha=
 cross_uid_sources=()
 cross_uid_scope_contract_only=false
 cross_uid_scope_baseline=b4c632e68e2f28ef67b9734bce82dac61bdc7bed
+v16_repair_source_contract_only=false
+v16_repair_mutation_contract_only=false
+v16_repair_mutation_name=
+v16_repair_mutation_slot=
+v16_repair_mutation_sha=
+v16_repair_sources=()
+v16_repair_scope_contract_only=false
+v16_repair_scope_baseline=4d71ae29474425b8fedecf6f9ac97517d68fd506
 iic0bivb1_handoff_contract_only=false
 iic0bivb1_fixture_source=
 iic0bivb1_physical_test_source=
@@ -1056,11 +1064,11 @@ if (( $# > 0 )); then
     elif (( $# == 1 )) \
         && [[ $1 == --iic-c-deadline-budget-contract-only ]]; then
         iicc_deadline_budget_contract_only=true
-    elif (( $# == 1 || $# == 12 )) \
+    elif (( $# == 1 || $# == 9 )) \
         && [[ $1 == --iic-c-preserved-capsule-contract-only ]]; then
         iicc_preserved_capsule_contract_only=true
         iicc_preserved_capsule_sources=("${@:2}")
-    elif (( $# == 15 )) \
+    elif (( $# == 12 )) \
         && [[ $1 == --iic-c-preserved-capsule-mutation-contract-only ]]; then
         iicc_preserved_capsule_mutation_contract_only=true
         iicc_preserved_capsule_mutation_name=$2
@@ -1091,11 +1099,11 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-prearm-failure-staged-scope-contract-only ]]; then
         prearm_failure_scope_contract_only=true
         prearm_failure_scope_baseline=${2:-51ea8c28b9431280bb0e8b7e6373e2e1ad538298}
-    elif (( $# == 1 || $# == 12 )) \
+    elif (( $# == 1 || $# == 9 )) \
         && [[ $1 == --iic-root-driver-lineage-l1-source-contract-only ]]; then
         iic_lineage_l1_source_contract_only=true
         iic_lineage_l1_sources=("${@:2}")
-    elif (( $# == 15 )) \
+    elif (( $# == 12 )) \
         && [[ $1 == --iic-root-driver-lineage-l1-mutation-contract-only ]]; then
         iic_lineage_l1_mutation_contract_only=true
         iic_lineage_l1_mutation_name=$2
@@ -1136,6 +1144,21 @@ if (( $# > 0 )); then
         && [[ $1 == --root-driver-lineage-cross-uid-staged-scope-contract-only ]]; then
         cross_uid_scope_contract_only=true
         cross_uid_scope_baseline=${2:-b4c632e68e2f28ef67b9734bce82dac61bdc7bed}
+    elif (( $# == 1 || $# == 9 )) \
+        && [[ $1 == --iic-c-v16-repair-source-contract-only ]]; then
+        v16_repair_source_contract_only=true
+        v16_repair_sources=("${@:2}")
+    elif (( $# == 12 )) \
+        && [[ $1 == --iic-c-v16-repair-mutation-contract-only ]]; then
+        v16_repair_mutation_contract_only=true
+        v16_repair_mutation_name=$2
+        v16_repair_mutation_slot=$3
+        v16_repair_mutation_sha=$4
+        v16_repair_sources=("${@:5}")
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-v16-repair-staged-scope-contract-only ]]; then
+        v16_repair_scope_contract_only=true
+        v16_repair_scope_baseline=${2:-4d71ae29474425b8fedecf6f9ac97517d68fd506}
     elif (( $# == 4 )) \
         && [[ $1 == --iic0b-iv-b1-handoff-contract-only ]]; then
         iic0bivb1_handoff_contract_only=true
@@ -12486,6 +12509,7 @@ M={
  "monitor-matrix-drop":("validator_tests","arguments: [0, 1, 2])","arguments: [0, 1])"),
  "failure-matrix-drop":("launcher_tests","@Test(arguments: GateFailurePoint.allCases)","@Test"),
 }
+
 if mode=="true":
     if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha):
         raise SystemExit("cross-UID mutation identity drifted")
@@ -12532,6 +12556,154 @@ for key,markers in required.items():
     for marker in markers:
         if marker not in sources[key]: raise SystemExit("cross-UID source contract drifted: "+marker)
 PY
+}
+
+function verify_iicc_v16_repair_source_contract() {
+    local -a paths=("${v16_repair_sources[@]}")
+    if (( ${#paths} == 0 )); then paths=(
+        Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c
+        Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift
+        Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift
+    ); fi
+    /usr/bin/python3 -I - "$v16_repair_mutation_contract_only" \
+        "$v16_repair_mutation_name" "$v16_repair_mutation_slot" \
+        "$v16_repair_mutation_sha" "${paths[@]}" <<'PY'
+from pathlib import Path
+import hashlib,re,sys
+mode,name,slot,sha=sys.argv[1:5]
+slots=("c","header","darwin","transport","validator",
+       "physical_tests","validator_tests","launcher_tests")
+canonical_args=(
+ "Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c",
+ "Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h",
+ "Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift",
+ "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift",
+ "Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift",
+ "Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift")
+args=tuple(sys.argv[5:]); paths=tuple(map(Path,args))
+if len(paths)!=8 or any(p.is_symlink() or not p.is_file() for p in paths):
+    raise SystemExit("v16 repair source identity drifted")
+sources=dict(zip(slots,(p.read_text() for p in paths)))
+canonical=dict(zip(slots,(Path(p).read_text() for p in canonical_args)))
+M={
+ "child-bsm-return":("c","pid_t first_session_id = getsid(process_id);","auditpinfo_addr_t child_audit = {0}; child_audit.ap_pid = process_id; (void)audit_get_pinfo_addr(&child_audit, sizeof(child_audit)); pid_t first_session_id = getsid(process_id);"),
+ "kernel-resample-drop":("c","result = stornaut_investigation_read_kernel_information(\n        process_id,\n        &second\n    );","result = 0;"),
+ "self-audit-pid-substitution":("c","getaudit_addr(&information, sizeof(information))","audit_get_pinfo_addr((auditpinfo_addr_t *)&information, sizeof(information))"),
+ "old-snapshot-return":("transport","stornaut_investigation_cross_uid_process_snapshot_for_pid(","stornaut_investigation_process_snapshot_for_pid("),
+ "audit-anchor-resample-drop":("darwin","firstGateAuditAnchor == secondGateAuditAnchor,","true,"),
+ "audit-anchor-join-drop":("validator","claim.process.auditSessionID\n                == input.gateAuditSessionAnchor.auditSessionID,","true,"),
+ "root-observation-drop":("validator","resolved.realUserID == 0, resolved.effectiveUserID == 0,","true,"),
+}
+if mode=="true":
+    if name not in M or slot!=M[name][0] or not re.fullmatch(r"[0-9a-f]{64}",sha):
+        raise SystemExit("v16 repair mutation identity drifted")
+    i=slots.index(slot); old,new=M[name][1:]
+    changed=[key for key in slots if sources[key]!=canonical[key]]
+    if changed!=[slot] or args[i]==canonical_args[i] \
+            or any(arg!=canonical_args[j] for j,arg in enumerate(args) if j!=i) \
+            or canonical[slot].count(old)!=1 \
+            or sources[slot]!=canonical[slot].replace(old,new,1):
+        raise SystemExit("v16 repair mutation contract drifted")
+    if hashlib.sha256(paths[i].read_bytes()).hexdigest()!=sha:
+        raise SystemExit("v16 repair mutation SHA drifted")
+elif mode!="false" or name or slot or sha or args!=canonical_args or sources!=canonical:
+    raise SystemExit("v16 repair canonical source drifted")
+for required_slot,old,_ in M.values():
+    if sources[required_slot].count(old)!=canonical[required_slot].count(old):
+        raise SystemExit("v16 repair source contract drifted: "+old)
+c=sources["c"]
+cross=c[c.index("stornaut_investigation_cross_uid_process_snapshot_for_pid("):
+        c.index("stornaut_investigation_current_audit_identity_read(")]
+self_audit=c[c.index("stornaut_investigation_current_audit_identity_read("):]
+if cross.count("stornaut_investigation_read_kernel_information(")!=2:
+    raise SystemExit("v16 repair kernel observation sandwich drifted")
+for forbidden in ("audit_get_pinfo_addr","PROC_PIDTBSDINFO",
+                  "task_name_for_pid","TASK_AUDIT_TOKEN"):
+    if forbidden in cross:
+        raise SystemExit("v16 repair child identity authority drifted")
+for marker in ("getsid(process_id)","stornaut_investigation_kernel_identity_matches"):
+    if marker not in cross: raise SystemExit("v16 repair kernel join drifted: "+marker)
+if "getaudit_addr(&information, sizeof(information))" not in self_audit \
+        or "process_id" in self_audit:
+    raise SystemExit("v16 repair self audit anchor drifted")
+required={
+ "header":("stornaut_investigation_current_audit_identity",
+            "stornaut_investigation_cross_uid_process_snapshot_for_pid"),
+ "transport":("stornaut_investigation_cross_uid_process_snapshot_for_pid(",
+              "package static func gateAuditSessionAnchor() throws"),
+ "darwin":("let firstGateAuditAnchor","let secondGateAuditAnchor",
+           "firstGateAuditAnchor == secondGateAuditAnchor,",
+           "gateAuditSessionAnchor: firstGateAuditAnchor"),
+ "validator":("struct InvestigationMachineGateAuditSessionAnchor:",
+              "== input.gateAuditSessionAnchor.auditUserID",
+              "== input.gateAuditSessionAnchor.auditSessionID",
+              "resolved.realUserID == 0, resolved.effectiveUserID == 0,",
+              "resolved.savedUserID == 0, resolved.realGroupID == 0,",
+              "resolved.supplementaryGroups.contains(0)"),
+ "physical_tests":("crossUIDSnapshotStatus == 0",
+                  "observation.firstGateAuditAnchor",
+                  "== observation.secondGateAuditAnchor",
+                  "rawInitialWaitStatus == 0x7f"),
+ "validator_tests":("resolvedDriverRequiresIndependentlyObservedRootCredentials",
+                   "gateAuditSessionAnchor"),
+ "launcher_tests":("!crossUIDBody.contains(\"audit_get_pinfo_addr\")",
+                  "selfAuditBody.contains(\"getaudit_addr\")"),
+}
+for key,markers in required.items():
+    for marker in markers:
+        if marker not in sources[key]:
+            raise SystemExit("v16 repair source contract drifted: "+marker)
+PY
+}
+
+function verify_iicc_v16_repair_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local baseline=${1:-$v16_repair_scope_baseline}
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == 4d71ae29474425b8fedecf6f9ac97517d68fd506 ]] \
+        || { print -u2 "v16 repair checkpoint baseline drifted"; return 1; }
+    local -A ceilings=(
+        Sources/CInvestigationIdentitySupport/CInvestigationIdentitySupport.c 260
+        Sources/CInvestigationIdentitySupport/include/CInvestigationIdentitySupport.h 80
+        Sources/StornautInvestigationMachineGateSupport/DarwinInvestigationMachineFixedGateSystem.swift 80
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineGateTransport.swift 120
+        Sources/StornautInvestigationMachineGateSupport/InvestigationMachineResolvedRootDriverValidator.swift 180
+        Tests/StornautInvestigationTests/InvestigationMachineGatePhysicalTests.swift 140
+        Tests/StornautInvestigationTests/InvestigationMachineResolvedRootDriverValidatorTests.swift 120
+        Tests/StornautInvestigationTests/InvestigationSudoShapedDriverLauncherTests.swift 120
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 100
+        scripts/verify-contract 500
+        scripts/verify-investigation-boundaries 650
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#observed}==11 )) && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "v16 repair checkpoint paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || { print -u2 "v16 repair binary checkpoint path rejected"; return 1; }
+        (( add+delete<=ceilings[$checkpoint_path] )) || { print -u2 "v16 repair path budget drifted: $checkpoint_path"; return 1; }
+        (( total+=add+delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total<=1700 )) || { print -u2 "v16 repair aggregate budget drifted"; return 1; }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "v16 repair index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry"|awk '{print $1,$3,$4}')" == "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry"|awk '{print $2}')" == "$(git hash-object -- "$checkpoint_path")" ]] \
+            || { print -u2 "v16 repair staged source/mode drifted: $checkpoint_path"; return 1; }
+    done
 }
 
 function verify_root_driver_lineage_cross_uid_staged_scope() {
@@ -12791,10 +12963,10 @@ transport, darwin, fixture, tests = (
     Path(value).read_text(encoding="utf-8") for value in sys.argv[1:]
 )
 expected_sha256 = (
-    "7c52fc0d80edc6170b9e376aa54143b5c4fd1734f5bd465d76762b74d8980e83",
-    "4eb70b3b103cd6a457bdec865640b3a88c46eab4e7821e5edfc143c802944687",
+    "40ad8b25e5bfb479cdadc67ce2913faab64fc391a02f3226bfc2809bcbe47588",
+    "cfabfdaa98018cad365b6d5f0440407123ba6676a1548c98522121b8b30c1cca",
     "d0bc9bc33f24f3eaa30440fafa4cda530568de9d754478c279014f41ec9b43fd",
-    "b9128269b2298733ce156241376051da6fdf05ee4e66bd4a7f37fc619a6e79f5",
+    "ea3f5490eebda4f02ffa58c6f114b9b657593df48d65f5a52cb730ae9b642ecb",
 )
 for path, expected in zip(map(Path, sys.argv[1:]), expected_sha256):
     if __import__("hashlib").sha256(path.read_bytes()).hexdigest() != expected:
@@ -19263,6 +19435,16 @@ fi
 if $cross_uid_scope_contract_only; then
     verify_root_driver_lineage_cross_uid_staged_scope "$cross_uid_scope_baseline"
     print "cross-UID staged scope verification passed."
+    exit 0
+fi
+if $v16_repair_source_contract_only || $v16_repair_mutation_contract_only; then
+    verify_iicc_v16_repair_source_contract
+    print "v16 status-82 identity repair source verification passed."
+    exit 0
+fi
+if $v16_repair_scope_contract_only; then
+    verify_iicc_v16_repair_staged_scope "$v16_repair_scope_baseline"
+    print "v16 status-82 identity repair staged scope verification passed."
     exit 0
 fi
 if $iicc_source_contract_only || $iicc_source_mutation_contract_only; then

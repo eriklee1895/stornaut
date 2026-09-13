@@ -35,10 +35,16 @@ receipt schemas.
 
 The first implementation was not accepted unchanged. It incorrectly required
 the UID-501 Gate to obtain a UID-0 driver's audit token through
-`task_name_for_pid`. The cross-UID correction uses public libproc/sysctl, BSM
-and PID-based Security observation instead. PID version and all audit-token
-words remain canonical driver-reported and sealed; the Gate does not claim to
-observe them independently. The PID-reuse post-fix uses PID plus start identity
+`task_name_for_pid`. The original correction used public libproc/sysctl,
+per-PID BSM and PID-based Security observation. The v16 machine attempt later
+proved `PROC_PIDTBSDINFO == EPERM` for the stopped root driver; this checkpoint
+does not claim an independently retained errno for `audit_get_pinfo_addr`. The
+accepted repair therefore removes both unavailable cross-UID surfaces and uses a stable double
+`KERN_PROC_PID` process observation and separately binds the driver's
+self-sealed AUID/ASID to the Gate's independently read inherited audit-session
+anchor. PID version and all audit-token words remain canonical driver-reported
+and sealed; the Gate does not claim to read those fields directly from the
+cross-UID child. The PID-reuse post-fix uses PID plus start identity
 and does not confuse a new process at a reused numeric PID with the retired
 lineage instance.
 
@@ -96,12 +102,16 @@ are no unresolved P0–P2 findings for this checkpoint.
 
 ## 6. Non-Claims and Next Step
 
-No L2 work or validation used root or `/usr/bin/sudo`, installed or uninstalled
-the fixed service, launched the real campaign, called a model, used network
-access or ran `scripts/verify --full`. The unique privileged attempt remains
-unconsumed.
+The original L2 work and validation, as completed on 2026-09-03, used neither
+root nor `/usr/bin/sudo`, did not install/uninstall the fixed service, did not
+launch a real campaign, and did not run `scripts/verify --full`. That historical
+state was later superseded: v8-v16 privileged attempts are consumed and
+non-admitting, while the current status-82 repair uses a non-privileged
+suspended-sudo physical fixture without continuing the child or showing a
+credential prompt.
 
 Task 39 remains incomplete, ADR 0018 remains Proposed and production Deep Dive
-remains unavailable. The current and only frontier is the `ii-c-c` unique real
-machine campaign, followed strictly by `L3c3d -> L3c4`; L3c4 alone owns final
-admission and the remaining authoritative full verifier.
+remains unavailable. The current frontier is the v16 status-82/cleanup
+attribution repair, then a separately authorized replacement campaign, followed
+strictly by `L3c3d -> L3c4`; L3c4 alone owns final admission and the remaining
+authoritative full verifier.

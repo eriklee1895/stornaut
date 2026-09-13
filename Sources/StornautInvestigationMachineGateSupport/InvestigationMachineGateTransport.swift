@@ -226,8 +226,9 @@ package enum InvestigationMachineResolvedRootDriverSupport {
         guard processID > 1 else {
             throw InvestigationMachineGateError.invalidObservation
         }
-        var snapshot = stornaut_investigation_process_snapshot()
-        let snapshotStatus = stornaut_investigation_process_snapshot_for_pid(
+        var snapshot = stornaut_investigation_cross_uid_process_snapshot()
+        let snapshotStatus =
+            stornaut_investigation_cross_uid_process_snapshot_for_pid(
             processID,
             &snapshot
         )
@@ -241,19 +242,17 @@ package enum InvestigationMachineResolvedRootDriverSupport {
             Array(bytes.bindMemory(to: gid_t.self))
         }
         let groupCount = Int(snapshot.supplementary_group_count)
-        let sessionID = getsid(processID)
         guard
             groupCount > 0,
             groupCount <= groups.count,
-            sessionID > 0
+            snapshot.session_id > 0
         else { throw InvestigationMachineGateError.containmentUncertain }
         let resolvedProcessID = UInt32(snapshot.process_id)
         let resolvedStartSeconds = Int64(snapshot.start_time_seconds)
         let resolvedStartMicroseconds = Int32(snapshot.start_time_microseconds)
         let resolvedParentProcessID = UInt32(snapshot.parent_process_id)
         let resolvedProcessGroupID = UInt32(snapshot.process_group_id)
-        let resolvedSessionID = UInt32(sessionID)
-        let resolvedAuditSessionID = UInt32(snapshot.audit_session_id)
+        let resolvedSessionID = UInt32(snapshot.session_id)
         let resolvedRealUserID = UInt32(snapshot.real_user_id)
         let resolvedEffectiveUserID = UInt32(snapshot.effective_user_id)
         let resolvedSavedUserID = UInt32(snapshot.saved_user_id)
@@ -271,8 +270,6 @@ package enum InvestigationMachineResolvedRootDriverSupport {
             parentProcessID: resolvedParentProcessID,
             processGroupID: resolvedProcessGroupID,
             sessionID: resolvedSessionID,
-            auditUserID: UInt32(snapshot.audit_user_id),
-            auditSessionID: resolvedAuditSessionID,
             realUserID: resolvedRealUserID,
             effectiveUserID: resolvedEffectiveUserID,
             savedUserID: resolvedSavedUserID,
@@ -281,6 +278,30 @@ package enum InvestigationMachineResolvedRootDriverSupport {
             savedGroupID: resolvedSavedGroupID,
             supplementaryGroups: supplementaryGroups
         )
+    }
+
+    package static func gateAuditSessionAnchor() throws
+        -> InvestigationMachineGateAuditSessionAnchor
+    {
+        var identity = stornaut_investigation_current_audit_identity()
+        let status = stornaut_investigation_current_audit_identity_read(
+            &identity
+        )
+        guard status == 0 else {
+            throw InvestigationMachineGateError.containmentUncertain
+        }
+        guard
+            let auditUserID = UInt32(exactly: identity.audit_user_id),
+            let auditSessionID = UInt32(exactly: identity.audit_session_id)
+        else { throw InvestigationMachineGateError.containmentUncertain }
+        do {
+            return try .init(
+                auditUserID: auditUserID,
+                auditSessionID: auditSessionID
+            )
+        } catch {
+            throw InvestigationMachineGateError.containmentUncertain
+        }
     }
 
     package static func liveExecutablePath(processID: pid_t) throws

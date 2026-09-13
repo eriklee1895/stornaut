@@ -1131,6 +1131,9 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         else { throw containment() }
         let claim = try readResolvedRootDriverClaim(descriptor: descriptor)
         let resolvedProcessID = pid_t(claim.process.processID)
+        let firstGateAuditAnchor =
+            try InvestigationMachineResolvedRootDriverSupport
+            .gateAuditSessionAnchor()
         let firstIdentity =
             try InvestigationMachineResolvedRootDriverSupport
             .gateObservedProcessIdentity(
@@ -1169,9 +1172,13 @@ private extension DarwinInvestigationMachineFixedGateSystem {
         let secondStopped = try processIsStopped(
             processID: resolvedProcessID
         )
+        let secondGateAuditAnchor =
+            try InvestigationMachineResolvedRootDriverSupport
+            .gateAuditSessionAnchor()
         let secondObservedAt = try continuousNanoseconds()
         guard
             firstIdentity == secondIdentity,
+            firstGateAuditAnchor == secondGateAuditAnchor,
             firstStopped,
             secondStopped
         else { throw InvestigationMachineGateError.invalidObservation }
@@ -1202,6 +1209,7 @@ private extension DarwinInvestigationMachineFixedGateSystem {
             initialLaunch: initialLaunch,
             recoveryProcessGroupID: recoveryProcessGroupID,
             coordinatorSessionID: coordinatorSessionID,
+            gateAuditSessionAnchor: firstGateAuditAnchor,
             lineageEdges: lineageEdges,
             firstProcessSample: .init(
                 identity: firstIdentity,

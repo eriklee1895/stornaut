@@ -193,10 +193,14 @@ before `setgid`/`setuid` completion.
 The child executes exactly `initgroups -> setgid -> setuid`, proves real,
 effective and saved IDs, that exact kernel-bounded supplementary group set and
 failed root regain, then sends typed `DROP_EVIDENCE`. The parent independently
-verifies post-drop PID/PPID/PGID and IDs with libproc, ASID with BSM, live signing
-with `kSecGuestAttributePid`, and fixed path/SHA/static signing. Reported audit
-facts are admitted only when they match independently observed facts and the
-pre-drop PID version/ASID.
+verifies post-drop PID/PPID/PGID and IDs with public kernel process APIs, binds
+the child's self-sealed AUID/ASID to the Gate's independently read inherited
+audit-session anchor, verifies live signing with `kSecGuestAttributePid`, and
+verifies fixed path/SHA/static signing. Per-PID BSM queries are not relied on
+for cross-UID observability; this checkpoint directly proves only that
+`PROC_PIDTBSDINFO` returns `EPERM` for the stopped root child. The child's audit
+token remains internally bound to its claimed PID,
+pidversion, AUID, ASID, EUID and EGID.
 
 All later boundaries repeat the post-drop independent verification; no
 cross-UID task-port lookup is used.
