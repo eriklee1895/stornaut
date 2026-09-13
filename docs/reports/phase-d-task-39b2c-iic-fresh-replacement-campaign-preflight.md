@@ -1,8 +1,8 @@
 # Phase D Task 39B2c ii-c fresh replacement campaign preflight
 
-> Status: v14 authorization superseded before launch / unconsumed / reauthorization required
+> Status: v15 authorized / pending / unconsumed
 >
-> Date: 2026-09-10
+> Date: 2026-09-13
 >
 > P2 implementation: `783770515ac20d364ac698f7f4a291422606d71f`
 >
@@ -23,27 +23,34 @@ closed post-arm failure. See the v13 failure disposition.
 The v14 authorization based on pushed authorization-hardening baseline
 `d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7` was stopped before launch by the
 exact v13 preservation P0. It remains unconsumed but is superseded; fresh
-authorization bound to the pushed prerequisite is required.
+authorization bound to the pushed prerequisite was required. The user has now
+authorized one fresh v15 campaign from pushed prerequisite
+`facf3eae2fbee83056189e2cfd54cf974ae1421b`; no launch has occurred.
 
 ## Read-only machine state
 
-- local `HEAD`, `origin/main` and the completion-audit baseline above are equal;
+- local `HEAD`, `origin/main` and the authorized prerequisite
+  `facf3eae2fbee83056189e2cfd54cf974ae1421b` are equal;
 - the worktree is clean;
 - the fixed diagnostic App, launchd plist and fixed runtime/lease roots are
   absent;
 - the persistent Gate exists only at
   `~/Library/Application Support/com.eriklee.stornaut.task39-machine-gate`;
 - the Gate base is UID/GID `501:20`, mode `0700`;
-- its sole entry is `.owner-lock-v1`, UID/GID `501:20`, mode `0600`, zero bytes,
-  one link and the same device as the base;
+- its exact inventory is `.owner-lock-v1` plus the retained v13 attempt
+  `a77c4d21-9bba-46f6-b694-3d1d1e55209d`; the attempt contains only the
+  28,997-byte capsule whose SHA-256 is
+  `1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17`;
 - the historical Caches Gate path is absent;
-- P2 aggregate, Debug/Release binary boundary, final 1,964-test serial and both
+- preservation aggregate, Debug/Release binary boundary, final 1,974-test
+  serial and both
   independent reviews are green with no unresolved P0–P2.
 
 ## Proposed one-shot authority
 
-After a separate explicit user approval, one fresh privileged replacement
-campaign may run from an authorization-only descendant of this pushed baseline.
+The user explicitly approved one fresh privileged replacement campaign based on
+the pushed preservation prerequisite. It may run only from an authorization-only
+descendant of that baseline.
 The descendant may change only authorization/status documentation and exact
 status-verifier pins. It must not change Swift production sources, campaign/App/
 helper/driver/Gate/coordinator binaries, the lifecycle script, fixed prompts,
@@ -78,7 +85,8 @@ release/notarization, Task 40, production Deep Dive, L3c3d or L3c4.
   cancellation, timeout, uncertainty, malformed receipt, containment failure or
   verifier rejection stops without automatic retry.
 - The campaign must not modify, delete, reconstruct, append to or reinterpret any
-  v8-v12 evidence root, receipt or historical Gate artifact.
+  v8-v14 evidence root, receipt or historical Gate artifact. The exact v13 Gate
+  attempt/capsule must remain byte- and identity-stable.
 - A green independently verified cohort may unlock L3c3d. It does not by itself
   complete Task 39 or enable production Deep Dive.
 - L3c3d remains the sole real Codex App Server/model step. L3c4 remains the sole
@@ -87,8 +95,8 @@ release/notarization, Task 40, production Deep Dive, L3c3d or L3c4.
 ## Authorization requirement
 
 The user explicitly approved one fresh privileged replacement machine campaign
-based on pushed authorization-hardening commit
-`d5a7df38c9ed360da35c0e9a4929f0dd0b7a02a7`. It was recorded as v14 only to
-distinguish it from consumed v8-v13 attempts. No launch occurred, so the
-authorization was not consumed; source changes required by the preservation
-prerequisite supersede it and require a fresh explicit authorization.
+based on pushed preservation prerequisite
+`facf3eae2fbee83056189e2cfd54cf974ae1421b`. It is recorded as v15 to
+distinguish it from consumed v8-v13 and superseded/unconsumed v14. The
+authorization is pending and unconsumed: no campaign UUID, attempt UUID, launch
+claim, install, sudo invocation or root action exists for v15.
