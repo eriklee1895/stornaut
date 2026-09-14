@@ -980,8 +980,13 @@ module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
   `receiptInvalid/exited-82/cleanup-02` 失败；schema-v9 checked disposition
   绑定九个 raw artifacts、双 persistent Gate attempt/capsule 与零固定运行时
   live residue。v16 consumed/non-admitting/non-retryable；status-82 identity 与
-  cleanup-02 typed-attribution repairs 已完成/non-admitting；当前 frontier 为
-  fresh campaign authorization → green campaign → L3c3d → L3c4；
+  cleanup-02 typed-attribution repairs 已完成/non-admitting；用户已批准基于
+  `a69bd33df8b27e0660e628ec59be308342141625` 的 fresh v17；但 launch 前
+  purgeable TMPDIR 中的 v13 raw evidence 在 macOS low-disk `cache_delete`
+  同一时间窗丢失（精确删除 actor 未独立绑定），
+  因而 v17 superseded-before-launch/unconsumed。当前 frontier 为 v13 purge
+  disposition → future raw-evidence persistent-path repair → fresh authorization
+  → replacement campaign → L3c3d → L3c4；
   这些 repairs 是 machine-campaign prerequisite checkpoints，
   不是新的 Task。
   ADR 0018 仍 Proposed；L3c4 独占 final admission 与

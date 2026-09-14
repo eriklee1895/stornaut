@@ -1,12 +1,12 @@
 # Phase D Task 39B2c ii-c Machine Campaign Preflight
 
-> Status: frozen / v8-v13 and v16 consumed / v14-v15 superseded / repair pending
+> Status: frozen / v8-v13 and v16 consumed / v14-v17 superseded / persistent evidence repair pending
 >
 > Date: 2026-08-30
 >
 > Baseline: `2b30a157c14bc507351b10bd521e710987860f71`
 >
-> Remaining order: checked v16 failure -> status-82/cleanup-02 repair -> new authorization -> green campaign -> L3c3d -> L3c4
+> Remaining order: v13 purge disposition -> future evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4
 >
 > v9 launch history: the first executable launch was cancelled at the generic
 > lifecycle install prompt before credentials, install, evidence creation or
@@ -44,7 +44,10 @@
 > launch occurred; v15 is superseded/unconsumed. The fixes are pushed at
 > `103a4836` and verified/non-admitting. Fresh v16 subsequently ran exactly once
 > and closed as `receiptInvalid/exited-82/cleanup-02`; it is consumed/non-admitting/
-> non-retryable. A tests-first repair and new pushed authorization are required.
+> non-retryable. The status-82/cleanup-02 repairs are complete/non-admitting,
+> and v17 was authorized from `a69bd33` but is superseded-before-launch and
+> unconsumed after v13 TMPDIR raw evidence disappeared concurrently with a
+> macOS low-disk purge; the exact deleting actor is not independently bound.
 
 ## 1. Decision
 

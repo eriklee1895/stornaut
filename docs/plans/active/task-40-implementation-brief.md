@@ -44,8 +44,10 @@ before launch and remains unconsumed; the preservation prerequisite is complete/
 non-admitting. Fresh v15 from `facf3ea` was stopped before launch by aggregate-
 scope/xattr evidence gaps and is superseded/unconsumed. The fixes are pushed at
 `103a4836`; v16 then ran once and is consumed/non-admitting/non-retryable after
-`receiptInvalid/exited-82/cleanup-02`. Task 40 remains blocked until a repaired,
-separately authorized campaign and L3c3d/L3c4 produce and push a Task 39 Ready
+`receiptInvalid/exited-82/cleanup-02`. Its repairs are complete/non-admitting,
+and v17 was authorized from `a69bd33` but is superseded-before-launch/unconsumed
+after external v13 TMPDIR evidence loss. Task 40
+remains blocked until the campaign and L3c3d/L3c4 produce and push a Task 39 Ready
 baseline.
 Inputs are:
 

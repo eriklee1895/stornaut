@@ -21,8 +21,11 @@
 > once and closed as `receiptInvalid/exited-82/cleanup-02`; it is consumed/
 > non-admitting/non-retryable. Its checked schema-v9 disposition binds both
 > persistent Gate attempts/capsules. Status-82 identity and cleanup-02 typed-
-> attribution repairs are complete/non-admitting; no replacement campaign is
-> authorized.
+> attribution repairs are complete/non-admitting. One fresh v17 was authorized
+> from `a69bd33`, but a pre-launch check found v13 raw evidence missing from
+> TMPDIR concurrently with a macOS low-disk purge; the exact deleting actor is
+> not independently bound. v17 is superseded/unconsumed; v13 loss
+> disposition and future evidence persistent-path repair are prerequisites.
 > v8 remains a conclusive immutable no-go. 39A, 39B1a, 39B1b-i,
 > 39B1b-ii, 39B2a and 39B2b-i are complete
 > and independently verified. 39B2b-ii prerequisite authority extraction is

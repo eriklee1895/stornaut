@@ -68,5 +68,9 @@ No privileged campaign, root action, model call, App launch or authoritative
 v16 remains consumed, non-admitting and non-retryable. Its evidence and the
 persistent Application Support Gate remain immutable. Production Deep Dive
 remains unavailable, Task 40 remains blocked, and L3c3d/L3c4 remain unproven.
-After this checkpoint is committed and pushed, exactly one fresh replacement
-campaign requires a new user authorization bound to that pushed commit.
+This checkpoint was committed and pushed as `a69bd33`; the user subsequently
+authorized exactly one fresh v17 replacement campaign bound to that commit. A
+read-only pre-launch check then found v13 raw evidence missing from TMPDIR
+concurrently with a macOS low-disk purge; the exact deleting actor is not
+independently bound. v17 was not launched and remains unconsumed, but is
+superseded pending a checked purge disposition and persistent evidence repair.

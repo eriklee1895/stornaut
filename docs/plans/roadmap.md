@@ -280,7 +280,11 @@ non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
    发现 aggregate scope/xattr no-mutation evidence gaps；未启动且
    superseded/unconsumed。修复已由 `103a4836` 推送并验证/non-admitting；
    fresh v16 随后唯一执行并以 `receiptInvalid/exited-82/cleanup-02` 失败，
-   当前 consumed/non-admitting/non-retryable；status-82 repair pending。Task 39
+   当前 consumed/non-admitting/non-retryable；status-82/cleanup-02 repairs
+   complete/non-admitting；fresh v17 曾基于 `a69bd33` 获批，但 launch 前因
+   发现 v13 TMPDIR raw evidence 丢失，且与 macOS low-disk purge 强时间相关
+   （精确删除 actor 未独立绑定），因而 superseded/unconsumed。当前先完成
+   v13 loss disposition 与 future evidence persistent-path repair。Task 39
    后续 serial validation 暴露历史 physical fixture 会触发 production
    stale-recovery 并误删 v9 Gate capsule；精确副本不可恢复，原 v2 receipt 与
    v3 predecessor 与当前 v5 receipt 已保留，fixture 已改为显式 opt-in + 双重保护。
@@ -578,7 +582,10 @@ four Mach-O projections 与 final no-unresolved-P0–P2 review。
    unconsumed 但已 superseded；修复已由 `103a4836` 推送并验证/non-admitting；
    fresh v16 随后唯一执行并以 closed post-arm failure 消费；当前
    non-admitting/non-retryable；status-82/cleanup-02 repair 已完成且保持
-   non-admitting，下一步需要绑定新提交的 fresh campaign 授权。
+   non-admitting；fresh v17 曾绑定 `a69bd33` 获批，但在 launch 前因 v13
+   TMPDIR evidence 丢失且与系统 purge 强时间相关（精确删除 actor 未独立绑定），
+   因而 superseded/unconsumed；persistent evidence
+   repair pending。
    Task 39 当前
    active/incomplete，L3c3d/L3c4 未证明，
    L3c4 的 final admission/full

@@ -21,8 +21,10 @@
 > aggregate scope/xattr evidence gaps and is superseded/unconsumed. The fixes
 > are pushed at `103a4836` and verified/non-admitting; v16 subsequently ran once
 > and is consumed/non-admitting/non-retryable after the checked closed failure.
-> Task 39 remains incomplete
-> and Task 40 remains blocked.
+> Task 39 remains incomplete. v17 was authorized from `a69bd33` but is
+> superseded-before-launch/unconsumed after external v13 TMPDIR evidence loss;
+> Task 40
+> remains blocked.
 
 ## Outcome
 

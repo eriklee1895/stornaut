@@ -9,6 +9,8 @@
 > P2 implementation tree: `06c8454f54c99dcb1d76637d13706d85c102ba9d`
 >
 > P2 completion audit baseline: `1d4faa53385f4f2f9b749257482e9424280b74da`
+>
+> Current authorization: v17 / `a69bd33df8b27e0660e628ec59be308342141625` / superseded before launch and unconsumed
 
 ## Purpose
 
@@ -33,21 +35,31 @@ The evidence-closure checkpoint is pushed at
 one fresh v16 campaign from that exact commit. That campaign subsequently ran
 once, durably armed and closed as `receiptInvalid/exited-82/cleanup-02`; the
 checked failure disposition supersedes this pre-launch statement.
+The status-82 identity and cleanup-02 typed-attribution repairs were then pushed
+as `a69bd33df8b27e0660e628ec59be308342141625`. The user explicitly authorized
+one fresh v17 campaign from that exact commit. Before launch, the nine v13 raw
+evidence files under TMPDIR were found missing in the same time window as a
+macOS low-disk purge; the exact deleting actor is not independently bound. No
+v17 launch occurred; v17 is superseded/unconsumed and cannot be reused.
 
 ## Read-only machine state
 
-- local `HEAD`, `origin/main` and the authorized evidence-closure prerequisite
-  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal;
-- the worktree is clean;
+- the authorized repair baseline
+  `a69bd33df8b27e0660e628ec59be308342141625` was pushed and matched
+  `origin/main` before this authorization-only descendant;
+- the authorization-only descendant must be clean and pushed before launch;
 - the fixed diagnostic App, launchd plist and fixed runtime/lease roots are
   absent;
 - the persistent Gate exists only at
   `~/Library/Application Support/com.eriklee.stornaut.task39-machine-gate`;
 - the Gate base is UID/GID `501:20`, mode `0700`;
 - its exact inventory is `.owner-lock-v1` plus the retained v13 attempt
-  `a77c4d21-9bba-46f6-b694-3d1d1e55209d`; the attempt contains only the
-  28,997-byte capsule whose SHA-256 is
-  `1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17`;
+  `a77c4d21-9bba-46f6-b694-3d1d1e55209d` and v16 attempt
+  `fa83c861-a7e2-4903-bf64-9eb08c757f74`; each attempt contains only its
+  checked capsule. The v13 capsule remains 28,997 bytes with SHA-256
+  `1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17`,
+  and the v16 capsule remains 29,029 bytes with SHA-256
+  `0858c551d0741e066e46e79b5317fb19da11c32a4064b3ef49e7e0377e5f2f1a`;
 - the historical Caches Gate path is absent;
 - preservation aggregate, Debug/Release binary boundary, final 1,974-test
   serial and both
@@ -56,8 +68,8 @@ checked failure disposition supersedes this pre-launch statement.
 ## Proposed one-shot authority
 
 The user explicitly approved one fresh privileged replacement campaign based on
-the pushed evidence-closure checkpoint `103a4836`. This one-shot v16 authority
-does not revive or transfer the superseded v14/v15 authorizations.
+the pushed repair checkpoint `a69bd33`. This one-shot v17 authority does not
+revive or transfer the consumed v16 or superseded v14/v15 authorizations.
 The descendant may change only authorization/status documentation and exact
 status-verifier pins. It must not change Swift production sources, campaign/App/
 helper/driver/Gate/coordinator binaries, the lifecycle script, fixed prompts,
@@ -92,7 +104,7 @@ release/notarization, Task 40, production Deep Dive, L3c3d or L3c4.
   cancellation, timeout, uncertainty, malformed receipt, containment failure or
   verifier rejection stops without automatic retry.
 - The campaign must not modify, delete, reconstruct, append to or reinterpret any
-  v8-v14 evidence root, receipt or historical Gate artifact. The exact v13 Gate
+  v8-v16 evidence root, receipt or historical Gate artifact. The exact v13 Gate
   attempt/capsule must remain byte- and identity-stable.
 - A green independently verified cohort may unlock L3c3d. It does not by itself
   complete Task 39 or enable production Deep Dive.
@@ -110,3 +122,9 @@ launch claim, install, sudo invocation or root action exists for v15. The user
 has now authorized v16 from pushed evidence-closure commit
 `103a4836f4aa80c5d3739ca357364ad5c9200cf6`; that one-shot authority is now
 consumed/non-admitting/non-retryable.
+The status-82 and cleanup-attribution repair checkpoint was subsequently pushed
+as `a69bd33df8b27e0660e628ec59be308342141625`. The user has now authorized
+exactly one fresh v17 campaign from that commit. The pre-launch external v13
+evidence loss invalidated its historical-evidence premise. v17 is
+superseded/unconsumed; no
+v17 UUID, launch claim, install, sudo invocation or root action exists.

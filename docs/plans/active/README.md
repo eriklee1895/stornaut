@@ -43,8 +43,13 @@ unconsumed. The fixes are pushed at `103a4836` and verified/non-admitting. One
 fresh v16 then ran exactly once and closed as
 `receiptInvalid/exited-82/cleanup-02`; it is consumed/non-admitting/non-retryable.
 Its schema-v9 disposition binds the nine raw artifacts, both persistent Gate
-attempts/capsules and zero fixed-runtime live residue. The current frontier is a
-tests-first status-82/cleanup-02 repair is complete/non-admitting; no replacement campaign is authorized.
+attempts/capsules and zero fixed-runtime live residue. The tests-first
+status-82/cleanup-02 repair is complete/non-admitting. Fresh v17 was authorized
+from `a69bd33`, but a pre-launch check found v13 raw evidence missing from
+TMPDIR concurrently with a macOS low-disk purge; the exact deleting actor is
+not independently bound. v17 is superseded-before-launch and
+unconsumed. The v13 purge disposition and future evidence persistent-path repair
+are now prerequisites.
 Checkpoints 39A,
 39B1a, 39B1b-i and 39B1b-ii are complete and independently verified. 39B1a
 closed the exact Evidence Store v4 path and directly async lifecycle prerequisites;
@@ -496,7 +501,7 @@ the sole normal-product admission gate.
 | [36](task-36-implementation-brief.md) | Domain, canonical projection, planner, budget and stop contracts | complete; [review](../../reports/phase-d-task-36-review.md) |
 | [37](task-37-implementation-brief.md) | Store v4, retention and source rejoin | complete; [review](../../reports/phase-d-task-37-review.md) |
 | [38](task-38-implementation-brief.md) | Closed coordinator with fake runtime | complete; [review](../../reports/phase-d-task-38-review.md) |
-| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8–v13/v16 consumed/no-go; v14/v15 superseded/unconsumed; status-82/cleanup-02 repair complete/non-admitting; fresh campaign authorization required; L3c3d/L3c4 unproven |
+| [39](task-39-implementation-brief.md) | Signed-App production-runtime admission | active: v8–v13/v16 consumed/no-go; v14/v15/v17 superseded/unconsumed; persistent evidence repair pending; L3c3d/L3c4 unproven |
 | [40](task-40-implementation-brief.md) | Evidence report and conservative Review projection | blocked on Task 39 under the approved sequential plan |
 | [41](task-41-implementation-brief.md) | First-use disclosure and typed availability | blocked on Task 40 |
 | [42](task-42-implementation-brief.md) | App workflow and recovery state | blocked on Task 41 |

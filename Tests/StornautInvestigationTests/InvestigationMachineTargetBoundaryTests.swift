@@ -257,6 +257,32 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func v17AuthorizationPinsExactRepairBaselineAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-c-v17-authorization-staged-scope-contract-only",
+            "function verify_iicc_v17_authorization_staged_scope()",
+            "iicc_v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625",
+            "ii-c-c v17 authorization aggregate budget drifted",
+            "ii-c-c v17 authorization index/worktree drifted",
+        ] { #expect(boundary.contains(marker), "missing: \(marker)") }
+        for marker in [
+            "v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625",
+            "v17_authorization_scope_fixtures=(extra missing binary wrong-mode",
+            "ii-c-c v17 authorization scope negative inventory drifted",
+            "v17_total == 801",
+            "iicc-v17-authorization-untracked.swift",
+            "$v17_authorization_scope_mode",
+            "v17-authorization-scope-actual.log",
+        ] { #expect(contract.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
     func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let boundary = try String(contentsOf: root.appending(
@@ -805,6 +831,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "${#expected} == 3 && ${#observed} == 3",
             "ii-c-c v16 authorization aggregate budget drifted",
             "ii-c-c v16 authorization index/worktree drifted",
+            "--iic-c-v17-authorization-staged-scope-contract-only",
+            "function verify_iicc_v17_authorization_staged_scope()",
+            "iicc_v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625",
+            "ii-c-c v17 authorization aggregate budget drifted",
+            "ii-c-c v17 authorization index/worktree drifted",
         ] {
             #expect(boundary.contains(marker), "missing: \(marker)")
         }
@@ -1108,26 +1139,27 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-c blocked status docs drifted"))
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
-            "(Path(\"AGENTS.md\"), \"5e5a80028e8d7ecf6809e417f89b314977e581f9a2f89d341fde6147c28f9595\")",
-            "(Path(\"README.md\"), \"161d2f87126ca534b1b8e0be8c91a65bd464a310800e5bc531a78940341e3d9c\")",
-            "(Path(\"docs/README.md\"), \"f39f7cff2f509ccc18d78f8afbe03094d37fd80ec454b69007520c237026cb29\")",
-            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"3332dc96c0aaadeded1ec5ee24df3d998e7370034ea6f539fd729a28be4bb82c\")",
-            "(Path(\"docs/plans/active/README.md\"), \"bd4ba98c608e18628ac5bd284e21f440ccc75a584a3bd16b857a6ef1e9c66f30\")",
-            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"064dd5f690062d4caf82507758967d7ce4338071afbe0f5c1adc090690059b88\")",
-            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"9a504720942a083dbba22c5d98104f7bcf00b69cbc162fb614bc72e26cd51e4e\")",
-            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"051dc7bdc1ecee8913f3bf916a29dbe3f55d4934aee8a42a2d461534ad901432\")",
-            "(Path(\"docs/plans/roadmap.md\"), \"3f2e7b995b2bf55da407944f68f521bb1731e6be1ea1335e40523e6770bc8481\")",
+            "(Path(\"AGENTS.md\"), \"613589f14bf3973b8e3c4c1413c994b46d195759b77cf81b3e215206d5968e97\")",
+            "(Path(\"README.md\"), \"83ef031f29adf1998db7be646d01e1cf2fb9aa879e8824aecec761980cf160ee\")",
+            "(Path(\"docs/README.md\"), \"8ad6e40af7895936b5940db0ce2be45fd08f85f555bd6b1a0b4aeb31ba09745c\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"24cd431d3abf67a346905e2f15a90768cf0b90e1b47eff5e2af9c9946d19b2c5\")",
+            "(Path(\"docs/plans/active/README.md\"), \"8ca778ea872d012f01e1f59464077a04e488a240a9a1f17f1ca5fc953b3e91b8\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"90c6a440c3711fd163620be12091afce2f8e9e9861add6f35c4fc68da9252d2e\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"dbe6e2d69a75e39fe9729144d567d9d70fd617863c97c45b2f9b4cd516909503\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"82ce3d3688bbc831b3da7d36bbc0e3488b6e34a9540f0f0283246d3db4fd7385\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"60ce006a6543ad1d9a59084fbb7ef6ba2106dd15fdac9323eb8320a5be0abb18\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md\"), \"9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md\"), \"6103985f4ba4e42fec28600b0589d6fef2356f70ce9fe78e9be8f72451a4bcb9\")",
-            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"fb3663b21e163c2b462456f2b00ee3118b0bed6cba4b2c001fb0754aa121f042\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md\"), \"c6ebe53446c6b0c9125fd0114713df20d8f9e2a5005a18be2799451a440d0682\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"84c10e60fe8fd9b5e8e56b97d9e039a8d8c8c9d7cf59d05a25652a6a16432011\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md\"), \"e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md\"), \"499a1086c3a2f4b3307faf6d81937bf46e2649529cc60d393122f895876b464d\")",
             "(Path(\"docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md\"), \"2504457bd050c2599d3e9d10a0eb0874a05a778b823f3c5995af8b0b803321ec\")",
-            "len(active_status_entries) != 19",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v17-replacement-campaign-authorization.md\"), \"95f22675a1e2230326f0e70a005122b1a5a2e0c2fa74684672f18a5a187c4a53\")",
+            "len(active_status_entries) != 20",
             "len(set(active_status_paths)) != len(active_status_paths)",
             "set(active_status_paths) != active_status_expected_paths",
             "ii-c-c blocked status docs inventory drifted",
@@ -1143,7 +1175,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "a supplemental sudo/PAM observation\\nis not campaign-bound",
             "v8-v13 and v16 consumed",
             "v8-v13 and v16 consumed",
-            "status-82/cleanup-02 repair -> new authorization -> green campaign -> L3c3d -> L3c4",
+            "v13 purge disposition -> future raw-evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
             "aggregate scope/xattr no-mutation evidence gaps",
             "Status: superseded before launch / unconsumed / reauthorization required",
             "v14 authorization based on `d5a7df3` was stopped before launch",
@@ -1156,6 +1188,12 @@ struct InvestigationMachineTargetBoundaryTests {
             "0cfccbf6e8a500365837b4cb9551f6ff70af4bbf",
             "The authorized invocation subsequently ran exactly once",
             "authorized evidence-closure prerequisite\\n  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal",
+            "Current authorization: v17",
+            "a69bd33df8b27e0660e628ec59be308342141625",
+            "f32d41c4a7bdf24519016666c942fe9ec5cf3789",
+            "Once v17 durably records",
+            "No v17 campaign UUID",
+            "v17 remains unconsumed but is superseded",
             "ii-c-c v13 supplemental observation became causal",
             "Task 40 start condition remains blocked",
         ]
