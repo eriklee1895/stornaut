@@ -1,0 +1,186 @@
+#!/bin/zsh -f
+set -euo pipefail
+self=$0:A
+# v13_raw_loss_contract_self_sha=e6762dbb7a276596829c7a7972be6346b537e0c55e595b7df5d6e4e692e8708a
+[[ $0 == /bin/zsh && ${1:-} == --sealed-bytes ]] || {
+    print -u2 "v13 raw evidence loss contract requires verified-byte execution"
+    exit 2
+}
+(( $# == 2 )) || { print -u2 "v13 raw evidence loss contract root missing"; exit 1; }
+repo_root=$2
+[[ $repo_root == /* && -d $repo_root && ! -L $repo_root ]] \
+    || { print -u2 "v13 raw evidence loss contract root invalid"; exit 1; }
+cd "$repo_root"
+temporary=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR)
+temporary=${temporary%/}
+temporary=$(cd "$temporary" && /bin/pwd -P)
+scratch=$(mktemp -d "$temporary/stornaut-v13-loss-contract.XXXXXX")
+trap 'rm -rf -- "$scratch"' EXIT
+loss=scripts/verify-iic-v13-raw-evidence-loss
+failure=scripts/verify-investigation-runtime-machine-failure
+typeset -r expected_loss=3384751426e67773015ae567b70bc44750d9aab739b84a8dd739e413f87b9363
+typeset -r expected_failure=62c4973b51254d907c57170ee860d114d0ecc935dc8c31d8e1f9396a75393e7a
+exec /usr/bin/python3 -I - "$loss" "$failure" "$repo_root" "$scratch" \
+    "$expected_loss" "$expected_failure" <<'PY'
+import ast, copy, hashlib, json, os, re, stat, subprocess, sys
+loss_path, failure_path, root, scratch, expected_loss, expected_failure = sys.argv[1:]
+def verified(path, expected, pattern, normalized_line):
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(fd); named = os.stat(path, follow_symlinks=False)
+        source = os.pread(fd, metadata.st_size, 0)
+        match = re.search(pattern, source)
+        normalized, count = re.subn(pattern, normalized_line, source)
+        before = (metadata.st_dev, metadata.st_ino, metadata.st_gen,
+                  metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns)
+        named_identity = (named.st_dev, named.st_ino, named.st_gen,
+                          named.st_size, named.st_mtime_ns, named.st_ctime_ns)
+        if (not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) != 0o755
+                or metadata.st_uid != os.getuid() or metadata.st_nlink != 1
+                or not 0 < metadata.st_size <= 1 << 20 or before != named_identity
+                or len(source) != metadata.st_size
+                or os.pread(fd, 1, metadata.st_size) != b""
+                or hashlib.sha256(source).hexdigest() != expected
+                or count != 1 or match is None
+                or hashlib.sha256(normalized).hexdigest().encode() != match.group(1)):
+            raise RuntimeError("child identity drifted")
+        return fd, source, before
+    except BaseException:
+        os.close(fd); raise
+def revalidate(path, fd, source, before):
+    held = os.fstat(fd); named = os.stat(path, follow_symlinks=False)
+    current = (held.st_dev, held.st_ino, held.st_gen, held.st_size,
+               held.st_mtime_ns, held.st_ctime_ns)
+    named_identity = (named.st_dev, named.st_ino, named.st_gen, named.st_size,
+                      named.st_mtime_ns, named.st_ctime_ns)
+    if (current != before or named_identity != before
+            or os.pread(fd, held.st_size, 0) != source
+            or os.pread(fd, 1, held.st_size) != b""):
+        raise RuntimeError("child changed during verification")
+def expect_rejected(operation, label):
+    try: operation()
+    except BaseException: return
+    raise RuntimeError("mutation accepted: " + label)
+loss_fd = failure_fd = -1
+try:
+    loss_fd, loss_source, loss_before = verified(
+        loss_path, expected_loss,
+        rb"(?m)^typeset -r self_sha=([0-9a-f]{64}) # v13-raw-loss-self-seal$",
+        b"typeset -r self_sha=SELF # v13-raw-loss-self-seal")
+    failure_fd, failure_source, failure_before = verified(
+        failure_path, expected_failure,
+        rb"(?m)^typeset -r iicc_failure_self_sha=([0-9a-f]{64}) # iicc-failure-self-seal$",
+        b"typeset -r iicc_failure_self_sha=SELF # iicc-failure-self-seal")
+    trusted = os.path.join(scratch, "trusted"); replacement = os.path.join(scratch, "replacement")
+    open(trusted, "wb").write(b"#!/bin/zsh -f\nprint trusted-path\n")
+    open(replacement, "wb").write(b"#!/bin/zsh -f\nprint replaced-path\n")
+    os.chmod(trusted, 0o755); snapshot = open(trusted, "rb").read()
+    os.replace(replacement, trusted)
+    byte_result = subprocess.run(["/bin/zsh", "-f", "-s"], input=snapshot,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if byte_result.returncode or byte_result.stdout != b"trusted-path\n":
+        raise RuntimeError("path replacement changed verified bytes")
+    same_inode = os.path.join(scratch, "same-inode")
+    open(same_inode, "wb").write(b"#!/bin/zsh -f\nprint trusted-inode\n")
+    snapshot = open(same_inode, "rb").read()
+    open(same_inode, "wb").write(b"#!/bin/zsh -f\nprint mutated-inode\n")
+    byte_result = subprocess.run(["/bin/zsh", "-f", "-s"], input=snapshot,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if byte_result.returncode or byte_result.stdout != b"trusted-inode\n":
+        raise RuntimeError("same-inode overwrite changed verified bytes")
+    fake = os.path.join(scratch, "fake-failure")
+    open(fake, "wb").write(b"#!/bin/zsh -f\nprint 'stornaut ii-c consumed failure disposition verified; admission rejected; retry forbidden'\n")
+    os.chmod(fake, 0o755)
+    expect_rejected(lambda: verified(fake, expected_failure,
+        rb"(?m)^typeset -r iicc_failure_self_sha=([0-9a-f]{64}) # iicc-failure-self-seal$",
+        b"typeset -r iicc_failure_self_sha=SELF # iicc-failure-self-seal"), "fake child output")
+    python_source = loss_source.split(b"<<'PY'\n", 1)[1].rsplit(b"\nPY\n", 1)[0]
+    tree = ast.parse(python_source); namespace = {"__name__": "v13_loss_contract"}
+    try_index = next(index for index, node in enumerate(tree.body)
+                     if isinstance(node, ast.Try))
+    setup = tree.body[:try_index]
+    exec(compile(ast.Module(body=setup, type_ignores=[]), "<verified-v13-loss>", "exec"), namespace)
+    Rejected = namespace["Rejected"]; validate = namespace["validate_receipt"]
+    verify_root = namespace["verify_residual_root"]
+    hold_fixed = namespace["hold_fixed_file"]
+    revalidate_fixed = namespace["revalidate_fixed_file"]
+    receipt_path = os.path.join(root, "docs/reports/evidence/task-39-iic-v13-raw-evidence-loss.json")
+    receipt = json.load(open(receipt_path, "r", encoding="utf-8")); validate(copy.deepcopy(receipt))
+    for mutation in ("unknown", "missing", "actor", "relationship"):
+        value = copy.deepcopy(receipt)
+        if mutation == "unknown": value["unknown"] = True
+        elif mutation == "missing": del value["nonClaims"]
+        elif mutation == "actor": value["temporalCorrelation"]["deletingActor"] = "cacheDelete"
+        else: value["temporalCorrelation"]["relationship"] = "causal"
+        expect_rejected(lambda value=value: validate(value), "receipt-" + mutation)
+    campaign, phases = namespace["CAMPAIGN"], namespace["PHASES"]
+    parent = os.path.join(scratch, "stornaut-iic-evidence-" + campaign)
+    evidence = os.path.join(parent, "stornaut-task39-iic-" + campaign)
+    os.mkdir(parent, 0o700); os.mkdir(evidence, 0o700)
+    for phase in phases: os.mkdir(os.path.join(evidence, phase), 0o700)
+    def observed():
+        def node(path):
+            value = os.lstat(path)
+            return {"device": str(value.st_dev), "inode": str(value.st_ino),
+                    "generation": str(value.st_gen),
+                    "changeTimeNanoseconds": str(value.st_ctime_ns)}
+        pv, rv = os.lstat(parent), os.lstat(evidence)
+        return {"parentIdentity": {"device": str(pv.st_dev), "inode": str(pv.st_ino),
+            "generation": str(pv.st_gen), "size": str(pv.st_size)},
+            "rootIdentity": {"device": str(rv.st_dev), "inode": str(rv.st_ino),
+            "generation": str(rv.st_gen), "size": str(rv.st_size)},
+            "phaseDirectories": {phase: node(os.path.join(evidence, phase)) for phase in phases}}
+    observation = observed(); verify_root(evidence, observation, lambda: None)
+    for mutation in ("root-inode", "phase-ctime", "extra-entry", "missing-phase", "create-delete"):
+        candidate = copy.deepcopy(observation); removed = None
+        if mutation == "root-inode": candidate["rootIdentity"]["inode"] = "1"
+        elif mutation == "phase-ctime": candidate["phaseDirectories"][phases[0]]["changeTimeNanoseconds"] = "1"
+        elif mutation == "extra-entry": open(os.path.join(evidence, phases[0], "extra"), "wb").close()
+        elif mutation == "missing-phase": removed = os.path.join(evidence, phases[-1]); os.rmdir(removed)
+        def successor():
+            if mutation == "create-delete":
+                transient = os.path.join(evidence, phases[0], "transient")
+                open(transient, "wb").close(); os.unlink(transient)
+        expect_rejected(lambda: verify_root(evidence, candidate, successor), "runtime-" + mutation)
+        extra = os.path.join(evidence, phases[0], "extra")
+        if os.path.exists(extra): os.unlink(extra)
+        if removed is not None: os.mkdir(removed, 0o700)
+        observation = observed()
+    canonical_disposition = os.path.join(
+        root, "docs/reports/evidence/task-39-iic-v16-failure-disposition.json")
+    disposition_bytes = open(canonical_disposition, "rb").read()
+    disposition_sha = hashlib.sha256(disposition_bytes).hexdigest()
+    for mutation in ("disposition-path-replacement", "disposition-same-inode"):
+        disposition = os.path.join(scratch, mutation + ".json")
+        open(disposition, "wb").write(disposition_bytes); os.chmod(disposition, 0o644)
+        held_fd = -1; held_queue = None
+        try:
+            held_fd, held_queue, held_before, held_bytes = hold_fixed(
+                disposition, disposition_sha)
+            if mutation == "disposition-path-replacement":
+                replacement = disposition + ".replacement"
+                open(replacement, "wb").write(disposition_bytes)
+                os.chmod(replacement, 0o644); os.replace(replacement, disposition)
+            else:
+                with open(disposition, "r+b") as stream:
+                    stream.seek(0); stream.write(b" ")
+                    stream.seek(0); stream.write(disposition_bytes[:1])
+                    stream.flush(); os.fsync(stream.fileno())
+            expect_rejected(lambda: revalidate_fixed(
+                disposition, held_fd, held_queue, held_before, held_bytes), mutation)
+        finally:
+            if held_queue is not None: held_queue.close()
+            if held_fd >= 0: os.close(held_fd)
+    result = subprocess.run(["/bin/zsh", "-f", "-s", "--", "--sealed-bytes",
+        root, str(failure_fd)], input=loss_source, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, check=False, pass_fds=(failure_fd,),
+        env={"HOME": "/var/empty", "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C"})
+    revalidate(loss_path, loss_fd, loss_source, loss_before)
+    revalidate(failure_path, failure_fd, failure_source, failure_before)
+    sys.stdout.buffer.write(result.stdout); sys.stderr.buffer.write(result.stderr)
+    raise SystemExit(result.returncode)
+finally:
+    for descriptor in (failure_fd, loss_fd):
+        if descriptor >= 0: os.close(descriptor)
+PY

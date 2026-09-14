@@ -1,0 +1,416 @@
+#!/bin/zsh -f
+set -euo pipefail
+typeset -r self_sha=0583847e402c79422179ead36f19a9b89800d4a6280f5b62b9d5803c8d0ca16a # v13-raw-loss-self-seal
+[[ $0 == /bin/zsh && ${1:-} == --sealed-bytes ]] || {
+    print -u2 "v13 raw evidence loss verifier requires sealed parent execution"
+    exit 2
+}
+(( $# == 3 )) || {
+    print -u2 "v13 raw evidence loss verifier arguments invalid"
+    exit 2
+}
+repo_root=$2
+failure_verifier_fd=$3
+[[ $repo_root == /* && -d $repo_root && ! -L $repo_root \
+    && $failure_verifier_fd == <3-> ]] || exit 2
+temporary=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR)
+temporary=${temporary%/}
+temporary=$(cd "$temporary" && /bin/pwd -P)
+typeset -r v13_campaign=864065f6-8c9e-48e1-bedf-b0f6becd7b21
+typeset -r v16_campaign=469fd1d1-f9fd-4a3c-a0e6-f72f586f5e72
+v13_root="$temporary/stornaut-iic-evidence-$v13_campaign/stornaut-task39-iic-$v13_campaign"
+v16_root="$temporary/stornaut-iic-evidence-$v16_campaign/stornaut-task39-iic-$v16_campaign"
+exec /usr/bin/python3 -I - \
+    "$v13_root" \
+    "$repo_root/docs/reports/evidence/task-39-iic-v13-raw-evidence-loss.json" \
+    "$repo_root/docs/reports/evidence/task-39-iic-v13-failure-disposition.json" \
+    "$v16_root" \
+    "$repo_root/docs/reports/evidence/task-39-iic-v16-failure-disposition.json" \
+    "$failure_verifier_fd" <<'PY'
+import ctypes
+import errno
+import fcntl
+import hashlib
+import json
+import os
+import re
+import select
+import stat
+import subprocess
+import sys
+import uuid
+
+EXPECTED_RECEIPT_SHA256 = "cfad5245cdeff2688d88b6395c8aa93208c9cc938df21bae57bad80ec56d5022"
+EXPECTED_V13_DISPOSITION_SHA256 = "09c62579bf4a78ce00f491993ccfbeb5f4cd22ed11e0e8744f1e52922080bafd"
+EXPECTED_V16_DISPOSITION_SHA256 = "9705e4d659cd316a74aefbc5510a66af942e6e024763baeb52c5d192e37e08f6"
+EXPECTED_FAILURE_VERIFIER_SHA256 = "62c4973b51254d907c57170ee860d114d0ecc935dc8c31d8e1f9396a75393e7a"
+CAMPAIGN = "864065f6-8c9e-48e1-bedf-b0f6becd7b21"
+PHASES = ("01-preflight", "02-install", "03-authorization",
+          "04-driver-epochs", "05-uninstall", "06-verifier")
+O_NOFOLLOW_ANY = 0x20000000
+O_RESOLVE_BENEATH = 0x00001000
+O_UNIQUE = 0x00002000
+ROOT_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NONBLOCK
+ROOT_FLAGS |= O_NOFOLLOW_ANY | O_UNIQUE
+DIRECTORY_FLAGS = ROOT_FLAGS | O_RESOLVE_BENEATH
+VNODE_FLAGS = (select.KQ_NOTE_DELETE | select.KQ_NOTE_ATTRIB
+               | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE
+               | select.KQ_NOTE_LINK | select.KQ_NOTE_WRITE
+               | select.KQ_NOTE_EXTEND)
+ACL_TYPE_EXTENDED = 0x00000100
+ACL_FIRST_ENTRY = 0
+libc = ctypes.CDLL(None, use_errno=True)
+libc.flistxattr.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+libc.flistxattr.restype = ctypes.c_ssize_t
+libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+libc.acl_get_fd_np.restype = ctypes.c_void_p
+libc.acl_get_entry.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_void_p)]
+libc.acl_get_entry.restype = ctypes.c_int
+libc.acl_free.argtypes = [ctypes.c_void_p]
+libc.acl_free.restype = ctypes.c_int
+
+class Rejected(Exception):
+    pass
+
+def require(value, message):
+    if not value:
+        raise Rejected(message)
+
+def exact_object(value, keys, name):
+    require(isinstance(value, dict) and set(value) == set(keys), name + " schema")
+
+def decimal(value, name, minimum=0):
+    require(isinstance(value, str) and value.isdecimal()
+            and (value == "0" or not value.startswith("0")), name)
+    result = int(value)
+    require(result >= minimum, name)
+    return result
+
+def canonical_absolute(path, name):
+    require(isinstance(path, str) and path.startswith("/")
+            and "\x00" not in path and os.path.realpath(path) == path, name)
+    return path
+
+def identity(value):
+    return (value.st_dev, value.st_ino, value.st_gen)
+
+def empty_acl(descriptor):
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED)
+    if not acl:
+        require(ctypes.get_errno() == errno.ENOENT, "acl read")
+        return True
+    entry = ctypes.c_void_p()
+    result = libc.acl_get_entry(acl, ACL_FIRST_ENTRY, ctypes.byref(entry))
+    free_result = libc.acl_free(acl)
+    require(result >= 0 and free_result == 0, "acl iteration")
+    return result != 0
+
+def validate_directory(descriptor, named, expected=None):
+    held = os.fstat(descriptor)
+    require(identity(held) == identity(named)
+            and stat.S_ISDIR(held.st_mode)
+            and stat.S_IMODE(held.st_mode) == 0o700
+            and held.st_uid == os.getuid() and held.st_gid == os.getgid()
+            and held.st_nlink > 0 and getattr(held, "st_flags", 0) == 0
+            and fcntl.fcntl(descriptor, fcntl.F_GETFD) & fcntl.FD_CLOEXEC
+            and fcntl.fcntl(descriptor, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY
+            and libc.flistxattr(descriptor, None, 0, 0) == 0
+            and empty_acl(descriptor), "directory metadata")
+    if expected is not None:
+        require(identity(held) == tuple(decimal(expected[key], key) for key in
+                ("device", "inode", "generation")), "directory identity")
+    return held
+
+def inventory(descriptor):
+    values = sorted(name for name in os.listdir(descriptor) if name not in (".", ".."))
+    require(len(values) <= 8, "inventory bound")
+    return values
+
+def open_absolute(path):
+    canonical_absolute(path, "evidence root")
+    descriptors = [os.open("/", ROOT_FLAGS)]
+    nodes = []
+    try:
+        for component in path.split("/")[1:]:
+            parent = descriptors[-1]
+            require(component in os.listdir(parent), "path component absent")
+            named = os.stat(component, dir_fd=parent, follow_symlinks=False)
+            descriptor = os.open(component, DIRECTORY_FLAGS, dir_fd=parent)
+            descriptors.append(descriptor)
+            held = os.fstat(descriptor)
+            require(identity(held) == identity(named)
+                    and stat.S_ISDIR(held.st_mode)
+                    and fcntl.fcntl(descriptor, fcntl.F_GETFD)
+                        & fcntl.FD_CLOEXEC
+                    and fcntl.fcntl(descriptor, fcntl.F_GETFL)
+                        & os.O_ACCMODE == os.O_RDONLY,
+                    "path component metadata")
+            nodes.append((parent, component, descriptor, identity(held)))
+        return descriptors[-1], descriptors, nodes
+    except BaseException:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+        raise
+
+def close_all(descriptors):
+    first = None
+    for descriptor in reversed(descriptors):
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            if first is None:
+                first = error
+    if first is not None:
+        raise first
+
+def parse_unique_json(data):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            require(key not in result, "duplicate json key")
+            result[key] = value
+        return result
+    require(data.endswith(b"\n") and not data.endswith(b"\n\n"),
+            "receipt newline")
+    try:
+        return json.loads(data.decode("utf-8"), object_pairs_hook=pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise Rejected("invalid receipt json") from error
+
+def read_fixed_file(path, expected_sha):
+    canonical_absolute(path, "receipt")
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | O_NOFOLLOW_ANY)
+    try:
+        metadata = os.fstat(descriptor)
+        require(stat.S_ISREG(metadata.st_mode) and stat.S_IMODE(metadata.st_mode) == 0o644
+                and metadata.st_uid == os.getuid() and metadata.st_gid == os.getgid()
+                and metadata.st_nlink == 1 and 0 < metadata.st_size <= 32_768
+                and getattr(metadata, "st_flags", 0) == 0
+                and libc.flistxattr(descriptor, None, 0, 0) == 0
+                and empty_acl(descriptor), "receipt metadata")
+        data = os.pread(descriptor, metadata.st_size, 0)
+        require(len(data) == metadata.st_size
+                and os.pread(descriptor, 1, metadata.st_size) == b""
+                and hashlib.sha256(data).hexdigest() == expected_sha,
+                "receipt digest")
+        return data
+    finally:
+        os.close(descriptor)
+
+def hold_fixed_file(path, expected_sha):
+    canonical_absolute(path, "held file")
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | O_NOFOLLOW_ANY)
+    queue = select.kqueue()
+    try:
+        named = os.stat(path, follow_symlinks=False)
+        metadata = os.fstat(descriptor)
+        require(stat.S_ISREG(metadata.st_mode) and stat.S_IMODE(metadata.st_mode) == 0o644
+                and metadata.st_uid == os.getuid() and metadata.st_gid == os.getgid()
+                and metadata.st_nlink == 1 and 0 < metadata.st_size <= 32_768
+                and getattr(metadata, "st_flags", 0) == 0
+                and identity(named) == identity(metadata)
+                and libc.flistxattr(descriptor, None, 0, 0) == 0
+                and empty_acl(descriptor), "held file metadata")
+        data = os.pread(descriptor, metadata.st_size, 0)
+        require(len(data) == metadata.st_size
+                and os.pread(descriptor, 1, metadata.st_size) == b""
+                and hashlib.sha256(data).hexdigest() == expected_sha,
+                "held file digest")
+        require(queue.control([select.kevent(descriptor,
+            filter=select.KQ_FILTER_VNODE, flags=select.KQ_EV_ADD,
+            fflags=VNODE_FLAGS)], 0, 0) == [], "held file watch")
+        return descriptor, queue, metadata, data
+    except BaseException:
+        queue.close(); os.close(descriptor); raise
+
+def revalidate_fixed_file(path, descriptor, queue, before, data):
+    held = os.fstat(descriptor)
+    named = os.stat(path, follow_symlinks=False)
+    require(identity(held) == identity(before) == identity(named)
+            and held.st_size == before.st_size
+            and held.st_mtime_ns == before.st_mtime_ns
+            and held.st_ctime_ns == before.st_ctime_ns
+            and os.pread(descriptor, held.st_size, 0) == data
+            and os.pread(descriptor, 1, held.st_size) == b""
+            and queue.control(None, 1, 0) == [], "held file changed")
+
+def validate_receipt(value):
+    exact_object(value, {"schemaVersion", "domain", "campaignUUID",
+        "classification", "admission", "retry",
+        "originalDispositionSHA256", "originalEvidenceSetSHA256",
+        "v16DispositionSHA256", "evidenceRootObservation",
+        "temporalCorrelation", "recoverySearchResult", "nonClaims"},
+        "loss receipt")
+    require(value["schemaVersion"] == 1
+            and value["domain"] == "stornaut.task39.iic.raw-evidence-loss.v1"
+            and str(uuid.UUID(value["campaignUUID"])) == CAMPAIGN
+            and value["classification"] == "externalRawEvidenceLoss"
+            and value["admission"] == "rejected"
+            and value["retry"] == "forbidden"
+            and value["originalDispositionSHA256"] == EXPECTED_V13_DISPOSITION_SHA256
+            and value["v16DispositionSHA256"] == EXPECTED_V16_DISPOSITION_SHA256
+            and value["originalEvidenceSetSHA256"]
+                == "95834147f74c92d932d27d0b261a1ebc8edf4a33f0d34d9e8217e2fbbf116dbb"
+            and value["recoverySearchResult"] == "exactRawArtifactBytesUnavailable",
+            "loss receipt semantics")
+    observation = value["evidenceRootObservation"]
+    exact_object(observation, {"acceptedLiveStates", "expectedMissingArtifactCount",
+        "parentIdentity", "rootIdentity", "phaseDirectories",
+        "stateAtObservation"}, "root observation")
+    require(observation["acceptedLiveStates"] == [
+                "exactRetainedEmptyPhaseTree"]
+            and observation["expectedMissingArtifactCount"] == 9
+            and observation["stateAtObservation"] == "exactRetainedEmptyPhaseTree"
+            and set(observation["phaseDirectories"]) == set(PHASES),
+            "root observation semantics")
+    temporal = value["temporalCorrelation"]
+    exact_object(temporal, {"source", "cacheDeleteEventUTC",
+        "cacheDeletePurgeGoalBytes", "cacheDeleteFreeSpaceBytes",
+        "phaseDirectoryChangeWindowUTC", "relationship",
+        "deletingActor", "firstObservedMissingUTC"}, "temporal correlation")
+    require(temporal["source"] == "macOSUnifiedLogAndReadOnlyFilesystemObservation"
+            and temporal["relationship"] == "strongTemporalCorrelationOnly"
+            and temporal["deletingActor"] == "notIndependentlyBound",
+            "temporal correlation non-claim")
+    require(value["nonClaims"] == [
+        "no attribution of the deleting actor",
+        "no recovery or reconstruction of removed raw evidence",
+        "no successful v13 or v16 machine admission",
+        "no v17 campaign launch or authorization consumption",
+        "no L3c3d authenticated model success",
+        "no Task 39 readiness",
+    ], "loss receipt non-claims")
+    return observation
+
+def verify_v16(root, disposition, verifier_fd):
+    for path, name in ((root, "v16 evidence root"),
+                       (disposition, "v16 disposition")):
+        canonical_absolute(path, name)
+    descriptor = int(verifier_fd)
+    metadata = os.fstat(descriptor)
+    require(stat.S_ISREG(metadata.st_mode) and stat.S_IMODE(metadata.st_mode) == 0o755
+            and metadata.st_uid == os.getuid() and metadata.st_gid == os.getgid()
+            and metadata.st_nlink == 1 and 0 < metadata.st_size <= 1 << 20
+            and getattr(metadata, "st_flags", 0) == 0
+            and fcntl.fcntl(descriptor, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY
+            and libc.flistxattr(descriptor, None, 0, 0) == 0
+            and empty_acl(descriptor), "failure verifier metadata")
+    source = os.pread(descriptor, metadata.st_size, 0)
+    require(len(source) == metadata.st_size
+            and os.pread(descriptor, 1, metadata.st_size) == b""
+            and hashlib.sha256(source).hexdigest()
+                == EXPECTED_FAILURE_VERIFIER_SHA256,
+            "failure verifier digest")
+    match = re.search(
+        rb"(?m)^typeset -r iicc_failure_self_sha=([0-9a-f]{64}) # iicc-failure-self-seal$",
+        source)
+    normalized, count = re.subn(
+        rb"(?m)^typeset -r iicc_failure_self_sha=[0-9a-f]{64} # iicc-failure-self-seal$",
+        b"typeset -r iicc_failure_self_sha=SELF # iicc-failure-self-seal", source)
+    require(match is not None and count == 1
+            and hashlib.sha256(normalized).hexdigest().encode() == match.group(1),
+            "failure verifier self seal")
+    try:
+        python_source = source.split(b"<<'PY'\n", 1)[1].rsplit(b"\nPY\n", 1)[0]
+    except (IndexError, ValueError) as error:
+        raise Rejected("failure verifier program framing") from error
+    disposition_fd = -1
+    disposition_queue = None
+    try:
+        disposition_fd, disposition_queue, disposition_before, disposition_bytes = \
+            hold_fixed_file(disposition, EXPECTED_V16_DISPOSITION_SHA256)
+        result = subprocess.run(
+            ["/usr/bin/python3", "-I", "-", root, disposition, "", "",
+             match.group(1).decode(), str(descriptor)], input=python_source,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            timeout=30, pass_fds=(descriptor,), env={"HOME": "/var/empty",
+                             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                             "LC_ALL": "C"})
+        revalidate_fixed_file(disposition, disposition_fd, disposition_queue,
+                              disposition_before, disposition_bytes)
+    finally:
+        if disposition_queue is not None:
+            disposition_queue.close()
+        if disposition_fd >= 0:
+            os.close(disposition_fd)
+    require(result.returncode == 0
+            and result.stdout == b"stornaut ii-c consumed failure disposition verified; admission rejected; retry forbidden\n"
+            and result.stderr == b"", "v16 retained evidence verification")
+
+def verify_residual_root(path, observation, verify_successor):
+    expected_parent = "stornaut-iic-evidence-" + CAMPAIGN
+    expected_root = "stornaut-task39-iic-" + CAMPAIGN
+    require(os.path.basename(path) == expected_root
+            and os.path.basename(os.path.dirname(path)) == expected_parent,
+            "evidence root naming")
+    require(os.path.lexists(path), "recorded residual root absent")
+    root_fd, descriptors, nodes = open_absolute(path)
+    queue = select.kqueue()
+    phase_descriptors = []
+    try:
+        require(queue.control([select.kevent(root_fd,
+            filter=select.KQ_FILTER_VNODE, flags=select.KQ_EV_ADD,
+            fflags=VNODE_FLAGS)], 0, 0) == [], "watch registration")
+        parent = nodes[-1][0]
+        parent_component = nodes[-2]
+        validate_directory(parent, os.stat(
+            parent_component[1], dir_fd=parent_component[0],
+            follow_symlinks=False), observation["parentIdentity"])
+        root = validate_directory(root_fd, os.stat(
+            nodes[-1][1], dir_fd=parent, follow_symlinks=False),
+            observation["rootIdentity"])
+        parent_metadata = os.fstat(parent)
+        require(identity(parent_metadata) == tuple(decimal(
+            observation["parentIdentity"][key], key) for key in
+            ("device", "inode", "generation"))
+            and parent_metadata.st_size == decimal(
+                observation["parentIdentity"]["size"], "parent size"),
+            "parent identity")
+        require(root.st_size == decimal(
+            observation["rootIdentity"]["size"], "root size")
+            and inventory(root_fd) == list(PHASES), "root inventory")
+        for phase in PHASES:
+            named = os.stat(phase, dir_fd=root_fd, follow_symlinks=False)
+            descriptor = os.open(phase, DIRECTORY_FLAGS, dir_fd=root_fd)
+            phase_descriptors.append(descriptor)
+            require(queue.control([select.kevent(descriptor,
+                filter=select.KQ_FILTER_VNODE, flags=select.KQ_EV_ADD,
+                fflags=VNODE_FLAGS)], 0, 0) == [], "watch registration")
+            held = validate_directory(descriptor, named,
+                observation["phaseDirectories"][phase])
+            require(str(held.st_ctime_ns) == observation["phaseDirectories"][phase]
+                    ["changeTimeNanoseconds"] and held.st_size == 64
+                    and inventory(descriptor) == [],
+                    "empty phase observation")
+        verify_successor()
+        for phase, descriptor in zip(PHASES, phase_descriptors):
+            require(identity(os.fstat(descriptor)) == tuple(decimal(
+                observation["phaseDirectories"][phase][key], key) for key in
+                ("device", "inode", "generation"))
+                and inventory(descriptor) == [], "phase changed during verification")
+        for parent_fd, component, descriptor, before in nodes:
+            require(identity(os.fstat(descriptor)) == before
+                    and identity(os.stat(component, dir_fd=parent_fd,
+                        follow_symlinks=False)) == before,
+                    "path changed during verification")
+        require(inventory(root_fd) == list(PHASES)
+                and queue.control(None, 1, 0) == [], "loss evidence changed")
+    finally:
+        queue.close()
+        close_all(phase_descriptors)
+        close_all(descriptors)
+
+try:
+    receipt = validate_receipt(parse_unique_json(
+        read_fixed_file(sys.argv[2], EXPECTED_RECEIPT_SHA256)))
+    read_fixed_file(sys.argv[3], EXPECTED_V13_DISPOSITION_SHA256)
+    verify_residual_root(
+        canonical_absolute(sys.argv[1], "evidence root"), receipt,
+        lambda: verify_v16(sys.argv[4], sys.argv[5], sys.argv[6]))
+except (OSError, Rejected, ValueError, KeyError, TypeError) as error:
+    print("stornaut ii-c v13 raw evidence loss rejected: " + str(error),
+          file=sys.stderr)
+    raise SystemExit(1)
+print("stornaut ii-c v13 raw evidence loss verified; admission rejected; retry forbidden")
+PY

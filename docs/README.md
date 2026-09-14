@@ -82,6 +82,7 @@
 | Phase D Task 39B2c v15 Authorization | [Replacement Campaign Amendment](reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md) — based on `facf3ea`；pre-arm evidence gaps；superseded/unconsumed |
 | Phase D Task 39B2c v16 Authorization | [Replacement Campaign Amendment](reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md) — based on `103a4836`；consumed/non-admitting/non-retryable |
 | Phase D Task 39B2c v17 Authorization | [Replacement Campaign Amendment](reports/phase-d-task-39b2c-iic-v17-replacement-campaign-authorization.md) — based on `a69bd33`；pre-launch low-disk purge；superseded/unconsumed |
+| Phase D Task 39B2c v13 Raw-Evidence Loss | [Read-only Loss Audit](reports/phase-d-task-39b2c-iic-v13-raw-evidence-loss-review.md) — exact residual-tree observation、v16 standalone replay、dual persistent Gate；complete/non-admitting |
 | Phase D Task 39B2c v16 Failure Disposition | [Read-only Failure Audit](reports/phase-d-task-39b2c-iic-v16-failure-disposition.md) — schema v9；dual persistent Gate；historical status-82 failure，successor repair complete |
 | Phase D Task 39B2c v11 Failure Disposition | [Read-only Failure Audit](reports/phase-d-task-39b2c-iic-v11-failure-disposition.md) — consumed post-arm unclassified failure；schema-v2 diagnostic repair；non-admitting/non-retryable |
 | Phase D Task 39B2c v11 Failure Closure | [Completion Audit](reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md) — strict schema-v2 grammar、historical chain、post-fix review；complete/non-admitting |

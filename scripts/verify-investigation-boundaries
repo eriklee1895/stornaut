@@ -363,6 +363,7 @@ iicc_v13_external_evidence_root=
 iicc_v16_external_evidence_only=false
 iicc_v16_external_evidence_root=
 iicc_v16_predecessor_evidence_root=
+iicc_v13_raw_evidence_loss_contract_only=false
 iicc_persistent_gate_contract_only=false
 iicc_persistent_gate_mutation_contract_only=false
 iicc_persistent_gate_mutation_name=
@@ -390,6 +391,8 @@ iicc_v16_authorization_scope_only=false
 iicc_v16_authorization_scope_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6
 iicc_v17_authorization_scope_only=false
 iicc_v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625
+iicc_v13_raw_evidence_loss_scope_only=false
+iicc_v13_raw_evidence_loss_scope_baseline=35524e5512b9e1f15b1979a22778ad1a75a0c942
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -1049,6 +1052,9 @@ if (( $# > 0 )); then
         iicc_v16_external_evidence_only=true
         iicc_v16_predecessor_evidence_root=$2
         iicc_v16_external_evidence_root=$3
+    elif (( $# == 1 )) \
+        && [[ $1 == --iic-c-v13-raw-evidence-loss-contract-only ]]; then
+        iicc_v13_raw_evidence_loss_contract_only=true
     elif (( $# == 1 || $# == 6 )) \
         && [[ $1 == --iic-c-persistent-gate-contract-only ]]; then
         iicc_persistent_gate_contract_only=true
@@ -1101,6 +1107,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-v17-authorization-staged-scope-contract-only ]]; then
         iicc_v17_authorization_scope_only=true
         iicc_v17_authorization_scope_baseline=${2:-a69bd33df8b27e0660e628ec59be308342141625}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-v13-raw-evidence-loss-staged-scope-contract-only ]]; then
+        iicc_v13_raw_evidence_loss_scope_only=true
+        iicc_v13_raw_evidence_loss_scope_baseline=${2:-35524e5512b9e1f15b1979a22778ad1a75a0c942}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -13354,6 +13364,8 @@ function verify_iicc_failure_disposition_contract() {
     local v12_evidence=docs/reports/evidence/task-39-iic-v12-failure-disposition.json
     local v13_evidence=docs/reports/evidence/task-39-iic-v13-failure-disposition.json
     local v16_evidence=docs/reports/evidence/task-39-iic-v16-failure-disposition.json
+    local v13_loss=docs/reports/evidence/task-39-iic-v13-raw-evidence-loss.json
+    local v13_loss_verifier=scripts/verify-iic-v13-raw-evidence-loss
     local tests=Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
     local boundary=Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
     local report=docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md
@@ -13366,21 +13378,23 @@ function verify_iicc_failure_disposition_contract() {
     local path
     for path in $verifier $evidence $v9_evidence $v9_prior $v9_before_v10 \
         $v9_before_v11 $v10_evidence $v10_before_v11 $v11_evidence \
-        $v12_evidence $v13_evidence $v16_evidence $tests $boundary $report $v9_report \
+        $v12_evidence $v13_evidence $v16_evidence $v13_loss $v13_loss_verifier \
+        $tests $boundary $report $v9_report \
         $v10_report $v11_report $v12_report $v13_report $v16_report; do
         [[ -f $path && ! -L $path ]] || {
             print -u2 "ii-c-c failure disposition source unavailable: $path"
             return 1
         }
     done
-    [[ -x $verifier ]] || {
+    [[ -x $verifier && -x $v13_loss_verifier ]] || {
         print -u2 "ii-c-c failure disposition verifier is not executable"
         return 1
     }
     /bin/zsh -n $verifier || return $?
     /usr/bin/python3 -I - $verifier $evidence $v9_evidence $v9_prior \
         $v9_before_v10 $v9_before_v11 $v10_evidence $v10_before_v11 \
-        $v11_evidence $v12_evidence $v13_evidence $v16_evidence $tests $boundary $report \
+        $v11_evidence $v12_evidence $v13_evidence $v16_evidence $v13_loss \
+        $v13_loss_verifier $tests $boundary $report \
         $v9_report $v10_report $v11_report $v12_report $v13_report $v16_report <<'PY'
 from pathlib import Path
 import hashlib
@@ -13390,10 +13404,11 @@ import sys
 
 verifier, evidence, v9_evidence, v9_prior, v9_before_v10, v9_before_v11, \
 v10_evidence, v10_before_v11, v11_evidence, v12_evidence, v13_evidence, \
-v16_evidence, tests, boundary, report, v9_report, v10_report, v11_report, \
+v16_evidence, v13_loss, v13_loss_verifier, tests, boundary, report, v9_report, v10_report, v11_report, \
 v12_report, v13_report, v16_report = (
     Path(value) for value in sys.argv[1:])
 source = verifier.read_text(encoding="utf-8")
+loss_source = v13_loss_verifier.read_text(encoding="utf-8")
 test_source = tests.read_text(encoding="utf-8")
 boundary_source = boundary.read_text(encoding="utf-8")
 report_source = report.read_text(encoding="utf-8")
@@ -13486,6 +13501,23 @@ checked_digests = {
     v13_evidence: "09c62579bf4a78ce00f491993ccfbeb5f4cd22ed11e0e8744f1e52922080bafd",
     v16_evidence: "9705e4d659cd316a74aefbc5510a66af942e6e024763baeb52c5d192e37e08f6",
 }
+if hashlib.sha256(v13_loss.read_bytes()).hexdigest() \
+        != "cfad5245cdeff2688d88b6395c8aa93208c9cc938df21bae57bad80ec56d5022":
+    raise SystemExit("ii-c-c checked v13 raw evidence loss digest drifted")
+loss = json.loads(v13_loss.read_bytes())
+if (loss.get("classification") != "externalRawEvidenceLoss"
+        or loss.get("admission") != "rejected"
+        or loss.get("retry") != "forbidden"
+        or loss.get("temporalCorrelation", {}).get("relationship")
+            != "strongTemporalCorrelationOnly"
+        or loss.get("temporalCorrelation", {}).get("deletingActor")
+            != "notIndependentlyBound"):
+    raise SystemExit("ii-c-c checked v13 raw evidence loss drifted")
+for marker in ("v13-raw-loss-self-seal",
+               "v16 retained evidence verification",
+               "admission rejected; retry forbidden"):
+    if marker not in loss_source:
+        raise SystemExit("ii-c-c v13 raw evidence loss verifier drifted")
 
 for checked_path, classification, events in checked:
     if hashlib.sha256(checked_path.read_bytes()).hexdigest() \
@@ -13669,8 +13701,8 @@ for marker in (
         raise SystemExit("ii-c-c v16 external evidence gate drifted: " + marker)
 active_status_entries = (
     (Path("AGENTS.md"), "613589f14bf3973b8e3c4c1413c994b46d195759b77cf81b3e215206d5968e97"),
-    (Path("README.md"), "83ef031f29adf1998db7be646d01e1cf2fb9aa879e8824aecec761980cf160ee"),
-    (Path("docs/README.md"), "8ad6e40af7895936b5940db0ce2be45fd08f85f555bd6b1a0b4aeb31ba09745c"),
+    (Path("README.md"), "484bcf3be5af4ffa0637c07a2175f7e817b4c5f4272a5a7193afb0245eadf21c"),
+    (Path("docs/README.md"), "e26a048f593b0b0f4aec059558c40bf4d04311e8a993019ebc811e7fe4d7f971"),
     (Path("docs/agent/coding-agent-handoff.md"), "24cd431d3abf67a346905e2f15a90768cf0b90e1b47eff5e2af9c9946d19b2c5"),
     (Path("docs/plans/active/README.md"), "8ca778ea872d012f01e1f59464077a04e488a240a9a1f17f1ca5fc953b3e91b8"),
     (Path("docs/plans/active/phase-d-conditional-deep-dive.md"), "90c6a440c3711fd163620be12091afce2f8e9e9861add6f35c4fc68da9252d2e"),
@@ -13808,15 +13840,16 @@ semantic_status = {
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md"): (
         "Status: v16 consumed / non-admitting / non-retryable",
-        "Current authorization: v17", "No v17 launch\noccurred",
-        "v17 is superseded/unconsumed", "fa83c861-a7e2-4903-bf64-9eb08c757f74",
-        "authorized evidence-closure prerequisite\n  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal",
+        "Current authorization: v17",
+        "v17 launch occurred; v17 is superseded/unconsumed",
+        "fa83c861-a7e2-4903-bf64-9eb08c757f74",
+        "evidence-closure checkpoint is pushed at\n`103a4836f4aa80c5d3739ca357364ad5c9200cf6`",
         "checked failure disposition supersedes this pre-launch statement",
         "operator personally enters administrator credentials",
     ),
     Path("docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md"): (
         "v8-v13 and v16 consumed", "v14-v17 superseded",
-        "v13 purge disposition -> future raw-evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
+        "v13 purge disposition -> future evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
         "aggregate scope/xattr no-mutation evidence gaps",
         "v15 is superseded/unconsumed",
     ),
@@ -13942,6 +13975,130 @@ function verify_iicc_v16_external_evidence() {
     "$verifier" \
         "$iicc_v16_predecessor_evidence_root" "$PWD/$v13_disposition" \
         "$iicc_v16_external_evidence_root" "$PWD/$v16_disposition"
+}
+
+function verify_iicc_v13_raw_evidence_loss_contract() {
+    local parent=scripts/verify-iic-v13-raw-evidence-loss-contract
+    local verifier=scripts/verify-iic-v13-raw-evidence-loss
+    local failure_verifier=scripts/verify-investigation-runtime-machine-failure
+    local loss=docs/reports/evidence/task-39-iic-v13-raw-evidence-loss.json
+    local v13_disposition=docs/reports/evidence/task-39-iic-v13-failure-disposition.json
+    local v16_disposition=docs/reports/evidence/task-39-iic-v16-failure-disposition.json
+    local path
+    for path in $parent $verifier $failure_verifier $loss $v13_disposition \
+        $v16_disposition; do
+        [[ -f $path && ! -L $path ]] || {
+            print -u2 "ii-c-c v13 raw evidence loss source unavailable: $path"
+            return 1
+        }
+    done
+    [[ -x $parent && -x $verifier && -x $failure_verifier ]] || {
+        print -u2 "ii-c-c v13 raw evidence loss verifier is not executable"
+        return 1
+    }
+    /bin/zsh -n $parent $verifier $failure_verifier || return $?
+    /usr/bin/python3 -I - $parent $verifier $loss "$PWD" \
+        acc1e59eae83dbd44e4b6d260b535df9dfaf9564b6345bf09e8887f8ccd5a94b <<'PY' \
+        || return $?
+import hashlib
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+
+parent_path, verifier_path, receipt_path, root, parent_raw_sha = sys.argv[1:]
+parent_fd = os.open(parent_path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+try:
+    parent_metadata = os.fstat(parent_fd)
+    parent_source_bytes = os.pread(parent_fd, parent_metadata.st_size, 0)
+    parent_named = os.stat(parent_path, follow_symlinks=False)
+    if (not stat.S_ISREG(parent_metadata.st_mode)
+            or stat.S_IMODE(parent_metadata.st_mode) != 0o755
+            or parent_metadata.st_uid != os.getuid() or parent_metadata.st_nlink != 1
+            or (parent_metadata.st_dev, parent_metadata.st_ino, parent_metadata.st_gen)
+                != (parent_named.st_dev, parent_named.st_ino, parent_named.st_gen)
+            or hashlib.sha256(parent_source_bytes).hexdigest() != parent_raw_sha):
+        raise SystemExit("ii-c-c v13 raw evidence loss parent identity drifted")
+    parent_source = parent_source_bytes.decode("utf-8")
+    source = open(verifier_path, encoding="utf-8").read()
+    receipt_bytes = open(receipt_path, "rb").read()
+    parent_match = re.search(
+        r"(?m)^# v13_raw_loss_contract_self_sha=([0-9a-f]{64})$",
+        parent_source)
+    parent_normalized, parent_count = re.subn(
+        r"(?m)^# v13_raw_loss_contract_self_sha=[0-9a-f]{64}$",
+        "# v13_raw_loss_contract_self_sha=SELF", parent_source)
+    if (parent_match is None or parent_count != 1
+            or hashlib.sha256(parent_normalized.encode()).hexdigest()
+                != parent_match.group(1)):
+        raise SystemExit("ii-c-c v13 raw evidence loss parent self seal drifted")
+    match = re.search(
+        r"(?m)^typeset -r self_sha=([0-9a-f]{64}) # v13-raw-loss-self-seal$",
+        source)
+    normalized, count = re.subn(
+        r"(?m)^typeset -r self_sha=[0-9a-f]{64} # v13-raw-loss-self-seal$",
+        "typeset -r self_sha=SELF # v13-raw-loss-self-seal", source)
+    if (match is None or count != 1
+            or hashlib.sha256(normalized.encode()).hexdigest() != match.group(1)):
+        raise SystemExit("ii-c-c v13 raw evidence loss self seal drifted")
+    if hashlib.sha256(receipt_bytes).hexdigest() \
+            != "cfad5245cdeff2688d88b6395c8aa93208c9cc938df21bae57bad80ec56d5022":
+        raise SystemExit("ii-c-c v13 raw evidence loss receipt drifted")
+    value = json.loads(receipt_bytes)
+    if (value.get("classification") != "externalRawEvidenceLoss"
+            or value.get("admission") != "rejected"
+            or value.get("retry") != "forbidden"
+            or value.get("temporalCorrelation", {}).get("relationship")
+                != "strongTemporalCorrelationOnly"
+            or value.get("temporalCorrelation", {}).get("deletingActor")
+                != "notIndependentlyBound"
+            or "no recovery or reconstruction of removed raw evidence"
+                not in value.get("nonClaims", [])):
+        raise SystemExit("ii-c-c v13 raw evidence loss semantics drifted")
+    for forbidden in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+                      "os.remove", "os.unlink", "os.rename", "os.mkdir",
+                      "shutil", "SIGTERM", "SIGKILL"):
+        if forbidden in source:
+            raise SystemExit(
+                "ii-c-c v13 raw evidence loss verifier gained authority: " + forbidden)
+    for marker in ("exactRetainedEmptyPhaseTree",
+                   "v16 retained evidence verification",
+                   "phase changed during verification", "admission rejected",
+                   "retry forbidden"):
+        if marker not in source:
+            raise SystemExit(
+                "ii-c-c v13 raw evidence loss verifier drifted: " + marker)
+    for marker in ("input=loss_source", "O_NOFOLLOW",
+                   "pass_fds=(failure_fd,)", "revalidate(loss_path",
+                   "fake child output",
+                   'for mutation in ("unknown", "missing", "actor", "relationship")',
+                   '"missing-phase", "create-delete")'):
+        if marker not in parent_source:
+            raise SystemExit(
+                "ii-c-c v13 raw evidence loss parent drifted: " + marker)
+    result = subprocess.run(
+        ["/bin/zsh", "-f", "-s", "--", "--sealed-bytes", root],
+        input=parent_source_bytes, check=False, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, env={"HOME": "/var/empty",
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C"})
+    after = os.fstat(parent_fd)
+    named_after = os.stat(parent_path, follow_symlinks=False)
+    if ((after.st_dev, after.st_ino, after.st_gen, after.st_size,
+         after.st_mtime_ns, after.st_ctime_ns) !=
+        (parent_metadata.st_dev, parent_metadata.st_ino, parent_metadata.st_gen,
+         parent_metadata.st_size, parent_metadata.st_mtime_ns, parent_metadata.st_ctime_ns)
+            or (named_after.st_dev, named_after.st_ino, named_after.st_gen)
+                != (parent_metadata.st_dev, parent_metadata.st_ino, parent_metadata.st_gen)
+            or os.pread(parent_fd, after.st_size, 0) != parent_source_bytes):
+        raise SystemExit("ii-c-c v13 raw evidence loss parent changed during verification")
+    sys.stdout.buffer.write(result.stdout); sys.stderr.buffer.write(result.stderr)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+finally:
+    os.close(parent_fd)
+PY
 }
 
 function verify_iicc_persistent_gate_contract() {
@@ -14831,6 +14988,66 @@ function verify_iicc_v17_authorization_staged_scope() {
             && "$(print -r -- "$entry" | awk '{print $2}')" == \
             "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
             print -u2 "ii-c-c v17 authorization staged source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+}
+
+function verify_iicc_v13_raw_evidence_loss_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local scope_root=${STORNAUT_IICC_SCOPE_WORKTREE_ROOT:-$repo_root}
+    [[ $scope_root == /* && -d $scope_root && ! -L $scope_root ]] || {
+        print -u2 "ii-c-c v13 raw evidence loss scope root invalid"; return 1
+    }
+    local baseline=${1:-$iicc_v13_raw_evidence_loss_scope_baseline}
+    local expected_baseline=35524e5512b9e1f15b1979a22778ad1a75a0c942
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        $expected_baseline ]] || {
+        print -u2 "ii-c-c v13 raw evidence loss baseline drifted"; return 1
+    }
+    local -A ceilings=(
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120
+        scripts/verify-contract 260
+        scripts/verify-iic-v13-raw-evidence-loss 420
+        scripts/verify-iic-v13-raw-evidence-loss-contract 240
+        scripts/verify-investigation-boundaries 300
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#expected} == 5 && ${#observed} == 5 )) \
+        && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "ii-c-c v13 raw evidence loss paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md \
+            || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || {
+            print -u2 "ii-c-c v13 raw evidence loss binary path rejected"; return 1
+        }
+        (( add + delete <= ceilings[$checkpoint_path] )) || {
+            print -u2 "ii-c-c v13 raw evidence loss path budget drifted: $checkpoint_path"
+            return 1
+        }
+        (( total += add + delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 1_200 )) || {
+        print -u2 "ii-c-c v13 raw evidence loss aggregate budget drifted"; return 1
+    }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "ii-c-c v13 raw evidence loss index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" == \
+            "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
+            print -u2 "ii-c-c v13 raw evidence loss staged source drifted: $checkpoint_path"
             return 1
         }
     done
@@ -19743,6 +19960,11 @@ if $iicc_v16_external_evidence_only; then
     print "ii-c-c frozen v13 to v16 joint external evidence verification passed."
     exit 0
 fi
+if $iicc_v13_raw_evidence_loss_contract_only; then
+    verify_iicc_v13_raw_evidence_loss_contract
+    print "ii-c-c v13 raw evidence loss contract verification passed."
+    exit 0
+fi
 if $iicc_persistent_gate_contract_only \
     || $iicc_persistent_gate_mutation_contract_only; then
     verify_iicc_persistent_gate_contract
@@ -19788,6 +20010,12 @@ if $iicc_v17_authorization_scope_only; then
     verify_iicc_v17_authorization_staged_scope \
         "$iicc_v17_authorization_scope_baseline"
     print "ii-c-c v17 authorization staged scope verification passed."
+    exit 0
+fi
+if $iicc_v13_raw_evidence_loss_scope_only; then
+    verify_iicc_v13_raw_evidence_loss_staged_scope \
+        "$iicc_v13_raw_evidence_loss_scope_baseline"
+    print "ii-c-c v13 raw evidence loss staged scope verification passed."
     exit 0
 fi
 if $iicc_scope_contract_only; then

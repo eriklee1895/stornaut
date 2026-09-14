@@ -283,6 +283,54 @@ struct InvestigationMachineTargetBoundaryTests {
     }
 
     @Test
+    func v13RawEvidenceLossIsReadOnlyNonAdmittingAndExact() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-iic-v13-raw-evidence-loss"), encoding: .utf8)
+        let parent = try String(contentsOf: root.appending(
+            path: "scripts/verify-iic-v13-raw-evidence-loss-contract"),
+            encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let receipt = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v13-raw-evidence-loss.json"),
+            encoding: .utf8)
+        for marker in [
+            "v13-raw-loss-self-seal", "exactRetainedEmptyPhaseTree",
+            "v16 retained evidence verification",
+            "phase changed during verification",
+            "admission rejected; retry forbidden",
+        ] { #expect(verifier.contains(marker), "missing: \(marker)") }
+        for forbidden in [
+            "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+            "os.remove", "os.unlink", "os.rename", "os.mkdir",
+            "SIGTERM", "SIGKILL",
+        ] { #expect(!verifier.contains(forbidden), "forbidden: \(forbidden)") }
+        for marker in [
+            "v13_raw_loss_contract_self_sha=", "O_NOFOLLOW",
+            "requires verified-byte execution", "expected_loss=",
+            "expected_failure=", "input=loss_source",
+            "pass_fds=(failure_fd,)",
+            #"for mutation in ("unknown", "missing", "actor", "relationship")"#,
+            #""missing-phase", "create-delete")"#, "fake child output",
+        ] { #expect(parent.contains(marker), "missing: \(marker)") }
+        for marker in [
+            "v13_loss_scope_fixtures=(extra missing binary wrong-mode",
+            "${#v13_loss_scope_fixtures} + 1 == 9",
+            "iicc-v13-loss-untracked.swift",
+        ] { #expect(contract.contains(marker), "missing: \(marker)") }
+        for marker in [
+            #""classification" : "externalRawEvidenceLoss""#,
+            #""admission" : "rejected""#,
+            #""retry" : "forbidden""#,
+            #""relationship" : "strongTemporalCorrelationOnly""#,
+            #""deletingActor" : "notIndependentlyBound""#,
+            "exactRawArtifactBytesUnavailable",
+        ] { #expect(receipt.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
     func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let boundary = try String(contentsOf: root.appending(
@@ -1140,8 +1188,8 @@ struct InvestigationMachineTargetBoundaryTests {
         #expect(boundarySource(root).contains("active_status_entries"))
         let pinnedStatusDocs = [
             "(Path(\"AGENTS.md\"), \"613589f14bf3973b8e3c4c1413c994b46d195759b77cf81b3e215206d5968e97\")",
-            "(Path(\"README.md\"), \"83ef031f29adf1998db7be646d01e1cf2fb9aa879e8824aecec761980cf160ee\")",
-            "(Path(\"docs/README.md\"), \"8ad6e40af7895936b5940db0ce2be45fd08f85f555bd6b1a0b4aeb31ba09745c\")",
+            "(Path(\"README.md\"), \"484bcf3be5af4ffa0637c07a2175f7e817b4c5f4272a5a7193afb0245eadf21c\")",
+            "(Path(\"docs/README.md\"), \"e26a048f593b0b0f4aec059558c40bf4d04311e8a993019ebc811e7fe4d7f971\")",
             "(Path(\"docs/agent/coding-agent-handoff.md\"), \"24cd431d3abf67a346905e2f15a90768cf0b90e1b47eff5e2af9c9946d19b2c5\")",
             "(Path(\"docs/plans/active/README.md\"), \"8ca778ea872d012f01e1f59464077a04e488a240a9a1f17f1ca5fc953b3e91b8\")",
             "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"90c6a440c3711fd163620be12091afce2f8e9e9861add6f35c4fc68da9252d2e\")",
@@ -1175,7 +1223,7 @@ struct InvestigationMachineTargetBoundaryTests {
             "a supplemental sudo/PAM observation\\nis not campaign-bound",
             "v8-v13 and v16 consumed",
             "v8-v13 and v16 consumed",
-            "v13 purge disposition -> future raw-evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
+            "v13 purge disposition -> future evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
             "aggregate scope/xattr no-mutation evidence gaps",
             "Status: superseded before launch / unconsumed / reauthorization required",
             "v14 authorization based on `d5a7df3` was stopped before launch",
@@ -1187,13 +1235,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "103a4836f4aa80c5d3739ca357364ad5c9200cf6",
             "0cfccbf6e8a500365837b4cb9551f6ff70af4bbf",
             "The authorized invocation subsequently ran exactly once",
-            "authorized evidence-closure prerequisite\\n  `103a4836f4aa80c5d3739ca357364ad5c9200cf6` are equal",
             "Current authorization: v17",
             "a69bd33df8b27e0660e628ec59be308342141625",
             "f32d41c4a7bdf24519016666c942fe9ec5cf3789",
             "Once v17 durably records",
             "No v17 campaign UUID",
             "v17 remains unconsumed but is superseded",
+            "v13 purge disposition -> future evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
             "ii-c-c v13 supplemental observation became causal",
             "Task 40 start condition remains blocked",
         ]
