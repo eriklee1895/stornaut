@@ -67,6 +67,22 @@ package struct InvestigationHistoricalGateCapsule: Sendable, Equatable {
                 "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17")
         )
     }
+
+    package static func retainedV16() throws -> Self {
+        guard let attempt = UUID(
+            uuidString: "fa83c861-a7e2-4903-bf64-9eb08c757f74"
+        ) else {
+            throw InvestigationHandoffContractError.invalidValue
+        }
+        return try Self(
+            outerAttemptUUID: attempt,
+            wholeInputSHA256: .init(lowercaseHex:
+                "4aa74ea388fef92d833a4d3af5a191231d79ab4f8ede35348589662ce9b38e0a"),
+            byteCount: 29_029,
+            fileSHA256: .init(lowercaseHex:
+                "0858c551d0741e066e46e79b5317fb19da11c32a4064b3ef49e7e0377e5f2f1a")
+        )
+    }
 }
 
 package struct InvestigationProjectedCohortSelection:

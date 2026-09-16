@@ -5,7 +5,7 @@ import StornautInvestigationMachineGateSupport
 
 #if DEBUG
 package enum InvestigationFixedGateHandoffProductionProfile: Sendable {
-    case replacementAfterV13
+    case replacementAfterV13AndV16
 }
 
 extension InvestigationFixedGateHandoff {
@@ -14,8 +14,8 @@ extension InvestigationFixedGateHandoff {
     ) throws {
         let preservedCapsules: [InvestigationHistoricalGateCapsule]
         switch productionProfile {
-        case .replacementAfterV13:
-            preservedCapsules = [try .retainedV13()]
+        case .replacementAfterV13AndV16:
+            preservedCapsules = [try .retainedV13(), try .retainedV16()]
         }
         self.init(system: try DarwinInvestigationFixedGateHandoffSystem(
             preservedCapsules: preservedCapsules

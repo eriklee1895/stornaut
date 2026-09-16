@@ -3,7 +3,7 @@
 set -euo pipefail
 
 contract_source=${0:A}
-# ib2_self_sha=0759c1da07beeb334ced07d1b423b41bbfbac6974c7821e2788b1e649c33b884
+# ib2_self_sha=018efd5a840aa30c8acde09af440b0836a2cb37f9a9978fc551cd3495cb23ac8
 ib2_self_sha=$(sed -nE 's/^# ib2_self_sha=([0-9a-f]{64})$/\1/p' "$contract_source"); ib2_observed_sha=$(sed -E 's/^# ib2_self_sha=[0-9a-f]{64}$/# ib2_self_sha=SELF/' "$contract_source" | shasum -a 256 | awk '{ print $1 }')
 [[ ${#ib2_self_sha} == 64 && "$ib2_observed_sha" == "$ib2_self_sha" ]] || { print -u2 "Machine claim verifier self-seal drifted"; exit 1; }
 repo_root=${contract_source:h:h}
@@ -3994,6 +3994,10 @@ function verify_iicc_contract() {
     local v13_loss_mode=--iic-c-v13-raw-evidence-loss-contract-only
     local v13_loss_scope_baseline=35524e5512b9e1f15b1979a22778ad1a75a0c942
     local v13_loss_scope_mode=--iic-c-v13-raw-evidence-loss-staged-scope-contract-only
+    local v13_loss_scope_commit=8a28c5b0ea36d13ae279c2f804b0a528603ddb23
+    local v13_loss_scope_tree=34b019a969c4de81426d4f4ebd28171b4571488d
+    local p2_scope_baseline=8a28c5b0ea36d13ae279c2f804b0a528603ddb23
+    local p2_scope_mode=--iic-c-persistent-evidence-p2-staged-scope-contract-only
     local -a v13_loss_scope_paths=(
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
         scripts/verify-contract scripts/verify-iic-v13-raw-evidence-loss
@@ -4003,6 +4007,18 @@ function verify_iicc_contract() {
     local -a v17_authorization_scope_paths=(
         Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
         scripts/verify-contract scripts/verify-investigation-boundaries
+    )
+    local -a p2_scope_paths=(
+        Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift
+        Sources/StornautInvestigationMachineCampaign/main.swift
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift
+        Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift
+        Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift
+        scripts/verify-contract scripts/verify-investigation-boundaries
+        scripts/verify-investigation-runtime-machine-report
     )
     local baseline=622e7b99d57dfe482ccd37481fcdb4dcff87a0ec
     local implementation=2a29aff40fb39ec6465f75b2e70d43e3ba42ed4e
@@ -4090,7 +4106,7 @@ function verify_iicc_contract() {
         [[ $v17_authorization_scope_item == scripts/* ]] \
             && v17_authorization_scope_entry_mode=100755
         v17_authorization_scope_blob=$(git rev-parse \
-            "$v17_authorization_scope_commit:$v17_authorization_scope_item")
+            "${v17_authorization_scope_commit}:$v17_authorization_scope_item")
         GIT_INDEX_FILE="$v17_authorization_scope_index" git update-index --add \
             --cacheinfo "$v17_authorization_scope_entry_mode,$v17_authorization_scope_blob,$v17_authorization_scope_item"
     done
@@ -4105,8 +4121,32 @@ function verify_iicc_contract() {
         "$v17_authorization_scope_mode" "$v17_authorization_scope_baseline" \
         >"$out/v17-authorization-scope-actual.log"
     "$gate" "$v13_loss_mode" >"$out/v13-raw-evidence-loss.log"
-    "$gate" "$v13_loss_scope_mode" "$v13_loss_scope_baseline" \
-        >"$out/v13-raw-evidence-loss-scope.log"
+    [[ "$(git show -s --format=%P "$v13_loss_scope_commit")" == \
+        "$v13_loss_scope_baseline" \
+        && "$(git show -s --format=%T "$v13_loss_scope_commit")" == \
+        "$v13_loss_scope_tree" ]] \
+        || fail_contract "ii-c-c immutable v13 loss checkpoint drifted"
+    local v13_loss_frozen_index="$out/v13-loss-frozen.index"
+    local v13_loss_frozen_worktree="$out/v13-loss-frozen.worktree"
+    GIT_INDEX_FILE="$v13_loss_frozen_index" git read-tree \
+        "$v13_loss_scope_tree"
+    local v13_loss_scope_item v13_loss_scope_entry_mode v13_loss_scope_blob
+    for v13_loss_scope_item in "${v13_loss_scope_paths[@]}"; do
+        v13_loss_scope_entry_mode=100644
+        [[ $v13_loss_scope_item == scripts/* ]] && v13_loss_scope_entry_mode=100755
+        v13_loss_scope_blob=$(git rev-parse \
+            "${v13_loss_scope_commit}:$v13_loss_scope_item")
+        GIT_INDEX_FILE="$v13_loss_frozen_index" git update-index --add \
+            --cacheinfo "$v13_loss_scope_entry_mode,$v13_loss_scope_blob,$v13_loss_scope_item"
+    done
+    /bin/mkdir -p "$v13_loss_frozen_worktree"
+    GIT_INDEX_FILE="$v13_loss_frozen_index" \
+        GIT_WORK_TREE="$v13_loss_frozen_worktree" git checkout-index -a
+    env GIT_DIR="$repo_root/.git" GIT_INDEX_FILE="$v13_loss_frozen_index" \
+        GIT_WORK_TREE="$v13_loss_frozen_worktree" \
+        STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$v13_loss_frozen_worktree" \
+        "$v13_loss_frozen_worktree/$gate" "$v13_loss_scope_mode" \
+        "$v13_loss_scope_baseline" >"$out/v13-raw-evidence-loss-scope.log"
     [[ "$(git show -s --format=%P "$implementation")" == "$baseline" \
         && "$(git show -s --format=%T "$implementation")" == "$implementation_tree" ]] \
         || fail_contract "ii-c-c immutable implementation drifted"
@@ -4193,30 +4233,72 @@ slots = ("contract","capsule","ownership","handoff","coordinator",
 mutations = (
     ("production-preservation-regression", "coordinator",
      "let value = try InvestigationFixedGateHandoff(\n"
-     "            productionProfile: .replacementAfterV13\n"
+     "            productionProfile: .replacementAfterV13AndV16\n"
      "          ).run(",
      "let value = try InvestigationFixedGateHandoff().run("),
     ("producer-schema-downgrade", "campaign",
-     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4',
-     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3'),
+     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:5',
+     'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4'),
     ("producer-cache-path", "campaign",
      '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
      '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    ("producer-evidence-tmpdir", "campaign",
+     'candidate = URL(filePath: String(cString: home), directoryHint: .isDirectory)\n'
+     '                .appending(path: "Library/Application Support",\n'
+     '                    directoryHint: .isDirectory)',
+     'candidate = FileManager.default.temporaryDirectory'),
     ("producer-inventory-bypass", "campaign",
-     '+ (preserved.map { [$0.attemptName] } ?? [])',
+     '+ preserved.map(\\.attemptName)',
      '+ []'),
     ("producer-lock-bypass", "campaign",
      "flock(lock, LOCK_EX | LOCK_NB) == 0", "true"),
     ("producer-close-bypass", "campaign",
      "guard closeAll(&descriptors, using: closeDescriptor) else {",
      "guard true else { throw invalid() }"),
-    ("swift-schema-four-drop", "evidence",
-     "? [schemaVersion, 2, 3, 4]", "? [schemaVersion, 2, 3]"),
+    ("producer-parent-sync-bypass", "campaign",
+     "do {\n"
+     "            try system.synchronize(descriptor: supportDescriptor)\n"
+     "        } catch {\n"
+     "            let residue = rollbackEmptyParent(",
+     "do {\n"
+     "            _ = supportDescriptor\n"
+     "        } catch {\n"
+     "            let residue = rollbackEmptyParent("),
+    ("producer-parent-rollback-bypass", "campaign",
+     "let residue = rollbackEmptyParent(\n"
+     "                supportDescriptor: supportDescriptor, leaf: leaf,\n"
+     "                expected: created, descriptor: nil, system: system\n"
+     "            )",
+     "let residue = InvestigationMachineEvidenceParentSetupError.Residue.preserved"),
+    ("producer-parent-residue-report-bypass", "campaign",
+     "stage: .initializeWriter, residue: residue\n"
+     "                )\n"
+     "                Self.reportEvidenceParentSetup(setup)\n"
+     "                throw setup",
+     "stage: .initializeWriter, residue: residue\n"
+     "                )\n"
+     "                throw setup"),
+    ("swift-schema-five-drop", "evidence",
+     "? [schemaVersion, 2, 3, 4, 5]", "? [schemaVersion, 2, 3, 4]"),
     ("swift-lock-exclusive-bypass", "evidence",
-     'boolean(object, "persistentGateLockExclusive") == true', "true"),
+     'integer(object, "persistentGateLockByteCount") == 0,\n'
+     '                    boolean(object, "persistentGateLockExclusive") == true\n'
+     '                else { throw invalid() }\n'
+     '            }\n'
+     '        case .verifierInput:',
+     'integer(object, "persistentGateLockByteCount") == 0,\n'
+     '                    true\n'
+     '                else { throw invalid() }\n'
+     '            }\n'
+     '        case .verifierInput:'),
     ("verifier-admission-downgrade", "verifier",
-     "elif teardown_schema == 4:",
-     "elif teardown_schema == 3:"),
+     "elif teardown_schema in (4, 5):",
+     "elif teardown_schema == 4:"),
+    ("verifier-evidence-path-bypass", "verifier",
+     'require(os.path.dirname(root_path) == expected_parent\n'
+     '                            and os.path.dirname(seal_path) == expected_parent\n'
+     '                            and os.path.basename(seal_path) == "seal.json",',
+     'require(True,'),
     ("verifier-path-regression", "verifier",
      '"preserved persistent Gate relative path")\n    base_path = canonical_absolute_path(\n        home + "/" + evidence["persistentGateRelativePath"])',
      '"preserved persistent Gate relative path")\n    base_path = canonical_absolute_path(\n        home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate")'),
@@ -4823,7 +4905,7 @@ PY
             v17_authorization_scope_expected="ii-c-c v17 authorization paths drifted";;
           missing)
             v17_authorization_scope_blob=$(git rev-parse \
-                "$v17_authorization_scope_baseline:${v17_authorization_scope_paths[1]}")
+                "${v17_authorization_scope_baseline}:${v17_authorization_scope_paths[1]}")
             GIT_INDEX_FILE="$v17_authorization_scope_bad" git update-index \
                 --cacheinfo "100644,$v17_authorization_scope_blob,${v17_authorization_scope_paths[1]}"
             v17_authorization_scope_expected="ii-c-c v17 authorization paths drifted";;
@@ -4834,7 +4916,8 @@ PY
                 --cacheinfo "100644,$v17_authorization_scope_blob,${v17_authorization_scope_paths[1]}"
             v17_authorization_scope_expected="ii-c-c v17 authorization binary path rejected";;
           wrong-mode)
-            v17_authorization_scope_blob=$(git hash-object -- scripts/verify-contract)
+            v17_authorization_scope_blob=$(git rev-parse \
+                "${v17_authorization_scope_commit}:scripts/verify-contract")
             GIT_INDEX_FILE="$v17_authorization_scope_bad" git update-index \
                 --cacheinfo "100644,$v17_authorization_scope_blob,scripts/verify-contract"
             v17_authorization_scope_expected="ii-c-c v17 authorization staged source drifted: scripts/verify-contract";;
@@ -4939,7 +5022,7 @@ PY
                 "ii-c-c v13 raw evidence loss scope diagnostic drifted: $label: $actual"
     }
     local v13_loss_scope_index="$out/v13-loss-scope.index"
-    cp "$(git rev-parse --git-path index)" "$v13_loss_scope_index"
+    cp "$v13_loss_frozen_index" "$v13_loss_scope_index"
     local -a v13_loss_scope_fixtures=(extra missing binary wrong-mode \
         over-budget aggregate-budget staged-worktree-divergence wrong-baseline)
     (( ${#v13_loss_scope_fixtures} + 1 == 9 )) \
@@ -4960,7 +5043,7 @@ PY
             v13_loss_scope_expected="ii-c-c v13 raw evidence loss paths drifted";;
           missing)
             v13_loss_scope_blob=$(git rev-parse \
-                "$v13_loss_scope_baseline:${v13_loss_scope_paths[1]}")
+                "${v13_loss_scope_baseline}:${v13_loss_scope_paths[1]}")
             GIT_INDEX_FILE="$v13_loss_scope_bad" git update-index \
                 --cacheinfo "100644,$v13_loss_scope_blob,${v13_loss_scope_paths[1]}"
             v13_loss_scope_expected="ii-c-c v13 raw evidence loss paths drifted";;
@@ -4970,8 +5053,8 @@ PY
                 --cacheinfo "100644,$v13_loss_scope_blob,${v13_loss_scope_paths[1]}"
             v13_loss_scope_expected="ii-c-c v13 raw evidence loss binary path rejected";;
           wrong-mode)
-            v13_loss_scope_blob=$(git hash-object -- \
-                scripts/verify-iic-v13-raw-evidence-loss-contract)
+            v13_loss_scope_blob=$(git rev-parse \
+                "${v13_loss_scope_commit}:scripts/verify-iic-v13-raw-evidence-loss-contract")
             GIT_INDEX_FILE="$v13_loss_scope_bad" git update-index \
                 --cacheinfo "100644,$v13_loss_scope_blob,scripts/verify-iic-v13-raw-evidence-loss-contract"
             v13_loss_scope_expected="ii-c-c v13 raw evidence loss staged source drifted: scripts/verify-iic-v13-raw-evidence-loss-contract";;
@@ -5065,6 +5148,155 @@ PY
           STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$v13_loss_untracked_worktree" \
           "$v13_loss_untracked_worktree/$gate" "$v13_loss_scope_mode" \
           "$v13_loss_scope_baseline" )
+
+    "$gate" "$p2_scope_mode" "$p2_scope_baseline" >"$out/p2-scope.log"
+    local p2_scope_index="$out/p2-scope.index"
+    cp "$(git rev-parse --git-path index)" "$p2_scope_index"
+    function materialize_iicc_p2_scope_worktree() {
+        local scope_index=$1 scope_worktree=$2
+        rm -rf -- "$scope_worktree"
+        mkdir -p "$scope_worktree"
+        GIT_INDEX_FILE="$scope_index" GIT_WORK_TREE="$scope_worktree" \
+            git checkout-index -a
+    }
+    function reject_iicc_p2_scope() {
+        local label=$1 expected=$2; shift 2
+        local log="$out/p2-scope-$label.log" scope_rc=0 actual
+        "$@" >"$log" 2>&1 || scope_rc=$?
+        (( scope_rc != 0 )) \
+            || fail_contract "ii-c-c persistent evidence P2 scope accepted: $label"
+        actual=$(<"$log")
+        [[ "$actual" == "$expected" ]] \
+            || fail_contract \
+                "ii-c-c persistent evidence P2 scope diagnostic drifted: $label: $actual"
+    }
+    local -a p2_scope_fixtures=(extra missing binary wrong-mode over-budget \
+        aggregate-budget index-divergence wrong-baseline)
+    (( ${#p2_scope_fixtures} + 1 == 9 )) \
+        || fail_contract "ii-c-c persistent evidence P2 scope negative inventory drifted"
+    local p2_scope_fixture p2_scope_bad p2_scope_expected p2_scope_blob
+    local p2_scope_baseline_arg p2_scope_worktree p2_scope_path p2_scope_mode_bits
+    for p2_scope_fixture in "${p2_scope_fixtures[@]}"; do
+        p2_scope_bad="$out/p2-scope-$p2_scope_fixture.index"
+        cp "$p2_scope_index" "$p2_scope_bad"
+        p2_scope_baseline_arg=$p2_scope_baseline
+        p2_scope_worktree="$out/p2-scope-$p2_scope_fixture.worktree"
+        case $p2_scope_fixture in
+          extra)
+            p2_scope_blob=$(print extra | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$p2_scope_bad" git update-index --add \
+                --cacheinfo "100644,$p2_scope_blob,iicc-p2-extra.swift"
+            p2_scope_expected="ii-c-c persistent evidence P2 paths drifted";;
+          missing)
+            p2_scope_blob=$(git rev-parse \
+                "${p2_scope_baseline}:${p2_scope_paths[1]}")
+            GIT_INDEX_FILE="$p2_scope_bad" git update-index \
+                --cacheinfo "100644,$p2_scope_blob,${p2_scope_paths[1]}"
+            p2_scope_expected="ii-c-c persistent evidence P2 paths drifted";;
+          binary)
+            p2_scope_blob=$(printf '\0iicc-p2\n' | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$p2_scope_bad" git update-index \
+                --cacheinfo "100644,$p2_scope_blob,${p2_scope_paths[1]}"
+            p2_scope_expected="ii-c-c persistent evidence P2 binary path rejected";;
+          wrong-mode)
+            p2_scope_blob=$(GIT_INDEX_FILE="$p2_scope_bad" git rev-parse \
+                ":scripts/verify-contract")
+            GIT_INDEX_FILE="$p2_scope_bad" git update-index \
+                --cacheinfo "100644,$p2_scope_blob,scripts/verify-contract"
+            p2_scope_expected="ii-c-c persistent evidence P2 staged source drifted: scripts/verify-contract";;
+          over-budget)
+            p2_scope_path=Sources/StornautInvestigationMachineCampaign/main.swift
+            local p2_current p2_add p2_source
+            p2_current=$(GIT_INDEX_FILE="$p2_scope_bad" git diff --cached \
+                --numstat "$p2_scope_baseline" -- "$p2_scope_path" \
+                | awk '{ print $1 + $2 }')
+            p2_add=$(( 701 - p2_current ))
+            p2_source="$out/p2-over-budget.swift"
+            GIT_INDEX_FILE="$p2_scope_bad" git show ":$p2_scope_path" >"$p2_source"
+            for item in {1..$p2_add}; do print "// iicc-p2-over-$item"; done \
+                >>"$p2_source"
+            p2_scope_blob=$(git hash-object -w -- "$p2_source")
+            GIT_INDEX_FILE="$p2_scope_bad" git update-index \
+                --cacheinfo "100644,$p2_scope_blob,$p2_scope_path"
+            p2_scope_expected="ii-c-c persistent evidence P2 path budget drifted: $p2_scope_path";;
+          aggregate-budget)
+            local p2_total p2_current p2_capacity p2_add p2_source p2_line
+            local -A p2_ceilings=(
+                Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift 80
+                Sources/StornautInvestigationMachineCampaign/main.swift 700
+                Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 900
+                Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 160
+                Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift 160
+                scripts/verify-contract 350
+                scripts/verify-investigation-runtime-machine-report 350
+            )
+            p2_total=$(GIT_INDEX_FILE="$p2_scope_bad" git diff --cached \
+                --numstat "$p2_scope_baseline" -- \
+                | awk 'index($3,"docs/")!=1&&$3!="AGENTS.md"&&$3!="README.md"{ total += $1 + $2 } END { print total + 0 }')
+            for p2_scope_path in ${(k)p2_ceilings}; do
+                (( p2_total > 2_500 )) && break
+                p2_current=$(GIT_INDEX_FILE="$p2_scope_bad" git diff --cached \
+                    --numstat "$p2_scope_baseline" -- "$p2_scope_path" \
+                    | awk '{ print $1 + $2 }')
+                p2_capacity=$(( p2_ceilings[$p2_scope_path] - p2_current ))
+                (( p2_capacity > 0 )) || continue
+                p2_add=$(( 2_501 - p2_total ))
+                (( p2_add > p2_capacity )) && p2_add=$p2_capacity
+                p2_source="$out/p2-aggregate-${p2_scope_path//\//_}"
+                GIT_INDEX_FILE="$p2_scope_bad" git show ":$p2_scope_path" \
+                    >"$p2_source"
+                p2_line=1
+                while (( p2_line <= p2_add )); do
+                    [[ $p2_scope_path == scripts/* ]] \
+                        && print "# iicc-p2-aggregate-$p2_line" \
+                        || print "// iicc-p2-aggregate-$p2_line"
+                    (( p2_line += 1 ))
+                done >>"$p2_source"
+                p2_scope_blob=$(git hash-object -w -- "$p2_source")
+                p2_scope_mode_bits=100644
+                [[ $p2_scope_path == scripts/* ]] && p2_scope_mode_bits=100755
+                GIT_INDEX_FILE="$p2_scope_bad" git update-index \
+                    --cacheinfo "$p2_scope_mode_bits,$p2_scope_blob,$p2_scope_path"
+                (( p2_total += p2_add ))
+            done
+            (( p2_total == 2_501 )) \
+                || fail_contract "ii-c-c persistent evidence P2 aggregate fixture unavailable"
+            p2_scope_expected="ii-c-c persistent evidence P2 aggregate budget drifted";;
+          index-divergence)
+            p2_scope_blob=$( { GIT_INDEX_FILE="$p2_scope_bad" \
+                    git show ":${p2_scope_paths[1]}";
+                    print '// iicc-p2-index-divergence'; } | git hash-object -w --stdin)
+            GIT_INDEX_FILE="$p2_scope_bad" git update-index \
+                --cacheinfo "100644,$p2_scope_blob,${p2_scope_paths[1]}"
+            p2_scope_expected="ii-c-c persistent evidence P2 index/worktree drifted";;
+          wrong-baseline)
+            p2_scope_baseline_arg=$p2_scope_baseline^
+            p2_scope_expected="ii-c-c persistent evidence P2 baseline drifted";;
+        esac
+        if [[ $p2_scope_fixture == index-divergence ]]; then
+            materialize_iicc_p2_scope_worktree \
+                "$p2_scope_index" "$p2_scope_worktree"
+        else
+            materialize_iicc_p2_scope_worktree \
+                "$p2_scope_bad" "$p2_scope_worktree"
+        fi
+        reject_iicc_p2_scope "$p2_scope_fixture" "$p2_scope_expected" env \
+            GIT_DIR="$(git rev-parse --absolute-git-dir)" \
+            GIT_INDEX_FILE="$p2_scope_bad" GIT_WORK_TREE="$p2_scope_worktree" \
+            STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$p2_scope_worktree" \
+            "$p2_scope_worktree/$gate" "$p2_scope_mode" \
+            "$p2_scope_baseline_arg"
+    done
+    ( local p2_untracked_worktree="$out/p2-scope-untracked.worktree"
+      materialize_iicc_p2_scope_worktree "$p2_scope_index" "$p2_untracked_worktree"
+      print x >"$p2_untracked_worktree/iicc-p2-untracked.swift"
+      reject_iicc_p2_scope untracked \
+          "ii-c-c persistent evidence P2 index/worktree drifted" env \
+          GIT_DIR="$(git rev-parse --absolute-git-dir)" \
+          GIT_INDEX_FILE="$p2_scope_index" GIT_WORK_TREE="$p2_untracked_worktree" \
+          STORNAUT_IICC_SCOPE_WORKTREE_ROOT="$p2_untracked_worktree" \
+          "$p2_untracked_worktree/$gate" "$p2_scope_mode" \
+          "$p2_scope_baseline" )
     (
         local account_home persistent_base physical_out scratch_parent scratch_base
         account_home=$(/usr/bin/python3 -I - <<'PY'
@@ -5239,7 +5471,7 @@ PY
                 >"$out/persistent-gate-v13-failure.log" || exit $?
             STORNAUT_TASK39_PERSISTENT_GATE_BASE="$persistent_base" \
                 /usr/bin/swift test --no-parallel \
-                --filter InvestigationMachineCampaignEvidenceTests.independentVerifierAdmitsOnlySchemaFourWithExactPreservedV13Gate \
+                --filter InvestigationMachineCampaignEvidenceTests.independentVerifierReadsButDoesNotAdmitHistoricalSchemaFour \
                 >"$out/persistent-gate-positive.log" || exit $?
         elif [[ $persistent_inventory == $'.owner-lock-v1\nattempt-a77c4d21-9bba-46f6-b694-3d1d1e55209d\nattempt-fa83c861-a7e2-4903-bf64-9eb08c757f74' ]]; then
             local v16_root
@@ -5905,7 +6137,7 @@ replacement = '''    static func main() async {
 Path(sys.argv[2]).write_text(source.replace(needle, replacement, 1))
 PY
     reject_iicc_protocol lifecycle-outer-main-spawn-alias \
-        'ii-c-b2b2 lifecycle actor drifted' \
+        'ii-c-b2b2 debug executable drifted' \
         "$gate" --iic-b2b2-source-contract-only \
         Package.swift "$lifecycle_outer_main_spawn_alias" \
         Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c \

@@ -497,17 +497,14 @@ struct InvestigationMachineTargetBoundaryTests {
             "ii-c-b2b2 lifecycle call-graph drifted",
             "ii-c-b2b2 debug executable drifted",
             "debug_executable = executable[:executable.index(debug_end)]",
-            "46dc6df47dbb80116dfce4443ec3f3fa6cb696b78404d62549a910610c6d9aca",
-            "1bc1f3ad259aa4d12c8181a2810bf9a669d1ebe4b5613120b6b83aa952c1d940",
+            "3dc4965de2e781653f5ea9954106e2cbbb03d2e93efbdfc65bdaa569c93586e3",
             "actor_source = executable.split(actor_marker, 1)[1]",
             "ii-c-b2b2 lifecycle actor drifted",
             "actor_block = executable[executable.index(actor_marker):",
-            "6a9dfdc4744e3869b3acee1647d664b748c61e15d96e2eaddcdb81a1805fc0df",
-            "664559633ca2f2b2ea211db2310717c32998ffe2bd351f875ffb6d3516a85198",
+            "b789b30bd0bd298fdfb0b9a4c64526047864a52945c29d7806f19ecbc56a185a",
             "require_body_digest(",
             "fea0c249566d0f57babb384980713873ed4a303e7943e5490d25d01e1357215c",
             "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
-            "67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac",
             "1a6411186393b37b8339281174ef1d803d9404d762aea161a2e120c160f23b2e",
             "active_executable.count('Self.runLifecycle(') != 3",
             "active_executable.count('runFixed(') != 4",
@@ -820,8 +817,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "production-preservation-regression", "producer-schema-downgrade",
             "producer-cache-path", "producer-inventory-bypass",
             "producer-lock-bypass", "producer-close-bypass",
-            "swift-schema-four-drop",
+            "swift-schema-five-drop",
             "swift-lock-exclusive-bypass", "verifier-admission-downgrade",
+            "verifier-evidence-path-bypass",
             "verifier-path-regression", "verifier-lock-bypass",
             "verifier-identity-bypass", "verifier-revalidation-bypass",
             "snapshot-xattr-drop",
@@ -859,6 +857,13 @@ struct InvestigationMachineTargetBoundaryTests {
             "STORNAUT_IICC_SCOPE_WORKTREE_ROOT=\"$authorization_scope_target_worktree\"",
             "ii-c-c authorization scope negative inventory drifted",
             "iicc-authorization-untracked.swift",
+            "p2_scope_mode=--iic-c-persistent-evidence-p2-staged-scope-contract-only",
+            "p2_scope_baseline=8a28c5b0ea36d13ae279c2f804b0a528603ddb23",
+            "p2_scope_fixtures=(extra missing binary wrong-mode over-budget",
+            "aggregate-budget index-divergence wrong-baseline",
+            "${#p2_scope_fixtures} + 1 == 9",
+            "ii-c-c persistent evidence P2 scope negative inventory drifted",
+            "iicc-p2-untracked.swift",
         ] {
             #expect(aggregate.contains(marker), "missing: \(marker)")
         }
@@ -983,9 +988,10 @@ struct InvestigationMachineTargetBoundaryTests {
             "observeIfPresent(basePath: String)",
             "persistentGateRelativePath", "persistentGateBaseDevice",
             "persistentGateLockInode", "persistentGateLockExclusive",
-            "schemaVersion:4",
+            "schemaVersion:5", "observePreservingV13AndV16",
+            "preservedGateCapsules", "Application Support",
         ] { #expect(campaign.contains(marker), "missing: \(marker)") }
-        #expect(evidence.contains("? [schemaVersion, 2, 3, 4]"))
+        #expect(evidence.contains("? [schemaVersion, 2, 3, 4, 5]"))
         for marker in [
             "def open_persistent_gate(owner, evidence):",
             "def revalidate_persistent_gate(gate, owner):",
@@ -993,8 +999,9 @@ struct InvestigationMachineTargetBoundaryTests {
             "persistent Gate base inventory",
         ] { #expect(verifier.contains(marker), "missing: \(marker)") }
         #expect(contract.contains("static func retainedV13() throws -> Self"))
+        #expect(contract.contains("static func retainedV16() throws -> Self"))
         #expect(coordinator.contains(
-            "productionProfile: .replacementAfterV13"))
+            "productionProfile: .replacementAfterV13AndV16"))
         #expect(!coordinator.contains("preservedCapsules:"))
         #expect(!coordinator.contains("InvestigationFixedGateHandoff()"))
         #expect(!handoff.contains("package convenience init()"))
@@ -1004,9 +1011,11 @@ struct InvestigationMachineTargetBoundaryTests {
             "physicalFixtureProfile: InvestigationFixedGateHandoffPhysicalFixtureProfile"))
         #expect(physical.contains(
             "-DSTORNAUT_FIXED_GATE_PHYSICAL_FIXTURE"))
-        #expect(campaign.contains("observePreservingV13(basePath: base)"))
-        #expect(campaign.contains("schemaVersion:4"))
-        #expect(verifier.contains("admitting preserved persistent Gate schema"))
+        #expect(campaign.contains(
+            "observePreservingV13AndV16(basePath: base)"))
+        #expect(campaign.contains("schemaVersion:5"))
+        #expect(verifier.contains(
+            "admitting dual preserved persistent Gate schema"))
     }
 
     @Test

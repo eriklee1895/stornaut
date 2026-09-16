@@ -100,9 +100,311 @@ package enum InvestigationMachineCampaignExecutableReportError: Error {
     case invalid
 }
 
+package enum InvestigationMachineEvidenceParentSetupError:
+    Error, Equatable, Sendable
+{
+    package enum Stage: String, Equatable, Sendable {
+        case validateApplicationSupport
+        case createParent
+        case synchronizeCreation
+        case openParent
+        case validateParent
+        case closeApplicationSupport
+        case initializeWriter
+        case publishInitialEvidence
+    }
+
+    package enum Residue: String, Equatable, Sendable {
+        case none
+        case removed
+        case preserved
+        case uncertain
+    }
+
+    case failed(stage: Stage, residue: Residue)
+}
+
+package enum InvestigationMachineInitialEvidencePublisher {
+    package static func publish(
+        _ bytes: Data, writer: InvestigationMachineRawEvidenceWriter
+    ) throws {
+        do {
+            _ = try writer.writeArtifact(path: .init(
+                phase: .preflight, leafName: "source-build.json"),
+                role: .sourceBuildIdentity, encoding: .strictJSON, bytes: bytes)
+        } catch {
+            throw InvestigationMachineEvidenceParentSetupError.failed(
+                stage: .publishInitialEvidence, residue: .preserved)
+        }
+    }
+}
+
+package struct InvestigationMachineEvidenceParentLocation:
+    Equatable, Sendable
+{
+    package let path: String
+    package let descriptor: Int32
+    package let metadata: InvestigationMachineEvidenceNodeMetadata
+    package var identity: InvestigationMachineEvidenceNodeIdentity {
+        metadata.identity
+    }
+}
+
+package enum InvestigationMachineEvidenceParentTransaction {
+    private static let directoryFlags = Int32(
+        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW_ANY
+            | O_RESOLVE_BENEATH | O_UNIQUE
+    )
+    private static let namedFlags = Int32(
+        AT_SYMLINK_NOFOLLOW_ANY | AT_RESOLVE_BENEATH | AT_UNIQUE
+    )
+    private static let unlinkFlags = Int32(
+        AT_NODELETEBUSY | AT_UNIQUE | AT_SYMLINK_NOFOLLOW_ANY
+            | AT_RESOLVE_BENEATH | AT_REMOVEDIR
+    )
+
+    package static func create(
+        campaignUUID: UUID, applicationSupportDirectory: URL? = nil,
+        system: any InvestigationMachineRawEvidenceSystem
+    ) throws -> InvestigationMachineEvidenceParentLocation {
+        let url = try InvestigationMachineCampaignExecutable.evidenceParentURL(
+            campaignUUID: campaignUUID,
+            applicationSupportDirectory: applicationSupportDirectory
+        )
+        let support = url.deletingLastPathComponent().path
+        let leaf = url.lastPathComponent
+        let supportDescriptor = open(
+            support, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NONBLOCK
+                | O_NOFOLLOW_ANY | O_UNIQUE
+        )
+        guard supportDescriptor >= 3 else {
+            throw failure(.validateApplicationSupport, .none)
+        }
+        var supportOpen = true
+        defer { if supportOpen { _ = Darwin.close(supportDescriptor) } }
+
+        var supportNode = stat()
+        guard fstat(supportDescriptor, &supportNode) == 0,
+              supportNode.st_mode & S_IFMT == S_IFDIR,
+              supportNode.st_uid == getuid(), supportNode.st_gid == getgid(),
+              supportNode.st_mode & 0o022 == 0, supportNode.st_nlink > 0
+        else {
+            throw failure(.validateApplicationSupport, .none)
+        }
+        do {
+            try system.createDirectory(
+                parentDescriptor: supportDescriptor, name: leaf, mode: 0o700
+            )
+        } catch {
+            throw failure(.createParent, .none)
+        }
+
+        let created: InvestigationMachineEvidenceNodeMetadata
+        do {
+            created = try system.namedMetadata(
+                parentDescriptor: supportDescriptor, name: leaf,
+                flags: namedFlags
+            )
+            guard validCreatedParent(created, supportNode: supportNode) else {
+                let residue = rollbackEmptyParent(
+                    supportDescriptor: supportDescriptor, leaf: leaf,
+                    expected: created, descriptor: nil, system: system
+                )
+                throw failure(.validateParent, residue)
+            }
+        } catch let error as InvestigationMachineEvidenceParentSetupError {
+            throw error
+        } catch {
+            throw failure(.validateParent, .uncertain)
+        }
+        do {
+            try system.synchronize(descriptor: supportDescriptor)
+        } catch {
+            let residue = rollbackEmptyParent(
+                supportDescriptor: supportDescriptor, leaf: leaf,
+                expected: created, descriptor: nil, system: system
+            )
+            throw failure(.synchronizeCreation, residue)
+        }
+
+        var descriptor = Int32(-1)
+        var opened = false
+        do {
+            descriptor = try system.openComponent(
+                parentDescriptor: supportDescriptor, name: leaf,
+                flags: directoryFlags, mode: nil
+            )
+            guard descriptor >= 3, descriptor != supportDescriptor else {
+                throw failure(.openParent, .preserved)
+            }
+            opened = true
+            let held = try system.metadata(descriptor: descriptor)
+            let named = try system.namedMetadata(
+                parentDescriptor: supportDescriptor, name: leaf,
+                flags: namedFlags
+            )
+            guard held == named, held == created,
+                  validCreatedParent(held, supportNode: supportNode),
+                  try system.descriptorFlags(descriptor) & FD_CLOEXEC == FD_CLOEXEC,
+                  try system.descriptorStatusFlags(descriptor) & O_ACCMODE == O_RDONLY,
+                  try system.extendedACLIsEmpty(descriptor: descriptor),
+                  try system.extendedAttributeNames(descriptor: descriptor).isEmpty
+            else {
+                throw failure(.validateParent, .preserved)
+            }
+        } catch {
+            let residue = rollbackEmptyParent(
+                supportDescriptor: supportDescriptor, leaf: leaf,
+                expected: created, descriptor: descriptor >= 3 ? descriptor : nil,
+                system: system
+            )
+            descriptor = -1
+            throw failure(opened ? .validateParent : .openParent, residue)
+        }
+
+        do {
+            try system.close(descriptor: supportDescriptor)
+            supportOpen = false
+        } catch {
+            supportOpen = false
+            _ = closeParent(&descriptor, system: system)
+            throw failure(.closeApplicationSupport, .uncertain)
+        }
+        return .init(path: url.path, descriptor: descriptor, metadata: created)
+    }
+
+    package static func settleFailedWriterInitialization(
+        _ location: InvestigationMachineEvidenceParentLocation,
+        system: any InvestigationMachineRawEvidenceSystem
+    ) -> InvestigationMachineEvidenceParentSetupError.Residue {
+        let url = URL(filePath: location.path, directoryHint: .isDirectory)
+        let supportDescriptor = open(
+            url.deletingLastPathComponent().path,
+            O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NONBLOCK
+                | O_NOFOLLOW_ANY | O_UNIQUE
+        )
+        guard supportDescriptor >= 3 else {
+            _ = try? system.close(descriptor: location.descriptor)
+            return .uncertain
+        }
+        defer { _ = Darwin.close(supportDescriptor) }
+        return rollbackEmptyParent(
+            supportDescriptor: supportDescriptor, leaf: url.lastPathComponent,
+            expected: location.metadata, descriptor: location.descriptor,
+            system: system
+        )
+    }
+
+    private static func rollbackEmptyParent(
+        supportDescriptor: Int32, leaf: String,
+        expected: InvestigationMachineEvidenceNodeMetadata,
+        descriptor initialDescriptor: Int32?,
+        system: any InvestigationMachineRawEvidenceSystem
+    ) -> InvestigationMachineEvidenceParentSetupError.Residue {
+        var descriptor = initialDescriptor ?? -1
+        var result: InvestigationMachineEvidenceParentSetupError.Residue = .preserved
+        do {
+            if descriptor < 0 {
+                descriptor = try system.openComponent(
+                    parentDescriptor: supportDescriptor, name: leaf,
+                    flags: directoryFlags, mode: nil
+                )
+            }
+            guard descriptor >= 3, descriptor != supportDescriptor else {
+                return .preserved
+            }
+            let held = try system.metadata(descriptor: descriptor)
+            let named = try system.namedMetadata(
+                parentDescriptor: supportDescriptor, name: leaf,
+                flags: namedFlags
+            )
+            let contents = try system.inventory(
+                descriptor: descriptor, maximumEntryCount: 1
+            )
+            guard held == named, held == expected,
+                  contents.reachedEnd, contents.names.isEmpty
+            else {
+                result = .preserved
+                if descriptor >= 0 {
+                    do { try system.close(descriptor: descriptor); descriptor = -1 }
+                    catch { return .uncertain }
+                }
+                return result
+            }
+            try system.close(descriptor: descriptor)
+            descriptor = -1
+            guard unlinkat(supportDescriptor, leaf, unlinkFlags) == 0 else {
+                return .preserved
+            }
+            do {
+                try system.synchronize(descriptor: supportDescriptor)
+                do {
+                    _ = try system.namedMetadata(
+                        parentDescriptor: supportDescriptor, name: leaf,
+                        flags: namedFlags
+                    )
+                    return .uncertain
+                } catch InvestigationMachineRawEvidenceSystemError.errno(let value)
+                    where value == ENOENT
+                {
+                    return .removed
+                } catch {
+                    return .uncertain
+                }
+            } catch {
+                return .uncertain
+            }
+        } catch {
+            result = .preserved
+        }
+        if descriptor >= 0 {
+            do { try system.close(descriptor: descriptor) }
+            catch { return .uncertain }
+        }
+        return result
+    }
+
+    private static func closeParent(
+        _ descriptor: inout Int32,
+        system: any InvestigationMachineRawEvidenceSystem
+    ) -> Bool {
+        guard descriptor >= 0 else { return true }
+        let value = descriptor
+        descriptor = -1
+        do { try system.close(descriptor: value); return true }
+        catch { return false }
+    }
+
+    private static func validCreatedParent(
+        _ value: InvestigationMachineEvidenceNodeMetadata, supportNode: stat
+    ) -> Bool {
+        value.identity.device == UInt64(supportNode.st_dev)
+            && value.identity.inode > 0 && value.fileType == .directory
+            && value.ownerUserID == getuid() && value.ownerGroupID == getgid()
+            && value.permissions == 0o700 && value.linkCount > 0
+            && value.flags == 0
+    }
+
+    private static func failure(
+        _ stage: InvestigationMachineEvidenceParentSetupError.Stage,
+        _ residue: InvestigationMachineEvidenceParentSetupError.Residue
+    ) -> InvestigationMachineEvidenceParentSetupError {
+        .failed(stage: stage, residue: residue)
+    }
+}
+
 package struct InvestigationMachinePersistentGateIdentity:
     Equatable, Sendable
 {
+    package struct PreservedCapsuleIdentity: Equatable, Sendable {
+        package let capsule: InvestigationHistoricalGateCapsule
+        package let attemptDevice: UInt64
+        package let attemptInode: UInt64
+        package let attemptGeneration: UInt64
+        package let capsuleDevice: UInt64
+        package let capsuleInode: UInt64
+        package let capsuleGeneration: UInt64
+    }
     package static let relativePath =
         "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
     package let baseDevice: UInt64
@@ -111,12 +413,25 @@ package struct InvestigationMachinePersistentGateIdentity:
     package let lockDevice: UInt64
     package let lockInode: UInt64
     package let lockGeneration: UInt64
-    package let preservedAttemptDevice: UInt64?
-    package let preservedAttemptInode: UInt64?
-    package let preservedAttemptGeneration: UInt64?
-    package let preservedCapsuleDevice: UInt64?
-    package let preservedCapsuleInode: UInt64?
-    package let preservedCapsuleGeneration: UInt64?
+    package let preservedCapsules: [PreservedCapsuleIdentity]
+    package var preservedAttemptDevice: UInt64? {
+        preservedCapsules.first?.attemptDevice
+    }
+    package var preservedAttemptInode: UInt64? {
+        preservedCapsules.first?.attemptInode
+    }
+    package var preservedAttemptGeneration: UInt64? {
+        preservedCapsules.first?.attemptGeneration
+    }
+    package var preservedCapsuleDevice: UInt64? {
+        preservedCapsules.first?.capsuleDevice
+    }
+    package var preservedCapsuleInode: UInt64? {
+        preservedCapsules.first?.capsuleInode
+    }
+    package var preservedCapsuleGeneration: UInt64? {
+        preservedCapsules.first?.capsuleGeneration
+    }
 }
 
 package enum InvestigationMachinePersistentGateObserver {
@@ -160,7 +475,7 @@ package enum InvestigationMachinePersistentGateObserver {
     package static func observePreservingV13(basePath: String) throws
         -> InvestigationMachinePersistentGateIdentity
     {
-        try observeExact(basePath: basePath, preserving: .retainedV13())
+        try observeExact(basePath: basePath, preserving: [.retainedV13()])
     }
 
     package static func observePreservingV13(
@@ -173,7 +488,7 @@ package enum InvestigationMachinePersistentGateObserver {
             basePath: basePath, closeDescriptor: closeDescriptor,
             openDirectoryStream: openDirectoryStream,
             closeDirectoryStream: closeDirectoryStream,
-            preserving: .retainedV13()
+            preserving: [.retainedV13()]
         )
     }
 
@@ -181,6 +496,34 @@ package enum InvestigationMachinePersistentGateObserver {
         -> InvestigationMachinePersistentGateIdentity?
     {
         do { return try observePreservingV13(basePath: basePath) }
+        catch Error.absent { return nil }
+    }
+
+    package static func observePreservingV13AndV16(basePath: String) throws
+        -> InvestigationMachinePersistentGateIdentity
+    {
+        try observeExact(
+            basePath: basePath, preserving: [.retainedV13(), .retainedV16()])
+    }
+
+    package static func observePreservingV13AndV16(
+        basePath: String, closeDescriptor: (Int32) -> Int32,
+        openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>? = fdopendir,
+        closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32 = closedir,
+        afterInitialValidation: () throws -> Void = {}
+    ) throws -> InvestigationMachinePersistentGateIdentity {
+        try observeExact(
+            basePath: basePath, closeDescriptor: closeDescriptor,
+            openDirectoryStream: openDirectoryStream,
+            closeDirectoryStream: closeDirectoryStream,
+            afterInitialValidation: afterInitialValidation,
+            preserving: [.retainedV13(), .retainedV16()])
+    }
+
+    package static func observeIfPresentPreservingV13AndV16(
+        basePath: String
+    ) throws -> InvestigationMachinePersistentGateIdentity? {
+        do { return try observePreservingV13AndV16(basePath: basePath) }
         catch Error.absent { return nil }
     }
 
@@ -195,7 +538,7 @@ package enum InvestigationMachinePersistentGateObserver {
         try observeExact(
             basePath: basePath, closeDescriptor: closeDescriptor,
             openDirectoryStream: openDirectoryStream,
-            closeDirectoryStream: closeDirectoryStream, preserving: nil
+            closeDirectoryStream: closeDirectoryStream, preserving: []
         )
     }
 
@@ -204,7 +547,8 @@ package enum InvestigationMachinePersistentGateObserver {
         closeDescriptor: (Int32) -> Int32 = Darwin.close,
         openDirectoryStream: (Int32) -> UnsafeMutablePointer<DIR>? = fdopendir,
         closeDirectoryStream: (UnsafeMutablePointer<DIR>) -> Int32 = closedir,
-        preserving preserved: InvestigationHistoricalGateCapsule?
+        afterInitialValidation: () throws -> Void = {},
+        preserving preserved: [InvestigationHistoricalGateCapsule]
     ) throws -> InvestigationMachinePersistentGateIdentity {
         guard basePath.first == "/", !basePath.hasSuffix("/"),
               !basePath.contains("\0"),
@@ -253,7 +597,7 @@ package enum InvestigationMachinePersistentGateObserver {
                 device: baseBefore.st_dev
             )
             let expectedBaseInventory = [".owner-lock-v1"]
-                + (preserved.map { [$0.attemptName] } ?? [])
+                + preserved.map(\.attemptName)
             guard try inventory(
                 base, closeDescriptor: closeDescriptor,
                 openDirectoryStream: openDirectoryStream,
@@ -277,12 +621,12 @@ package enum InvestigationMachinePersistentGateObserver {
                   flock(lock, LOCK_EX | LOCK_NB) == 0
             else { throw invalid() }
 
-            var preservedAttempt: stat?
-            var preservedCapsule: stat?
-            var preservedBytes: Data?
-            var preservedAttemptDescriptor: Int32?
-            var preservedCapsuleDescriptor: Int32?
-            if let preserved {
+            var preservedRecords: [(
+                contract: InvestigationHistoricalGateCapsule,
+                attempt: stat, capsule: stat, bytes: Data,
+                attemptDescriptor: Int32, capsuleDescriptor: Int32
+            )] = []
+            for preserved in preserved {
                 let attempt = openat(base, preserved.attemptName, directoryFlags)
                 guard attempt >= 3, !descriptors.contains(attempt) else {
                     throw posix()
@@ -332,12 +676,12 @@ package enum InvestigationMachinePersistentGateObserver {
                         == preserved.outerAttemptUUID,
                       projected.wholeInputSHA256 == preserved.wholeInputSHA256
                 else { throw invalid() }
-                preservedAttempt = attemptHeld
-                preservedCapsule = capsuleHeld
-                preservedBytes = bytes
-                preservedAttemptDescriptor = attempt
-                preservedCapsuleDescriptor = capsule
+                preservedRecords.append((
+                    preserved, attemptHeld, capsuleHeld, bytes, attempt, capsule
+                ))
             }
+
+            try afterInitialValidation()
 
             let baseAfter = try metadata(base)
             let lockAfter = try metadata(lock)
@@ -369,12 +713,13 @@ package enum InvestigationMachinePersistentGateObserver {
                         parent: node.parent, name: node.name))
                 else { throw invalid() }
             }
-            if let preserved, let attemptBefore = preservedAttempt,
-               let capsuleBefore = preservedCapsule,
-               let expectedBytes = preservedBytes,
-               let attempt = preservedAttemptDescriptor,
-               let capsule = preservedCapsuleDescriptor
-            {
+            for record in preservedRecords {
+                let preserved = record.contract
+                let attemptBefore = record.attempt
+                let capsuleBefore = record.capsule
+                let expectedBytes = record.bytes
+                let attempt = record.attemptDescriptor
+                let capsule = record.capsuleDescriptor
                 let attemptAfter = try metadata(attempt)
                 let capsuleAfter = try metadata(capsule)
                 try validatePrivateNode(
@@ -408,12 +753,17 @@ package enum InvestigationMachinePersistentGateObserver {
                 lockDevice: UInt64(lockBefore.st_dev),
                 lockInode: UInt64(lockBefore.st_ino),
                 lockGeneration: UInt64(lockBefore.st_gen),
-                preservedAttemptDevice: preservedAttempt.map { UInt64($0.st_dev) },
-                preservedAttemptInode: preservedAttempt.map { UInt64($0.st_ino) },
-                preservedAttemptGeneration: preservedAttempt.map { UInt64($0.st_gen) },
-                preservedCapsuleDevice: preservedCapsule.map { UInt64($0.st_dev) },
-                preservedCapsuleInode: preservedCapsule.map { UInt64($0.st_ino) },
-                preservedCapsuleGeneration: preservedCapsule.map { UInt64($0.st_gen) }
+                preservedCapsules: preservedRecords.map { record in
+                    .init(
+                        capsule: record.contract,
+                        attemptDevice: UInt64(record.attempt.st_dev),
+                        attemptInode: UInt64(record.attempt.st_ino),
+                        attemptGeneration: UInt64(record.attempt.st_gen),
+                        capsuleDevice: UInt64(record.capsule.st_dev),
+                        capsuleInode: UInt64(record.capsule.st_ino),
+                        capsuleGeneration: UInt64(record.capsule.st_gen)
+                    )
+                }
             )
         }
     }
@@ -631,30 +981,42 @@ package enum InvestigationMachineCampaignExecutable {
 
     package static func evidenceParentURL(
         campaignUUID: UUID,
-        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+        applicationSupportDirectory: URL? = nil
     ) throws -> URL {
-        // Resolve the existing parent before appending the absent evidence leaf.
-        // On macOS, standardizing an existing /var child follows /var -> /private/var,
-        // while reopening the /var spelling with O_NOFOLLOW_ANY fails closed.
-        guard temporaryDirectory.isFileURL,
-              let resolved = realpath(temporaryDirectory.path, nil)
+        let candidate: URL
+        if let applicationSupportDirectory {
+            candidate = applicationSupportDirectory
+        } else {
+            guard let record = getpwuid(getuid()),
+                  record.pointee.pw_uid == getuid(),
+                  record.pointee.pw_gid == getgid(),
+                  let home = record.pointee.pw_dir
+            else { throw InvestigationMachineCampaignExecutableReportError.invalid }
+            candidate = URL(filePath: String(cString: home), directoryHint: .isDirectory)
+                .appending(path: "Library/Application Support",
+                    directoryHint: .isDirectory)
+        }
+        // Resolve the existing Application Support directory before appending
+        // the absent, campaign-unique owner-private evidence directory.
+        guard candidate.isFileURL,
+              let resolved = realpath(candidate.path, nil)
         else {
             throw InvestigationMachineCampaignExecutableReportError.invalid
         }
         defer { free(resolved) }
-        let physicalTemporaryDirectory = URL(
+        let physicalApplicationSupport = URL(
             filePath: String(cString: resolved),
             directoryHint: .isDirectory
         )
-        let result = physicalTemporaryDirectory.appending(
+        let result = physicalApplicationSupport.appending(
             path: "stornaut-iic-evidence-"
                 + campaignUUID.uuidString.lowercased(),
             directoryHint: .isDirectory
         )
         guard
-            physicalTemporaryDirectory.path.hasPrefix("/"),
-            physicalTemporaryDirectory.path != "/",
-            result.deletingLastPathComponent() == physicalTemporaryDirectory
+            physicalApplicationSupport.path.hasPrefix("/"),
+            physicalApplicationSupport.path != "/",
+            result.deletingLastPathComponent() == physicalApplicationSupport
         else {
             throw InvestigationMachineCampaignExecutableReportError.invalid
         }
@@ -782,12 +1144,11 @@ package enum InvestigationMachineCampaignExecutable {
         private struct GlobalObservation {
             let processCounts: [Int]
             let persistentGate: InvestigationMachinePersistentGateIdentity?
-            let preservedGate: InvestigationHistoricalGateCapsule?
             var canonicalObject: [String: Any] {
                 let gateState: String
                 if let persistentGate {
-                    gateState = persistentGate.preservedAttemptInode == nil
-                        ? "ownerLockOnly" : "ownerLockAndPreservedV13"
+                    gateState = persistentGate.preservedCapsules.isEmpty
+                        ? "ownerLockOnly" : "ownerLockAndPreservedV13V16"
                 } else {
                     gateState = "absentBeforeHandoff"
                 }
@@ -810,43 +1171,30 @@ package enum InvestigationMachineCampaignExecutable {
                         String(persistentGate.lockInode)
                     value["persistentGateLockGeneration"] =
                         String(persistentGate.lockGeneration)
-                    value["preservedV13Present"] =
-                        persistentGate.preservedAttemptInode != nil
-                    if let preserved = preservedGate,
-                       let attemptDevice =
-                        persistentGate.preservedAttemptDevice,
-                       let attemptInode = persistentGate.preservedAttemptInode,
-                       let attemptGeneration =
-                        persistentGate.preservedAttemptGeneration,
-                       let capsuleDevice =
-                        persistentGate.preservedCapsuleDevice,
-                       let capsuleInode = persistentGate.preservedCapsuleInode,
-                       let capsuleGeneration =
-                        persistentGate.preservedCapsuleGeneration
-                    {
-                        value["preservedGateAttemptUUID"] =
-                            preserved.outerAttemptUUID.uuidString.lowercased()
-                        value["preservedGateWholeInputSHA256"] =
-                            preserved.wholeInputSHA256.lowercaseHex
-                        value["preservedGateCapsuleByteCount"] =
-                            Int(preserved.byteCount)
-                        value["preservedGateCapsuleSHA256"] =
-                            preserved.fileSHA256.lowercaseHex
-                        value["preservedGateAttemptDevice"] = String(
-                            attemptDevice)
-                        value["preservedGateAttemptInode"] = String(
-                            attemptInode)
-                        value["preservedGateAttemptGeneration"] = String(
-                            attemptGeneration)
-                        value["preservedGateCapsuleDevice"] = String(
-                            capsuleDevice)
-                        value["preservedGateCapsuleInode"] = String(
-                            capsuleInode)
-                        value["preservedGateCapsuleGeneration"] = String(
-                            capsuleGeneration)
-                    }
+                    value["preservedV13AndV16Present"] =
+                        persistentGate.preservedCapsules.count == 2
+                    value["preservedGateCapsules"] =
+                        persistentGate.preservedCapsules.map(Self.capsuleObject)
                 }
                 return value
+            }
+            static func capsuleObject(
+                _ value: InvestigationMachinePersistentGateIdentity
+                    .PreservedCapsuleIdentity
+            ) -> [String: Any] {
+                [
+                    "attemptUUID": value.capsule.outerAttemptUUID
+                        .uuidString.lowercased(),
+                    "wholeInputSHA256": value.capsule.wholeInputSHA256.lowercaseHex,
+                    "capsuleByteCount": Int(value.capsule.byteCount),
+                    "capsuleSHA256": value.capsule.fileSHA256.lowercaseHex,
+                    "attemptDevice": String(value.attemptDevice),
+                    "attemptInode": String(value.attemptInode),
+                    "attemptGeneration": String(value.attemptGeneration),
+                    "capsuleDevice": String(value.capsuleDevice),
+                    "capsuleInode": String(value.capsuleInode),
+                    "capsuleGeneration": String(value.capsuleGeneration),
+                ]
             }
         }
         private var preparedFrameSHA256:Data?;private var bufferedReceipt=Data();private var evidenceWriter:InvestigationMachineRawEvidenceWriter?;private var evidenceParentDescriptor:Int32 = -1;private var lastEvidenceTime:Int64=0;private var installReceipt:[String:Any]?;private var lifecyclePayload:(root:String,bytes:Data,hashes:[String],plist:String)?
@@ -1259,24 +1607,38 @@ package enum InvestigationMachineCampaignExecutable {
             throws -> InvestigationMachineRawEvidenceWriter
         {
             let campaignUUID = UUID()
-            let path = try InvestigationMachineCampaignExecutable
-                .evidenceParentURL(campaignUUID: campaignUUID).path
-            guard mkdir(path, 0o700) == 0 else { throw Failure.posix(errno) }
-            let parent = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC
-                | O_NOFOLLOW_ANY | O_UNIQUE | O_NONBLOCK)
-            guard parent >= 3 else { throw Failure.posix(errno) }
-            evidenceParentDescriptor = parent
             let system = DarwinInvestigationMachineRawEvidenceSystem()
-            let writer = try InvestigationMachineRawEvidenceWriter(
-                system: system, parentDescriptor: parent,
-                expectedParentIdentity: try system.metadata(descriptor: parent).identity,
-                campaignUUID: campaignUUID, attemptUUID: preArm.outerAttemptUUID,
-                mode: .privileged, sourceBinding: .init(
-                    repositoryHEAD: preArm.repositoryHEAD,
-                    repositoryTree: preArm.repositoryTree,
-                    canonicalSourceManifestSHA256: preArm.canonicalSourceManifestSHA256,
-                    buildProvenanceSHA256: preArm.buildProvenanceSHA256,
-                    signedRuntimeBindingSHA256: preArm.signedRuntimeBindingSHA256))
+            let location: InvestigationMachineEvidenceParentLocation
+            do {
+                location = try InvestigationMachineEvidenceParentTransaction.create(
+                    campaignUUID: campaignUUID, system: system)
+            } catch let setup as InvestigationMachineEvidenceParentSetupError {
+                Self.reportEvidenceParentSetup(setup)
+                throw setup
+            }
+            let parent = location.descriptor, path = location.path
+            let writer: InvestigationMachineRawEvidenceWriter
+            do {
+                writer = try InvestigationMachineRawEvidenceWriter(
+                    system: system, parentDescriptor: parent,
+                    expectedParentIdentity: location.identity,
+                    campaignUUID: campaignUUID, attemptUUID: preArm.outerAttemptUUID,
+                    mode: .privileged, sourceBinding: .init(
+                        repositoryHEAD: preArm.repositoryHEAD,
+                        repositoryTree: preArm.repositoryTree,
+                        canonicalSourceManifestSHA256: preArm.canonicalSourceManifestSHA256,
+                        buildProvenanceSHA256: preArm.buildProvenanceSHA256,
+                        signedRuntimeBindingSHA256: preArm.signedRuntimeBindingSHA256))
+            } catch {
+                let residue = InvestigationMachineEvidenceParentTransaction
+                    .settleFailedWriterInitialization(location, system: system)
+                let setup = InvestigationMachineEvidenceParentSetupError.failed(
+                    stage: .initializeWriter, residue: residue
+                )
+                Self.reportEvidenceParentSetup(setup)
+                throw setup
+            }
+            evidenceParentDescriptor = parent
             self.campaignUUID=campaignUUID;self.evidenceParentPath=path
             let source = try InvestigationMachineEvidenceJSON.canonicalData([
                 "schemaVersion": 1, "role": "sourceBuildIdentity",
@@ -1289,10 +1651,24 @@ package enum InvestigationMachineCampaignExecutable {
                 "signedRuntimeBindingSHA256": preArm.signedRuntimeBindingSHA256.lowercaseHex,
                 "preArmFrameSHA256": preArm.frameSHA256.lowercaseHex,
             ])
-            _ = try writer.writeArtifact(path: .init(phase: .preflight,
-                leafName: "source-build.json"), role: .sourceBuildIdentity,
-                encoding: .strictJSON, bytes: source)
+            do {
+                try InvestigationMachineInitialEvidencePublisher.publish(
+                    source, writer: writer)
+            } catch let setup as InvestigationMachineEvidenceParentSetupError {
+                Self.reportEvidenceParentSetup(setup)
+                throw setup
+            }
             return writer
+        }
+
+        private static func reportEvidenceParentSetup(
+            _ failure: InvestigationMachineEvidenceParentSetupError
+        ) {
+            guard case let .failed(stage, residue) = failure else { return }
+            writeFixedError(
+                "stornaut ii-c evidence-parent-setup-failed stage="
+                    + stage.rawValue + " residue=" + residue.rawValue + "\n"
+            )
         }
 
         private func writePreArmEvidence(_ preArm: InvestigationMachineCampaignPreArmFrame,
@@ -1598,15 +1974,11 @@ package enum InvestigationMachineCampaignExecutable {
             guard let persistentGate = global.persistentGate else {
                 throw Failure.invalid
             }
-            let preserved = try InvestigationHistoricalGateCapsule.retainedV13()
-            guard let attemptDevice = persistentGate.preservedAttemptDevice,
-                  let attemptInode = persistentGate.preservedAttemptInode,
-                  let attemptGeneration =
-                    persistentGate.preservedAttemptGeneration,
-                  let capsuleDevice = persistentGate.preservedCapsuleDevice,
-                  let capsuleInode = persistentGate.preservedCapsuleInode,
-                  let capsuleGeneration =
-                    persistentGate.preservedCapsuleGeneration
+            let preserved = [
+                try InvestigationHistoricalGateCapsule.retainedV13(),
+                try InvestigationHistoricalGateCapsule.retainedV16(),
+            ]
+            guard persistentGate.preservedCapsules.map(\.capsule) == preserved
             else { throw Failure.invalid }
             var un:[String:Any]=["transactionReceiptSHA256":Self.digest(try Self.canonical(uninstall)),
                 "bootoutCompleted":true,"installedRootRemoved":true,"installedAppRemoved":true,
@@ -1629,7 +2001,7 @@ package enum InvestigationMachineCampaignExecutable {
                 "serviceAbsent":true,"gateOwnerLockRevalidated":true,"gateAttemptEntryCount":0,
                 "gateCapsuleEntryCount":0,
                 "persistentGateRelativePath":InvestigationMachinePersistentGateIdentity.relativePath,
-                "persistentGateEntryCount":2,
+                "persistentGateEntryCount":3,
                 "persistentGateBaseDevice":String(persistentGate.baseDevice),
                 "persistentGateBaseInode":String(persistentGate.baseInode),
                 "persistentGateBaseGeneration":String(persistentGate.baseGeneration),
@@ -1638,22 +2010,12 @@ package enum InvestigationMachineCampaignExecutable {
                 "persistentGateLockGeneration":String(persistentGate.lockGeneration),
                 "persistentGateLockByteCount":0,
                 "persistentGateLockExclusive":true,
-                "preservedGateAttemptEntryCount":1,
-                "preservedGateCapsuleEntryCount":1,
-                "preservedGateAttemptUUID":
-                    preserved.outerAttemptUUID.uuidString.lowercased(),
-                "preservedGateWholeInputSHA256":
-                    preserved.wholeInputSHA256.lowercaseHex,
-                "preservedGateCapsuleByteCount":Int(preserved.byteCount),
-                "preservedGateCapsuleSHA256":preserved.fileSHA256.lowercaseHex,
-                "preservedGateAttemptDevice":String(attemptDevice),
-                "preservedGateAttemptInode":String(attemptInode),
-                "preservedGateAttemptGeneration":String(attemptGeneration),
-                "preservedGateCapsuleDevice":String(capsuleDevice),
-                "preservedGateCapsuleInode":String(capsuleInode),
-                "preservedGateCapsuleGeneration":String(capsuleGeneration)],
+                "preservedGateAttemptEntryCount":2,
+                "preservedGateCapsuleEntryCount":2,
+                "preservedGateCapsules":persistentGate.preservedCapsules
+                    .map(GlobalObservation.capsuleObject)],
                 role:.globalPostTeardown,phase:.verifier,
-                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4)
+                leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:5)
             try writeJSON(["expectedConsumed":expectedConsumed,
                 "expectedEpochCount":expectedEpochCount,
                 "evidenceSetSHA256":preArm.frameSHA256.lowercaseHex,
@@ -1747,14 +2109,11 @@ package enum InvestigationMachineCampaignExecutable {
             let persistentGate: InvestigationMachinePersistentGateIdentity?
             persistentGate = allowAbsentGate
                 ? try InvestigationMachinePersistentGateObserver
-                    .observeIfPresentPreservingV13(basePath: base)
+                    .observeIfPresentPreservingV13AndV16(basePath: base)
                 : try InvestigationMachinePersistentGateObserver
-                    .observePreservingV13(basePath: base)
-            let preservedGate = persistentGate?.preservedAttemptInode == nil
-                ? nil : try InvestigationHistoricalGateCapsule.retainedV13()
+                    .observePreservingV13AndV16(basePath: base)
             return .init(
-                processCounts: counts, persistentGate: persistentGate,
-                preservedGate: preservedGate
+                processCounts: counts, persistentGate: persistentGate
             )}
 
         nonisolated var isBootstrapInvocation: Bool {

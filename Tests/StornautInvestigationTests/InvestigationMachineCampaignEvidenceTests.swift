@@ -13,43 +13,215 @@ import Testing
 @Suite("Investigation machine campaign evidence", .serialized)
 struct InvestigationMachineCampaignEvidenceTests {
     @Test
-    func productionEvidenceParentUsesPhysicalTemporaryDirectory() throws {
+    func productionEvidenceParentUsesPhysicalApplicationSupportDirectory() throws {
         let campaignUUID = UUID()
         let parent = try InvestigationMachineCampaignExecutable
             .evidenceParentURL(campaignUUID: campaignUUID)
-        guard let resolved = realpath(
-            FileManager.default.temporaryDirectory.path,
-            nil
-        ) else {
+        guard let account = getpwuid(getuid()), let home = account.pointee.pw_dir,
+              let resolved = realpath(
+                URL(filePath: String(cString: home))
+                    .appending(path: "Library/Application Support").path, nil)
+        else {
             throw CampaignEvidenceFixtureError.realpath(errno)
         }
         defer { free(resolved) }
-        let physicalTemporaryDirectory = URL(
+        let physicalApplicationSupport = URL(
             filePath: String(cString: resolved),
             directoryHint: .isDirectory
         )
 
-        #expect(parent.deletingLastPathComponent() == physicalTemporaryDirectory)
+        #expect(parent.deletingLastPathComponent() == physicalApplicationSupport)
         #expect(
             parent.lastPathComponent
                 == "stornaut-iic-evidence-"
                     + campaignUUID.uuidString.lowercased()
         )
-        try #require(mkdir(parent.path, 0o700) == 0)
-        defer {
-            if rmdir(parent.path) != 0 {
-                Issue.record("evidence-parent cleanup failed with errno \(errno)")
-            }
+        #expect(!parent.path.contains("/Library/Caches/"))
+        #expect(!parent.path.hasPrefix(FileManager.default.temporaryDirectory.path))
+    }
+
+    @Test
+    func evidenceParentResolvesInjectedPhysicalApplicationSupportDirectory() throws {
+        let logical = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-evidence-app-support-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: logical, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: logical) }
+        let campaignUUID = UUID()
+        let parent = try InvestigationMachineCampaignExecutable.evidenceParentURL(
+            campaignUUID: campaignUUID, applicationSupportDirectory: logical)
+        guard let resolved = realpath(logical.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
         }
-        let descriptor = open(
-            parent.path,
-            O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY
-                | O_UNIQUE | O_NONBLOCK
-        )
-        try #require(descriptor >= 3)
-        if close(descriptor) != 0 {
-            Issue.record("evidence-parent close failed with errno \(errno)")
+        defer { free(resolved) }
+        #expect(parent.deletingLastPathComponent().path == String(cString: resolved))
+        #expect(parent.lastPathComponent ==
+            "stornaut-iic-evidence-" + campaignUUID.uuidString.lowercased())
+    }
+
+    @Test
+    func evidenceParentCreationSynchronizesContainingDirectory() throws {
+        let support = try Self.makePrivateTestDirectory(
+            prefix: "stornaut-evidence-parent-sync-")
+        defer { try? FileManager.default.removeItem(at: support) }
+        let system = CampaignFaultingEvidenceSystem(
+            base: DarwinInvestigationMachineRawEvidenceSystem())
+        let campaignUUID = UUID()
+        let location = try InvestigationMachineEvidenceParentTransaction.create(
+            campaignUUID: campaignUUID,
+            applicationSupportDirectory: support, system: system)
+        defer { _ = Darwin.close(location.descriptor) }
+
+        #expect(system.synchronizeCount == 1)
+        #expect(FileManager.default.fileExists(atPath: location.path))
+        #expect(location.path.hasSuffix(
+            "stornaut-iic-evidence-" + campaignUUID.uuidString.lowercased()))
+    }
+
+    @Test
+    func evidenceParentSynchronizationFailureRemovesOnlyExactEmptyParent()
+        throws
+    {
+        let support = try Self.makePrivateTestDirectory(
+            prefix: "stornaut-evidence-parent-rollback-")
+        defer { try? FileManager.default.removeItem(at: support) }
+        let system = CampaignFaultingEvidenceSystem(
+            base: DarwinInvestigationMachineRawEvidenceSystem())
+        system.failSynchronizeCall = 1
+        let campaignUUID = UUID()
+        let expected = support.appending(path:
+            "stornaut-iic-evidence-" + campaignUUID.uuidString.lowercased())
+
+        #expect(throws: InvestigationMachineEvidenceParentSetupError.failed(
+            stage: .synchronizeCreation, residue: .removed)) {
+            _ = try InvestigationMachineEvidenceParentTransaction.create(
+                campaignUUID: campaignUUID,
+                applicationSupportDirectory: support, system: system)
         }
+        #expect(!FileManager.default.fileExists(atPath: expected.path))
+        #expect(system.synchronizeCount == 2)
+    }
+
+    @Test
+    func evidenceParentOpenFailureRemovesOnlyExactDurableEmptyParent() throws {
+        let support = try Self.makePrivateTestDirectory(
+            prefix: "stornaut-evidence-parent-open-")
+        defer { try? FileManager.default.removeItem(at: support) }
+        let system = CampaignFaultingEvidenceSystem(
+            base: DarwinInvestigationMachineRawEvidenceSystem())
+        system.failOpenCall = 1
+        let campaignUUID = UUID()
+        let expected = support.appending(path:
+            "stornaut-iic-evidence-" + campaignUUID.uuidString.lowercased())
+
+        #expect(throws: InvestigationMachineEvidenceParentSetupError.failed(
+            stage: .openParent, residue: .removed)) {
+            _ = try InvestigationMachineEvidenceParentTransaction.create(
+                campaignUUID: campaignUUID,
+                applicationSupportDirectory: support, system: system)
+        }
+        #expect(!FileManager.default.fileExists(atPath: expected.path))
+        #expect(system.synchronizeCount == 2)
+    }
+
+    @Test
+    func evidenceParentIdentityFailureRemovesOnlyExactDurableEmptyParent()
+        throws
+    {
+        let support = try Self.makePrivateTestDirectory(
+            prefix: "stornaut-evidence-parent-identity-")
+        defer { try? FileManager.default.removeItem(at: support) }
+        let system = CampaignFaultingEvidenceSystem(
+            base: DarwinInvestigationMachineRawEvidenceSystem())
+        system.driftMetadataCall = 1
+        let campaignUUID = UUID()
+        let expected = support.appending(path:
+            "stornaut-iic-evidence-" + campaignUUID.uuidString.lowercased())
+
+        #expect(throws: InvestigationMachineEvidenceParentSetupError.failed(
+            stage: .validateParent, residue: .removed)) {
+            _ = try InvestigationMachineEvidenceParentTransaction.create(
+                campaignUUID: campaignUUID,
+                applicationSupportDirectory: support, system: system)
+        }
+        #expect(!FileManager.default.fileExists(atPath: expected.path))
+        #expect(system.synchronizeCount == 2)
+    }
+
+    @Test
+    func writerInitializationFailurePreservesTypedPartialEvidenceResidue()
+        throws
+    {
+        let support = try Self.makePrivateTestDirectory(
+            prefix: "stornaut-evidence-parent-partial-")
+        defer { try? FileManager.default.removeItem(at: support) }
+        let system = CampaignFaultingEvidenceSystem(
+            base: DarwinInvestigationMachineRawEvidenceSystem())
+        let campaignUUID = CampaignEvidenceFixture.uuid(0x71)
+        let location = try InvestigationMachineEvidenceParentTransaction.create(
+            campaignUUID: campaignUUID,
+            applicationSupportDirectory: support, system: system)
+        system.failDirectoryCreationCall = 3
+        let source = try InvestigationMachineCampaignSourceBinding(
+            repositoryHEAD: String(repeating: "a", count: 40),
+            repositoryTree: String(repeating: "b", count: 40),
+            canonicalSourceManifestSHA256: Self.digest(0x72),
+            buildProvenanceSHA256: Self.digest(0x73),
+            signedRuntimeBindingSHA256: Self.digest(0x74))
+
+        #expect(throws: InvestigationMachineRawEvidenceError
+            .uncertain(stage: .createPhase)) {
+            _ = try InvestigationMachineRawEvidenceWriter(
+                system: system, parentDescriptor: location.descriptor,
+                expectedParentIdentity: location.identity,
+                campaignUUID: campaignUUID,
+                attemptUUID: CampaignEvidenceFixture.uuid(0x75),
+                mode: .privileged, sourceBinding: source)
+        }
+        let residue = InvestigationMachineEvidenceParentTransaction
+            .settleFailedWriterInitialization(location, system: system)
+        #expect(residue == .preserved)
+        #expect(FileManager.default.fileExists(atPath: location.path))
+        #expect(FileManager.default.fileExists(atPath:
+            URL(filePath: location.path).appending(path:
+                InvestigationMachineRawEvidenceWriter.rootName(
+                    campaignUUID: campaignUUID)).path))
+    }
+
+    @Test(arguments: CampaignInitialEvidenceFault.allCases)
+    func productionInitialEvidencePublicationReportsTypedPreservedResidue(
+        _ fault: CampaignInitialEvidenceFault
+    ) throws {
+        let fixture = try CampaignEvidenceDiskFixture.make()
+        defer { fixture.remove() }
+        let system = CampaignFaultingEvidenceSystem(base: fixture.system)
+        let writer = try fixture.makeWriter(system: system, mode: .privileged)
+        system.arm(fault.writerFault)
+        let source = try InvestigationMachineEvidenceJSON.canonicalData([
+            "schemaVersion": 1, "role": "sourceBuildIdentity",
+            "campaignUUID": fixture.campaignUUID.uuidString.lowercased(),
+            "attemptUUID": fixture.attemptUUID.uuidString.lowercased(),
+            "repositoryHEAD": fixture.sourceBinding.repositoryHEAD,
+            "repositoryTree": fixture.sourceBinding.repositoryTree,
+            "canonicalSourceManifestSHA256": fixture.sourceBinding
+                .canonicalSourceManifestSHA256.lowercaseHex,
+            "buildProvenanceSHA256": fixture.sourceBinding
+                .buildProvenanceSHA256.lowercaseHex,
+            "signedRuntimeBindingSHA256": fixture.sourceBinding
+                .signedRuntimeBindingSHA256.lowercaseHex,
+            "preArmFrameSHA256": Self.digest(0x76).lowercaseHex,
+        ])
+
+        #expect(throws: InvestigationMachineEvidenceParentSetupError.failed(
+            stage: .publishInitialEvidence, residue: .preserved)) {
+            try InvestigationMachineInitialEvidencePublisher.publish(
+                source, writer: writer)
+        }
+        #expect(FileManager.default.fileExists(atPath: fixture.evidenceRoot.path))
+        #expect(!FileManager.default.fileExists(atPath:
+            fixture.evidenceRoot.appending(path: "manifest.bin").path))
     }
 
     @Test
@@ -206,7 +378,12 @@ struct InvestigationMachineCampaignEvidenceTests {
             let verifier = try privilegedVerifierResult(
                 fixture: fixture, transport: transport,
                 persistentPreservedGlobal: persistent)
-            #expect(verifier.status == 0, Comment(rawValue: verifier.stderr))
+            #expect(verifier.status != 0)
+            #expect(verifier.stderr.contains(
+                "admitting dual preserved persistent Gate schema")
+                || verifier.stderr.contains("preserved persistent Gate base inventory")
+                || verifier.stderr.contains("inventory overflow"),
+                Comment(rawValue: verifier.stderr))
         }
     }
 
@@ -504,9 +681,145 @@ struct InvestigationMachineCampaignEvidenceTests {
             == "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17")
     }
 
+    @Test
+    func retainedV16CapsuleContractIsExact() throws {
+        let preserved = try InvestigationHistoricalGateCapsule.retainedV16()
+        #expect(preserved.outerAttemptUUID.uuidString.lowercased()
+            == "fa83c861-a7e2-4903-bf64-9eb08c757f74")
+        #expect(preserved.wholeInputSHA256.lowercaseHex
+            == "4aa74ea388fef92d833a4d3af5a191231d79ab4f8ede35348589662ce9b38e0a")
+        #expect(preserved.byteCount == 29_029)
+        #expect(preserved.fileSHA256.lowercaseHex
+            == "0858c551d0741e066e46e79b5317fb19da11c32a4064b3ef49e7e0377e5f2f1a")
+    }
+
     @Test(
         .enabled(
-            if: Self.hasExplicitPersistentPreservedGateFixture,
+            if: Self.hasExplicitPersistentV13V16GateFixture,
+            "Requires the exact Application Support Gate with v13 and v16"
+        )
+    )
+    func persistentGateObserverBindsExactV13AndV16WithoutMutation() throws {
+        let base = try #require(Self.explicitPersistentGateFixtureURL)
+        let before = try Self.treeSnapshot(base)
+        let observed = try InvestigationMachinePersistentGateObserver
+            .observePreservingV13AndV16(basePath: base.path)
+        #expect(observed.preservedCapsules.map(\.capsule) == [
+            try InvestigationHistoricalGateCapsule.retainedV13(),
+            try InvestigationHistoricalGateCapsule.retainedV16(),
+        ])
+        #expect(Set(observed.preservedCapsules.map(\.attemptInode)).count == 2)
+        #expect(Set(observed.preservedCapsules.map(\.capsuleInode)).count == 2)
+        #expect(try Self.treeSnapshot(base) == before)
+    }
+
+    @Test
+    func schemaFiveBindsExactOrderedV13AndV16Capsules() throws {
+        let fixture = try CampaignEvidenceFixture.make()
+        let path = try InvestigationMachineEvidenceRelativePath(
+            phase: .verifier, leafName: "global-post-teardown.json")
+        let exact = try Self.globalTeardownV5(
+            campaignUUID: fixture.campaignUUID, attemptUUID: fixture.attemptUUID)
+        try InvestigationMachineEvidenceJSON.validate(
+            InvestigationMachineEvidenceJSON.canonicalData(exact),
+            role: .globalPostTeardown, path: path,
+            campaignUUID: fixture.campaignUUID, attemptUUID: fixture.attemptUUID,
+            sourceBinding: fixture.sourceBinding)
+        var mutations: [[String: Any]] = []
+        var missing = exact
+        var missingCapsules = try #require(
+            missing["preservedGateCapsules"] as? [[String: Any]])
+        missingCapsules.removeLast(); missing["preservedGateCapsules"] = missingCapsules
+        mutations.append(missing)
+        var reversed = exact
+        reversed["preservedGateCapsules"] = Array(try #require(
+            reversed["preservedGateCapsules"] as? [[String: Any]]).reversed())
+        mutations.append(reversed)
+        var duplicate = exact
+        let capsules = try #require(
+            duplicate["preservedGateCapsules"] as? [[String: Any]])
+        duplicate["preservedGateCapsules"] = [capsules[0], capsules[0]]
+        mutations.append(duplicate)
+        var extra = exact
+        extra["preservedGateCapsules"] = capsules + [capsules[1]]
+        mutations.append(extra)
+        var substituted = exact
+        var substitutedCapsules = capsules
+        substitutedCapsules[1]["capsuleSHA256"] = String(repeating: "a", count: 64)
+        substituted["preservedGateCapsules"] = substitutedCapsules
+        mutations.append(substituted)
+        var unknown = exact; unknown["preservedGateUnknown"] = true
+        mutations.append(unknown)
+        for mutation in mutations {
+            #expect(throws: InvestigationMachineEvidenceContractError.invalidEncoding) {
+                try InvestigationMachineEvidenceJSON.validate(
+                    InvestigationMachineEvidenceJSON.canonicalData(mutation),
+                    role: .globalPostTeardown, path: path,
+                    campaignUUID: fixture.campaignUUID,
+                    attemptUUID: fixture.attemptUUID,
+                    sourceBinding: fixture.sourceBinding)
+            }
+        }
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentV13V16GateFixture,
+            "Requires the exact Application Support Gate with v13 and v16"
+        ),
+        arguments: PreservedV13V16GateMutation.allCases.filter { $0 != .none }
+    )
+    fileprivate func persistentGateObserverRejectsV13V16DriftWithoutMutation(
+        _ mutation: PreservedV13V16GateMutation
+    ) throws {
+        let source = try #require(Self.explicitPersistentGateFixtureURL)
+        let fixture = try PreservedV13V16GateFixture.make(
+            copying: source, mutation: mutation)
+        defer { fixture.remove() }
+        let before = try Self.treeSnapshot(fixture.base)
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachinePersistentGateObserver
+                .observePreservingV13AndV16(basePath: fixture.base.path)
+        }
+        #expect(try Self.treeSnapshot(fixture.base) == before)
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentV13V16GateFixture,
+            "Requires the exact Application Support Gate with v13 and v16"
+        )
+    )
+    func persistentGateObserverRejectsLiveCapsuleOverwriteDuringObservation()
+        throws
+    {
+        let source = try #require(Self.explicitPersistentGateFixtureURL)
+        let fixture = try PreservedV13V16GateFixture.make(
+            copying: source, mutation: .none)
+        defer { fixture.remove() }
+        let v16 = try InvestigationHistoricalGateCapsule.retainedV16()
+        let capsule = fixture.base.appending(path: v16.attemptName)
+            .appending(path: v16.capsuleName)
+
+        #expect(throws: (any Error).self) {
+            _ = try InvestigationMachinePersistentGateObserver
+                .observePreservingV13AndV16(
+                    basePath: fixture.base.path,
+                    closeDescriptor: Darwin.close,
+                    afterInitialValidation: {
+                        let descriptor = open(capsule.path, O_WRONLY | O_CLOEXEC)
+                        try #require(descriptor >= 3)
+                        defer { _ = Darwin.close(descriptor) }
+                        var byte = UInt8(0xff)
+                        try #require(pwrite(descriptor, &byte, 1, 0) == 1)
+                        try #require(fsync(descriptor) == 0)
+                    })
+        }
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentV13OnlyGateFixture,
             "Requires the explicit Application Support Gate with exact v13 capsule"
         )
     )
@@ -535,7 +848,7 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     @Test(
         .enabled(
-            if: Self.hasExplicitPersistentPreservedGateFixture,
+            if: Self.hasExplicitPersistentV13OnlyGateFixture,
             "Requires the explicit Application Support Gate with exact v13 capsule"
         ),
         arguments: PreservedV13GateMutation.allCases.filter { $0 != .none }
@@ -558,7 +871,7 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     @Test(
         .enabled(
-            if: Self.hasExplicitPersistentPreservedGateFixture,
+            if: Self.hasExplicitPersistentV13OnlyGateFixture,
             "Requires the explicit Application Support Gate with exact v13 capsule"
         )
     )
@@ -3821,11 +4134,11 @@ struct InvestigationMachineCampaignEvidenceTests {
 
     @Test(
         .enabled(
-            if: Self.hasExplicitPersistentPreservedGateFixture,
+            if: Self.hasExplicitPersistentV13OnlyGateFixture,
             "Requires the explicit Application Support Gate with exact v13 capsule"
         )
     )
-    func independentVerifierAdmitsOnlySchemaFourWithExactPreservedV13Gate()
+    func independentVerifierReadsButDoesNotAdmitHistoricalSchemaFour()
         throws
     {
         let base = try #require(Self.explicitPersistentGateFixtureURL)
@@ -3849,9 +4162,82 @@ struct InvestigationMachineCampaignEvidenceTests {
             sealName: "persistent-preserved-v13-gate-seal.json"
         )
 
+        #expect(result.status != 0)
+        #expect(result.stderr.contains(
+            "admitting dual preserved persistent Gate schema")
+            || result.stderr.contains("preserved persistent Gate base inventory")
+            || result.stderr.contains("inventory overflow"),
+            Comment(rawValue: result.stderr))
+        #expect(try Self.treeSnapshot(base) == before)
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentV13V16GateFixture,
+            "Requires the exact Application Support Gate with v13 and v16"
+        )
+    )
+    func independentVerifierAdmitsSchemaFiveFromPersistentEvidenceParent() throws {
+        let gate = try #require(Self.explicitPersistentGateFixtureURL)
+        let gateBefore = try Self.treeSnapshot(gate)
+        let persistent = try #require(
+            try Self.explicitPersistentV13V16GateIdentity())
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            productionEvidenceName: true,
+            parentDirectory: gate.deletingLastPathComponent())
+        defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport()
+        let result = try privilegedVerifierResult(
+            fixture: fixture, transport: transport,
+            persistentPreservedGlobal: persistent,
+            sealName: "seal.json")
         #expect(result.status == 0, Comment(rawValue: result.stderr))
         #expect(result.stdout == "stornaut ii-c machine evidence verified\n")
-        #expect(try Self.treeSnapshot(base) == before)
+        #expect(try Self.treeSnapshot(gate) == gateBefore)
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentV13V16GateFixture,
+            "Requires the exact Application Support Gate with v13 and v16"
+        )
+    )
+    func independentVerifierRejectsSchemaFiveFromTemporaryEvidenceParent() throws {
+        let gate = try #require(Self.explicitPersistentGateFixtureURL)
+        let gateBefore = try Self.treeSnapshot(gate)
+        let persistent = try #require(
+            try Self.explicitPersistentV13V16GateIdentity())
+        let result = try privilegedVerifierResult(
+            persistentPreservedGlobal: persistent,
+            sealName: "temporary-schema-five-seal.json")
+        #expect(result.status != 0)
+        #expect(result.stderr.contains("evidence Application Support parent"),
+            Comment(rawValue: result.stderr))
+        #expect(try Self.treeSnapshot(gate) == gateBefore)
+    }
+
+    @Test(
+        .enabled(
+            if: Self.hasExplicitPersistentV13V16GateFixture,
+            "Requires the exact Application Support Gate with v13 and v16"
+        )
+    )
+    func independentVerifierRejectsSchemaFiveFromWrongApplicationSupportSibling()
+        throws
+    {
+        let gate = try #require(Self.explicitPersistentGateFixtureURL)
+        let persistent = try #require(
+            try Self.explicitPersistentV13V16GateIdentity())
+        let fixture = try CampaignEvidenceDiskFixture.make(
+            parentDirectory: gate.deletingLastPathComponent())
+        defer { fixture.remove() }
+        let transport = try fixture.privilegedTransport()
+        let result = try privilegedVerifierResult(
+            fixture: fixture, transport: transport,
+            persistentPreservedGlobal: persistent, sealName: "seal.json")
+        #expect(result.status != 0)
+        #expect(result.stderr.contains("evidence Application Support parent"),
+            Comment(rawValue: result.stderr))
     }
 
     @Test
@@ -3901,6 +4287,27 @@ struct InvestigationMachineCampaignEvidenceTests {
                 .appending(path: preserved.capsuleName).path)
     }
 
+    private static var hasExplicitPersistentV13OnlyGateFixture: Bool {
+        guard hasExplicitPersistentPreservedGateFixture,
+              let base = explicitPersistentGateFixtureURL,
+              let entries = try? FileManager.default.contentsOfDirectory(
+                atPath: base.path)
+        else { return false }
+        return entries.count == 2
+    }
+
+    private static var hasExplicitPersistentV13V16GateFixture: Bool {
+        guard let base = explicitPersistentGateFixtureURL,
+              let v13 = try? InvestigationHistoricalGateCapsule.retainedV13(),
+              let v16 = try? InvestigationHistoricalGateCapsule.retainedV16()
+        else { return false }
+        return [v13, v16].allSatisfy { preserved in
+            FileManager.default.fileExists(atPath:
+                base.appending(path: preserved.attemptName)
+                    .appending(path: preserved.capsuleName).path)
+        }
+    }
+
     private static func explicitPersistentGateIdentity() throws
         -> CampaignPersistentGateIdentity?
     {
@@ -3932,6 +4339,31 @@ struct InvestigationMachineCampaignEvidenceTests {
             base: baseNode, lock: lockNode, attempt: attemptNode,
             capsule: capsuleNode
         )
+    }
+
+    private static func explicitPersistentV13V16GateIdentity() throws
+        -> CampaignPersistentGateIdentity?
+    {
+        guard let base = explicitPersistentGateFixtureURL else { return nil }
+        let preserved = [
+            try InvestigationHistoricalGateCapsule.retainedV13(),
+            try InvestigationHistoricalGateCapsule.retainedV16(),
+        ]
+        var baseNode = stat(), lockNode = stat()
+        guard lstat(base.path, &baseNode) == 0,
+              lstat(base.appending(path: ".owner-lock-v1").path, &lockNode) == 0
+        else { return nil }
+        var nodes: [(stat, stat)] = []
+        for item in preserved {
+            var attemptNode = stat(), capsuleNode = stat()
+            let attempt = base.appending(path: item.attemptName)
+            guard lstat(attempt.path, &attemptNode) == 0,
+                  lstat(attempt.appending(path: item.capsuleName).path,
+                    &capsuleNode) == 0
+            else { return nil }
+            nodes.append((attemptNode, capsuleNode))
+        }
+        return .init(base: baseNode, lock: lockNode, preserved: nodes)
     }
 
     @Test
@@ -4259,6 +4691,42 @@ struct InvestigationMachineCampaignEvidenceTests {
         return value
     }
 
+    fileprivate static func globalTeardownV5(
+        campaignUUID: UUID, attemptUUID: UUID,
+        identity: CampaignPersistentGateIdentity? = nil
+    ) throws -> [String: Any] {
+        let identity = identity ?? .dualPreservedFixture
+        var value = globalTeardownV3(
+            campaignUUID: campaignUUID, attemptUUID: attemptUUID,
+            identity: identity)
+        let preserved = [
+            try InvestigationHistoricalGateCapsule.retainedV13(),
+            try InvestigationHistoricalGateCapsule.retainedV16(),
+        ]
+        guard identity.preserved.count == 2 else {
+            throw CampaignEvidenceFixtureError.unsupportedRole
+        }
+        value["schemaVersion"] = 5
+        value["persistentGateEntryCount"] = 3
+        value["preservedGateAttemptEntryCount"] = 2
+        value["preservedGateCapsuleEntryCount"] = 2
+        value["preservedGateCapsules"] = zip(preserved, identity.preserved).map { capsule, node in
+            [
+                "attemptUUID": capsule.outerAttemptUUID.uuidString.lowercased(),
+                "wholeInputSHA256": capsule.wholeInputSHA256.lowercaseHex,
+                "capsuleByteCount": Int(capsule.byteCount),
+                "capsuleSHA256": capsule.fileSHA256.lowercaseHex,
+                "attemptDevice": String(node.attemptDevice),
+                "attemptInode": String(node.attemptInode),
+                "attemptGeneration": String(node.attemptGeneration),
+                "capsuleDevice": String(node.capsuleDevice),
+                "capsuleInode": String(node.capsuleInode),
+                "capsuleGeneration": String(node.capsuleGeneration),
+            ] as [String: Any]
+        }
+        return value
+    }
+
     private static func runVerifier(
         _ evidenceRoot: URL, _ sealURL: URL
     ) throws -> CampaignVerifierResult {
@@ -4319,6 +4787,21 @@ struct InvestigationMachineCampaignEvidenceTests {
         }
         defer { free(resolved) }
         return URL(filePath: String(cString: resolved))
+    }
+
+    private static func makePrivateTestDirectory(prefix: String) throws -> URL {
+        let logical = FileManager.default.temporaryDirectory.appending(
+            path: prefix + UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: logical, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        try #require(chmod(logical.path, 0o700) == 0)
+        guard let resolved = realpath(logical.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        return URL(filePath: String(cString: resolved),
+            directoryHint: .isDirectory)
     }
 
     private static func runVerifier(
@@ -5354,6 +5837,14 @@ enum CampaignTreeMutation: CaseIterable {
 }
 
 private struct CampaignPersistentGateIdentity: Sendable {
+    struct Preserved: Sendable {
+        let attemptDevice: UInt64
+        let attemptInode: UInt64
+        let attemptGeneration: UInt64
+        let capsuleDevice: UInt64
+        let capsuleInode: UInt64
+        let capsuleGeneration: UInt64
+    }
     let baseDevice: UInt64
     let baseInode: UInt64
     let baseGeneration: UInt64
@@ -5366,20 +5857,38 @@ private struct CampaignPersistentGateIdentity: Sendable {
     let preservedCapsuleDevice: UInt64?
     let preservedCapsuleInode: UInt64?
     let preservedCapsuleGeneration: UInt64?
+    let preserved: [Preserved]
 
     static let fixture = Self(
         baseDevice: 101, baseInode: 201, baseGeneration: 3,
         lockDevice: 101, lockInode: 202, lockGeneration: 4,
         preservedAttemptDevice: nil, preservedAttemptInode: nil,
         preservedAttemptGeneration: nil, preservedCapsuleDevice: nil,
-        preservedCapsuleInode: nil, preservedCapsuleGeneration: nil
+        preservedCapsuleInode: nil, preservedCapsuleGeneration: nil,
+        preserved: []
     )
     static let preservedFixture = Self(
         baseDevice: 101, baseInode: 201, baseGeneration: 3,
         lockDevice: 101, lockInode: 202, lockGeneration: 4,
         preservedAttemptDevice: 101, preservedAttemptInode: 203,
         preservedAttemptGeneration: 5, preservedCapsuleDevice: 101,
-        preservedCapsuleInode: 204, preservedCapsuleGeneration: 6
+        preservedCapsuleInode: 204, preservedCapsuleGeneration: 6,
+        preserved: [.init(
+            attemptDevice: 101, attemptInode: 203, attemptGeneration: 5,
+            capsuleDevice: 101, capsuleInode: 204, capsuleGeneration: 6)]
+    )
+    static let dualPreservedFixture = Self(
+        baseDevice: 101, baseInode: 201, baseGeneration: 3,
+        lockDevice: 101, lockInode: 202, lockGeneration: 4,
+        preservedAttemptDevice: 101, preservedAttemptInode: 203,
+        preservedAttemptGeneration: 5, preservedCapsuleDevice: 101,
+        preservedCapsuleInode: 204, preservedCapsuleGeneration: 6,
+        preserved: [
+            .init(attemptDevice: 101, attemptInode: 203, attemptGeneration: 5,
+                capsuleDevice: 101, capsuleInode: 204, capsuleGeneration: 6),
+            .init(attemptDevice: 101, attemptInode: 205, attemptGeneration: 7,
+                capsuleDevice: 101, capsuleInode: 206, capsuleGeneration: 8),
+        ]
     )
 
     init(base: stat, lock: stat) {
@@ -5395,6 +5904,7 @@ private struct CampaignPersistentGateIdentity: Sendable {
         preservedCapsuleDevice = nil
         preservedCapsuleInode = nil
         preservedCapsuleGeneration = nil
+        preserved = []
     }
 
     init(base: stat, lock: stat, attempt: stat, capsule: stat) {
@@ -5410,6 +5920,37 @@ private struct CampaignPersistentGateIdentity: Sendable {
         preservedCapsuleDevice = UInt64(capsule.st_dev)
         preservedCapsuleInode = UInt64(capsule.st_ino)
         preservedCapsuleGeneration = UInt64(capsule.st_gen)
+        preserved = [.init(
+            attemptDevice: UInt64(attempt.st_dev),
+            attemptInode: UInt64(attempt.st_ino),
+            attemptGeneration: UInt64(attempt.st_gen),
+            capsuleDevice: UInt64(capsule.st_dev),
+            capsuleInode: UInt64(capsule.st_ino),
+            capsuleGeneration: UInt64(capsule.st_gen))]
+    }
+
+    init(base: stat, lock: stat, preserved nodes: [(stat, stat)]) {
+        baseDevice = UInt64(base.st_dev)
+        baseInode = UInt64(base.st_ino)
+        baseGeneration = UInt64(base.st_gen)
+        lockDevice = UInt64(lock.st_dev)
+        lockInode = UInt64(lock.st_ino)
+        lockGeneration = UInt64(lock.st_gen)
+        preserved = nodes.map { attempt, capsule in
+            .init(
+                attemptDevice: UInt64(attempt.st_dev),
+                attemptInode: UInt64(attempt.st_ino),
+                attemptGeneration: UInt64(attempt.st_gen),
+                capsuleDevice: UInt64(capsule.st_dev),
+                capsuleInode: UInt64(capsule.st_ino),
+                capsuleGeneration: UInt64(capsule.st_gen))
+        }
+        preservedAttemptDevice = preserved.first?.attemptDevice
+        preservedAttemptInode = preserved.first?.attemptInode
+        preservedAttemptGeneration = preserved.first?.attemptGeneration
+        preservedCapsuleDevice = preserved.first?.capsuleDevice
+        preservedCapsuleInode = preserved.first?.capsuleInode
+        preservedCapsuleGeneration = preserved.first?.capsuleGeneration
     }
 
     private init(
@@ -5417,7 +5958,8 @@ private struct CampaignPersistentGateIdentity: Sendable {
         lockDevice: UInt64, lockInode: UInt64, lockGeneration: UInt64,
         preservedAttemptDevice: UInt64?, preservedAttemptInode: UInt64?,
         preservedAttemptGeneration: UInt64?, preservedCapsuleDevice: UInt64?,
-        preservedCapsuleInode: UInt64?, preservedCapsuleGeneration: UInt64?
+        preservedCapsuleInode: UInt64?, preservedCapsuleGeneration: UInt64?,
+        preserved: [Preserved]
     ) {
         self.baseDevice = baseDevice
         self.baseInode = baseInode
@@ -5431,6 +5973,7 @@ private struct CampaignPersistentGateIdentity: Sendable {
         self.preservedCapsuleDevice = preservedCapsuleDevice
         self.preservedCapsuleInode = preservedCapsuleInode
         self.preservedCapsuleGeneration = preservedCapsuleGeneration
+        self.preserved = preserved
     }
 }
 
@@ -5567,6 +6110,90 @@ private struct PreservedV13GateFixture {
     func remove() { try? FileManager.default.removeItem(at: root) }
 }
 
+private enum PreservedV13V16GateMutation: CaseIterable, Sendable {
+    case none, extraEntry, missingV13, missingV16, v13Bytes, v16Bytes
+    case v13Mode, v16Mode, v16HardLink, v16Xattr, v16AttemptSymlink
+}
+
+private struct PreservedV13V16GateFixture {
+    let root: URL
+    let base: URL
+
+    static func make(
+        copying source: URL, mutation: PreservedV13V16GateMutation
+    ) throws -> Self {
+        let logicalRoot = FileManager.default.temporaryDirectory.appending(
+            path: "stornaut-preserved-v13-v16-" + UUID().uuidString,
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: logicalRoot, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        guard let resolved = realpath(logicalRoot.path, nil) else {
+            throw CampaignEvidenceFixtureError.realpath(errno)
+        }
+        defer { free(resolved) }
+        let root = URL(filePath: String(cString: resolved),
+            directoryHint: .isDirectory)
+        let base = root.appending(path:
+            "home/Library/Application Support/"
+                + "com.eriklee.stornaut.task39-machine-gate",
+            directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: base, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        try #require(chmod(base.path, 0o700) == 0)
+        let lock = base.appending(path: ".owner-lock-v1")
+        try Data().write(to: lock); try #require(chmod(lock.path, 0o600) == 0)
+        let preserved = [
+            try InvestigationHistoricalGateCapsule.retainedV13(),
+            try InvestigationHistoricalGateCapsule.retainedV16(),
+        ]
+        var attempts: [URL] = [], capsules: [URL] = []
+        for item in preserved {
+            let attempt = base.appending(path: item.attemptName,
+                directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(
+                at: attempt, withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+            try #require(chmod(attempt.path, 0o700) == 0)
+            let capsule = attempt.appending(path: item.capsuleName)
+            try Data(contentsOf: source.appending(path: item.attemptName)
+                .appending(path: item.capsuleName)).write(to: capsule)
+            try #require(chmod(capsule.path, 0o600) == 0)
+            attempts.append(attempt); capsules.append(capsule)
+        }
+        switch mutation {
+        case .none: break
+        case .extraEntry: try Data().write(to: base.appending(path: "extra"))
+        case .missingV13: try FileManager.default.removeItem(at: attempts[0])
+        case .missingV16: try FileManager.default.removeItem(at: attempts[1])
+        case .v13Bytes, .v16Bytes:
+            let index = mutation == .v13Bytes ? 0 : 1
+            var bytes = try Data(contentsOf: capsules[index]); bytes[0] ^= 1
+            try bytes.write(to: capsules[index]); try #require(chmod(
+                capsules[index].path, 0o600) == 0)
+        case .v13Mode: try #require(chmod(attempts[0].path, 0o755) == 0)
+        case .v16Mode: try #require(chmod(capsules[1].path, 0o644) == 0)
+        case .v16HardLink:
+            try #require(link(capsules[1].path,
+                attempts[1].appending(path: "capsule-alias").path) == 0)
+        case .v16Xattr:
+            let bytes = Data([1]); try bytes.withUnsafeBytes { raw in
+                try #require(setxattr(capsules[1].path,
+                    "com.eriklee.stornaut-test", raw.baseAddress,
+                    raw.count, 0, 0) == 0)
+            }
+        case .v16AttemptSymlink:
+            let original = base.appending(path: "original-v16")
+            try FileManager.default.moveItem(at: attempts[1], to: original)
+            try #require(symlink(original.lastPathComponent, attempts[1].path) == 0)
+        }
+        return .init(root: root, base: base)
+    }
+
+    func remove() { try? FileManager.default.removeItem(at: root) }
+}
+
 private struct PersistentGateObserverFixture {
     let parent: URL
     let base: URL
@@ -5621,6 +6248,23 @@ enum CampaignEvidenceFault: CaseIterable {
         case .reopenFinal: .reopenFinal
         case .readFinal: .readFinal
         case .closeDescriptor: .closeDescriptor
+        }
+    }
+}
+
+enum CampaignInitialEvidenceFault: CaseIterable {
+    case createPending, writePending, synchronizeFile, publish
+    case synchronizeDirectory, reopenFinal, readFinal
+
+    var writerFault: CampaignEvidenceFault {
+        switch self {
+        case .createPending: .validatePending
+        case .writePending: .writePending
+        case .synchronizeFile: .synchronizeFile
+        case .publish: .publish
+        case .synchronizeDirectory: .synchronizeDirectory
+        case .reopenFinal: .reopenFinal
+        case .readFinal: .readFinal
         }
     }
 }
@@ -5703,9 +6347,11 @@ private final class CampaignEvidenceDiskFixture {
     }
 
     static func make(
-        productionEvidenceName: Bool = false
+        productionEvidenceName: Bool = false,
+        parentDirectory: URL? = nil
     ) throws -> CampaignEvidenceDiskFixture {
-        let parent = FileManager.default.temporaryDirectory.appending(
+        let parent = (parentDirectory ?? FileManager.default.temporaryDirectory)
+            .appending(
             path: productionEvidenceName
                 ? "stornaut-iic-evidence-"
                     + CampaignEvidenceFixture.uuid(0x51).uuidString.lowercased()
@@ -6184,13 +6830,23 @@ private final class CampaignEvidenceDiskFixture {
         case .globalPostTeardown:
             var teardown: [String: Any] = ["observationReceiptSHA256": hex(0xd3), "appProcessCount": 0, "helperProcessCount": 0, "driverProcessCount": 0, "gateProcessCount": 0, "coordinatorProcessCount": 0, "childCount": 0, "descendantCount": 0, "openChannelCount": 0, "ownedProcessGroupMemberCount": 0, "serviceAbsent": true, "gateOwnerLockRevalidated": true, "gateAttemptEntryCount": 0, "gateCapsuleEntryCount": 0]
             if let persistentPreservedGlobal {
-                value["schemaVersion"] = 4
-                teardown = try InvestigationMachineCampaignEvidenceTests
-                    .globalTeardownV4(
-                    campaignUUID: campaignUUID, attemptUUID: attemptUUID,
-                    identity: persistentPreservedGlobal
-                ).filter { !["schemaVersion", "role", "campaignUUID",
-                    "attemptUUID"].contains($0.key) }
+                if persistentPreservedGlobal.preserved.count == 2 {
+                    value["schemaVersion"] = 5
+                    teardown = try InvestigationMachineCampaignEvidenceTests
+                        .globalTeardownV5(
+                        campaignUUID: campaignUUID, attemptUUID: attemptUUID,
+                        identity: persistentPreservedGlobal
+                    ).filter { !["schemaVersion", "role", "campaignUUID",
+                        "attemptUUID"].contains($0.key) }
+                } else {
+                    value["schemaVersion"] = 4
+                    teardown = try InvestigationMachineCampaignEvidenceTests
+                        .globalTeardownV4(
+                        campaignUUID: campaignUUID, attemptUUID: attemptUUID,
+                        identity: persistentPreservedGlobal
+                    ).filter { !["schemaVersion", "role", "campaignUUID",
+                        "attemptUUID"].contains($0.key) }
+                }
             } else if let persistentGlobal {
                 value["schemaVersion"] = 3
                 teardown.merge([
@@ -6437,11 +7093,14 @@ private final class CampaignFaultingEvidenceSystem:
     var failPostManifestSynchronize = false
     private var fault: CampaignEvidenceFault?
     private var openCount = 0
-    private var synchronizeCount = 0
+    private(set) var synchronizeCount = 0
     private var manifestDescriptor = Int32(-1)
     private var manifestMetadataCount = 0
     private var manifestWasPublished = false
     var failDirectoryCreationCall: Int?
+    var failSynchronizeCall: Int?
+    var failOpenCall: Int?
+    var driftMetadataCall: Int?
     var driftDescriptor: Int32?
     var nextOpenedDescriptor: Int32?
     var protectedDescriptor: Int32?
@@ -6493,6 +7152,7 @@ private final class CampaignFaultingEvidenceSystem:
             return nextOpenedDescriptor
         }
         openCount += 1
+        if openCount == failOpenCall { throw failure() }
         if fault == .reopenFinal && openCount == 2 { throw failure() }
         let descriptor = try base.openComponent(
             parentDescriptor: parentDescriptor, name: name,
@@ -6509,6 +7169,16 @@ private final class CampaignFaultingEvidenceSystem:
             throw failure()
         }
         let value = try base.metadata(descriptor: descriptor)
+        if metadataCount == driftMetadataCall {
+            return .init(
+                identity: .init(
+                    device: value.identity.device, inode: value.identity.inode + 1,
+                    generation: value.identity.generation, size: value.identity.size
+                ), fileType: value.fileType, ownerUserID: value.ownerUserID,
+                ownerGroupID: value.ownerGroupID, permissions: value.permissions,
+                linkCount: value.linkCount, flags: value.flags
+            )
+        }
         if descriptor == driftDescriptor {
             return .init(
                 identity: .init(
@@ -6567,6 +7237,10 @@ private final class CampaignFaultingEvidenceSystem:
     }
     func synchronize(descriptor: Int32) throws {
         synchronizeCount += 1
+        if synchronizeCount == failSynchronizeCall {
+            failSynchronizeCall = nil
+            throw failure()
+        }
         if fault == .synchronizeFile && synchronizeCount == 1 { throw failure() }
         if fault == .synchronizeDirectory && synchronizeCount == 2 { throw failure() }
         if failPostManifestSynchronize && manifestWasPublished { throw failure() }

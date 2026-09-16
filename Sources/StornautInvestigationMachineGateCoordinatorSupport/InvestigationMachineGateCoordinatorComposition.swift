@@ -1590,7 +1590,7 @@ public enum InvestigationMachineGateCoordinatorSupport {
               .protocolFailure
           }
           let value = try InvestigationFixedGateHandoff(
-            productionProfile: .replacementAfterV13
+            productionProfile: .replacementAfterV13AndV16
           ).run(
             canonicalProjectedInput: bytes
           )

@@ -725,7 +725,7 @@ package enum InvestigationMachineEvidenceJSON {
         sourceBinding: InvestigationMachineCampaignSourceBinding
     ) throws {
         let acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown
-            ? [schemaVersion, 2, 3, 4] : [schemaVersion]
+            ? [schemaVersion, 2, 3, 4, 5] : [schemaVersion]
         try exactCommon(
             object, role: roleName(role), campaignUUID: campaignUUID,
             attemptUUID: attemptUUID,
@@ -932,6 +932,23 @@ package enum InvestigationMachineEvidenceJSON {
                     "preservedGateCapsuleGeneration",
                 ])
             }
+            if schema == 5 {
+                keys.formUnion([
+                    "persistentGateRelativePath",
+                    "persistentGateEntryCount",
+                    "persistentGateBaseDevice",
+                    "persistentGateBaseInode",
+                    "persistentGateBaseGeneration",
+                    "persistentGateLockDevice",
+                    "persistentGateLockInode",
+                    "persistentGateLockGeneration",
+                    "persistentGateLockByteCount",
+                    "persistentGateLockExclusive",
+                    "preservedGateAttemptEntryCount",
+                    "preservedGateCapsuleEntryCount",
+                    "preservedGateCapsules",
+                ])
+            }
             try exact(object, keys)
             guard digest(object, "observationReceiptSHA256") != nil,
                   processCounts.allSatisfy({ integer(object, $0) == 0 }),
@@ -987,6 +1004,54 @@ package enum InvestigationMachineEvidenceJSON {
                             object, "persistentGateBaseDevice"),
                     positiveDecimal(object, "preservedGateCapsuleInode") != nil,
                     decimal(object, "preservedGateCapsuleGeneration") != nil
+                else { throw invalid() }
+            }
+            if schema == 5 {
+                let expected = [
+                    try InvestigationHistoricalGateCapsule.retainedV13(),
+                    try InvestigationHistoricalGateCapsule.retainedV16(),
+                ]
+                guard
+                    integer(object, "persistentGateEntryCount") == 3,
+                    integer(object, "preservedGateAttemptEntryCount") == 2,
+                    integer(object, "preservedGateCapsuleEntryCount") == 2,
+                    let entries = object["preservedGateCapsules"] as? [[String: Any]],
+                    entries.count == expected.count,
+                    zip(entries, expected).allSatisfy({ entry, preserved in
+                        Set(entry.keys) == [
+                            "attemptUUID", "wholeInputSHA256",
+                            "capsuleByteCount", "capsuleSHA256",
+                            "attemptDevice", "attemptInode",
+                            "attemptGeneration", "capsuleDevice",
+                            "capsuleInode", "capsuleGeneration",
+                        ]
+                            && uuid(entry, "attemptUUID") == preserved.outerAttemptUUID
+                            && digest(entry, "wholeInputSHA256")
+                                == preserved.wholeInputSHA256.lowercaseHex
+                            && integer(entry, "capsuleByteCount")
+                                == Int(preserved.byteCount)
+                            && digest(entry, "capsuleSHA256")
+                                == preserved.fileSHA256.lowercaseHex
+                            && positiveDecimal(entry, "attemptDevice")
+                                == positiveDecimal(object, "persistentGateBaseDevice")
+                            && positiveDecimal(entry, "attemptInode") != nil
+                            && decimal(entry, "attemptGeneration") != nil
+                            && positiveDecimal(entry, "capsuleDevice")
+                                == positiveDecimal(object, "persistentGateBaseDevice")
+                            && positiveDecimal(entry, "capsuleInode") != nil
+                            && decimal(entry, "capsuleGeneration") != nil
+                    }),
+                    string(object, "persistentGateRelativePath") ==
+                        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+                    let baseDevice = positiveDecimal(
+                        object, "persistentGateBaseDevice"),
+                    positiveDecimal(object, "persistentGateBaseInode") != nil,
+                    decimal(object, "persistentGateBaseGeneration") != nil,
+                    positiveDecimal(object, "persistentGateLockDevice") == baseDevice,
+                    positiveDecimal(object, "persistentGateLockInode") != nil,
+                    decimal(object, "persistentGateLockGeneration") != nil,
+                    integer(object, "persistentGateLockByteCount") == 0,
+                    boolean(object, "persistentGateLockExclusive") == true
                 else { throw invalid() }
             }
         case .verifierInput:

@@ -393,6 +393,8 @@ iicc_v17_authorization_scope_only=false
 iicc_v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625
 iicc_v13_raw_evidence_loss_scope_only=false
 iicc_v13_raw_evidence_loss_scope_baseline=35524e5512b9e1f15b1979a22778ad1a75a0c942
+iicc_persistent_evidence_p2_scope_only=false
+iicc_persistent_evidence_p2_scope_baseline=8a28c5b0ea36d13ae279c2f804b0a528603ddb23
 iicc_prearm_scope_contract_only=false
 iicc_prearm_scope_baseline=62ee47091e338107e182233eaed80ed1ecc059cc
 prearm_failure_source_contract_only=false
@@ -1111,6 +1113,10 @@ if (( $# > 0 )); then
         && [[ $1 == --iic-c-v13-raw-evidence-loss-staged-scope-contract-only ]]; then
         iicc_v13_raw_evidence_loss_scope_only=true
         iicc_v13_raw_evidence_loss_scope_baseline=${2:-35524e5512b9e1f15b1979a22778ad1a75a0c942}
+    elif (( $# == 1 || $# == 2 )) \
+        && [[ $1 == --iic-c-persistent-evidence-p2-staged-scope-contract-only ]]; then
+        iicc_persistent_evidence_p2_scope_only=true
+        iicc_persistent_evidence_p2_scope_baseline=${2:-8a28c5b0ea36d13ae279c2f804b0a528603ddb23}
     elif (( $# == 1 || $# == 2 )) \
         && [[ $1 == --iic-c-prearm-staged-scope-contract-only ]]; then
         iicc_prearm_scope_contract_only=true
@@ -11965,7 +11971,7 @@ if executable.count(actor_end) != 1:
 actor_block = executable[executable.index(actor_marker):
                          executable.index(actor_end, executable.index(actor_marker)) + len('\n    }')]
 if hashlib.sha256(actor_block.encode()).hexdigest() != \
-        '6a9dfdc4744e3869b3acee1647d664b748c61e15d96e2eaddcdb81a1805fc0df':
+        'b789b30bd0bd298fdfb0b9a4c64526047864a52945c29d7806f19ecbc56a185a':
     raise SystemExit("ii-c-b2b2 lifecycle actor drifted")
 def require_body_digest(start, end, expected):
     if executable.count(start) != 1 or executable.count(end) != 1:
@@ -11986,7 +11992,7 @@ require_body_digest(
 require_body_digest(
     '        func finishProduction(_ outcome: InvestigationMachineCampaignHarnessOutcome)',
     '\n\n        private func writePostArm',
-    '67ea49852779191afed6edc5fe374c0e32b7486090990e8c2497abd8bec468ac')
+    '1a6411186393b37b8339281174ef1d803d9404d762aea161a2e120c160f23b2e')
 target = '''        .executableTarget(
             name: "StornautInvestigationMachineCampaign",
             dependencies: [
@@ -12065,7 +12071,7 @@ if executable.count(debug_end) != 1:
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 debug_executable = executable[:executable.index(debug_end)]
 if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-        '46dc6df47dbb80116dfce4443ec3f3fa6cb696b78404d62549a910610c6d9aca':
+        '3dc4965de2e781653f5ea9954106e2cbbb03d2e93efbdfc65bdaa569c93586e3':
     raise SystemExit("ii-c-b2b2 debug executable drifted")
 authority_surface = active_executable
 for marker in allowed_sudo:
@@ -13045,7 +13051,7 @@ if mode != "true" or name.startswith("lifecycle-"):
     actor_block = main[main.index(actor_marker):
                        main.index(actor_end, main.index(actor_marker)) + len('\n    }')]
     if hashlib.sha256(actor_block.encode()).hexdigest() != \
-            '664559633ca2f2b2ea211db2310717c32998ffe2bd351f875ffb6d3516a85198':
+            'b789b30bd0bd298fdfb0b9a4c64526047864a52945c29d7806f19ecbc56a185a':
         raise SystemExit("ii-c-c lifecycle actor drifted")
     def require_body_digest(start, end, expected):
         if main.count(start) != 1 or main.count(end) != 1:
@@ -13080,7 +13086,7 @@ if mode != "true" or name.startswith("lifecycle-"):
         raise SystemExit("ii-c-c debug executable drifted")
     debug_executable = main[:main.index(debug_end)]
     if hashlib.sha256(debug_executable.encode()).hexdigest() != \
-            '1bc1f3ad259aa4d12c8181a2810bf9a669d1ebe4b5613120b6b83aa952c1d940':
+            '3dc4965de2e781653f5ea9954106e2cbbb03d2e93efbdfc65bdaa569c93586e3':
         raise SystemExit("ii-c-c debug executable drifted")
 required=((main,tuple(M[n][1] for n in ("extra-argv","production-coordinator-path","fixture-capability-bypass","held-lifecycle","probe-argv","lifecycle-open-action","lifecycle-generic-prompt","prepared-event-order","uninstall-success-only","terminal-event-drop","seal-before-teardown","success-before-verifier","teardown-uncertainty"))),
  (harness,(M[n][1] for n in ("arm-order","frame-missing","frame-swap"))),
@@ -14540,30 +14546,72 @@ canonical = [path.read_text(encoding="utf-8") for path in canonical_paths]
 mutations = {
     "production-preservation-regression": ("coordinator",
         "let value = try InvestigationFixedGateHandoff(\n"
-        "            productionProfile: .replacementAfterV13\n"
+        "            productionProfile: .replacementAfterV13AndV16\n"
         "          ).run(",
         "let value = try InvestigationFixedGateHandoff().run("),
     "producer-schema-downgrade": ("campaign",
-        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4',
-        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:3'),
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:5',
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4'),
     "producer-cache-path": ("campaign",
         '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
         '"Library/Caches/com.eriklee.stornaut.task39-machine-gate"'),
+    "producer-evidence-tmpdir": ("campaign",
+        'candidate = URL(filePath: String(cString: home), directoryHint: .isDirectory)\n'
+        '                .appending(path: "Library/Application Support",\n'
+        '                    directoryHint: .isDirectory)',
+        'candidate = FileManager.default.temporaryDirectory'),
     "producer-inventory-bypass": ("campaign",
-        '+ (preserved.map { [$0.attemptName] } ?? [])',
+        '+ preserved.map(\\.attemptName)',
         '+ []'),
     "producer-lock-bypass": ("campaign",
         "flock(lock, LOCK_EX | LOCK_NB) == 0", "true"),
     "producer-close-bypass": ("campaign",
         "guard closeAll(&descriptors, using: closeDescriptor) else {",
         "guard true else { throw invalid() }"),
-    "swift-schema-four-drop": ("evidence",
-        "? [schemaVersion, 2, 3, 4]", "? [schemaVersion, 2, 3]"),
+    "producer-parent-sync-bypass": ("campaign",
+        "do {\n"
+        "            try system.synchronize(descriptor: supportDescriptor)\n"
+        "        } catch {\n"
+        "            let residue = rollbackEmptyParent(",
+        "do {\n"
+        "            _ = supportDescriptor\n"
+        "        } catch {\n"
+        "            let residue = rollbackEmptyParent("),
+    "producer-parent-rollback-bypass": ("campaign",
+        "let residue = rollbackEmptyParent(\n"
+        "                supportDescriptor: supportDescriptor, leaf: leaf,\n"
+        "                expected: created, descriptor: nil, system: system\n"
+        "            )",
+        "let residue = InvestigationMachineEvidenceParentSetupError.Residue.preserved"),
+    "producer-parent-residue-report-bypass": ("campaign",
+        "stage: .initializeWriter, residue: residue\n"
+        "                )\n"
+        "                Self.reportEvidenceParentSetup(setup)\n"
+        "                throw setup",
+        "stage: .initializeWriter, residue: residue\n"
+        "                )\n"
+        "                throw setup"),
+    "swift-schema-five-drop": ("evidence",
+        "? [schemaVersion, 2, 3, 4, 5]", "? [schemaVersion, 2, 3, 4]"),
     "swift-lock-exclusive-bypass": ("evidence",
-        'boolean(object, "persistentGateLockExclusive") == true', "true"),
+        'integer(object, "persistentGateLockByteCount") == 0,\n'
+        '                    boolean(object, "persistentGateLockExclusive") == true\n'
+        '                else { throw invalid() }\n'
+        '            }\n'
+        '        case .verifierInput:',
+        'integer(object, "persistentGateLockByteCount") == 0,\n'
+        '                    true\n'
+        '                else { throw invalid() }\n'
+        '            }\n'
+        '        case .verifierInput:'),
     "verifier-admission-downgrade": ("verifier",
-        "elif teardown_schema == 4:",
-        "elif teardown_schema == 3:"),
+        "elif teardown_schema in (4, 5):",
+        "elif teardown_schema == 4:"),
+    "verifier-evidence-path-bypass": ("verifier",
+        'require(os.path.dirname(root_path) == expected_parent\n'
+        '                            and os.path.dirname(seal_path) == expected_parent\n'
+        '                            and os.path.basename(seal_path) == "seal.json",',
+        'require(True,'),
     "verifier-path-regression": ("verifier",
         '"preserved persistent Gate relative path")\n    base_path = canonical_absolute_path(\n        home + "/" + evidence["persistentGateRelativePath"])',
         '"preserved persistent Gate relative path")\n    base_path = canonical_absolute_path(\n        home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate")'),
@@ -14620,6 +14668,9 @@ preserved = (
     "a77c4d21-9bba-46f6-b694-3d1d1e55209d",
     "c484b8c14a5e70a4ee4364584013f864af30738c52494ebb727ac4fb326dfdc0",
     "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17",
+    "fa83c861-a7e2-4903-bf64-9eb08c757f74",
+    "4aa74ea388fef92d833a4d3af5a191231d79ab4f8ede35348589662ce9b38e0a",
+    "0858c551d0741e066e46e79b5317fb19da11c32a4064b3ef49e7e0377e5f2f1a",
 )
 for marker in preserved:
     if marker not in contract or marker not in verifier:
@@ -14628,6 +14679,7 @@ required = {
     "contract": ("struct InvestigationHistoricalGateCapsule",
         "static func retainedV11() throws -> Self",
         "static func retainedV13() throws -> Self",
+        "static func retainedV16() throws -> Self",
         '"projected-cohort-" + wholeInputSHA256.lowercaseHex + ".bin"'),
     "capsule": ("preserving: [InvestigationHistoricalGateCapsule]",
         "Set(preserving.map(\\.attemptName)).isSubset(of: Set(entries))",
@@ -14638,32 +14690,55 @@ required = {
     "ownership": ("preservedCapsules: [InvestigationHistoricalGateCapsule]",
         "preservedCapsules: preservedCapsules"),
     "handoff": ("InvestigationFixedGateHandoffProductionProfile",
-        "case replacementAfterV13",
-        "preservedCapsules = [try .retainedV13()]",
+        "case replacementAfterV13AndV16",
+        "preservedCapsules = [try .retainedV13(), try .retainedV16()]",
         "#if STORNAUT_FIXED_GATE_PHYSICAL_FIXTURE",
         "physicalFixtureProfile: InvestigationFixedGateHandoffPhysicalFixtureProfile",
         "InvestigationOwnerOnlyCapsulePublisher("),
-    "coordinator": ("productionProfile: .replacementAfterV13",),
+    "coordinator": ("productionProfile: .replacementAfterV13AndV16",),
     "campaign": ("private struct GlobalObservation",
         "InvestigationMachinePersistentGateObserver",
         '"Library/Application Support/com.eriklee.stornaut.task39-machine-gate"',
-        '"persistentGateEntryCount":2',
+        '"persistentGateEntryCount":3',
         '"persistentGateLockExclusive":true',
-        "observePreservingV13(basePath: base)",
-        '+ (preserved.map { [$0.attemptName] } ?? [])',
+        "observePreservingV13AndV16(basePath: base)",
+        "evidenceParentURL(",
+        '"Library/Application Support"',
+        "enum InvestigationMachineEvidenceParentSetupError:",
+        "enum InvestigationMachineEvidenceParentTransaction",
+        "do {\n"
+        "            try system.synchronize(descriptor: supportDescriptor)\n"
+        "        } catch {\n"
+        "            let residue = rollbackEmptyParent(\n"
+        "                supportDescriptor: supportDescriptor, leaf: leaf,\n"
+        "                expected: created, descriptor: nil, system: system",
+        "settleFailedWriterInitialization(",
+        "reportEvidenceParentSetup(",
+        "case publishInitialEvidence",
+        "InvestigationMachineInitialEvidencePublisher.publish(",
+        "stage: .initializeWriter, residue: residue\n"
+        "                )\n"
+        "                Self.reportEvidenceParentSetup(setup)\n"
+        "                throw setup",
+        'residue=" + residue.rawValue',
+        '+ preserved.map(\\.attemptName)',
         "try exactBytes(capsule, count: expectedBytes.count)",
         "flock(lock, LOCK_EX | LOCK_NB) == 0",
         "observeIfPresent(basePath: String)",
         "withClosedDescriptors<T>(",
         "guard closeAll(&descriptors, using: closeDescriptor) else {",
-        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:4'),
+        'leaf:"global-post-teardown.json",preArm:preArm,schemaVersion:5'),
     "evidence": ("acceptedSchemaVersions: Set<Int> = role == .globalPostTeardown",
-        "? [schemaVersion, 2, 3, 4]",
+        "? [schemaVersion, 2, 3, 4, 5]",
         '"preservedGateAttemptEntryCount"',
         "InvestigationHistoricalGateCapsule.retainedV13()",
         "== preserved.fileSHA256.lowercaseHex",
         '"persistentGateRelativePath"',
-        'boolean(object, "persistentGateLockExclusive") == true'),
+        'positiveDecimal(object, "persistentGateLockDevice") == baseDevice,\n'
+        '                    positiveDecimal(object, "persistentGateLockInode") != nil,\n'
+        '                    decimal(object, "persistentGateLockGeneration") != nil,\n'
+        '                    integer(object, "persistentGateLockByteCount") == 0,\n'
+        '                    boolean(object, "persistentGateLockExclusive") == true'),
     "capsule_tests": ("exactHistoricalCapsuleIsPreservedWhileOtherStaleAndFreshNodesSettle",
         "historicalCapsuleMismatchFailsBeforeCleanupOrPublication",
         "historicalCapsuleDriftDuringOtherStaleCleanupBlocksFreshPublication",
@@ -14672,8 +14747,18 @@ required = {
     "evidence_tests": ("globalTeardownV2AcceptsOnlyExactPreservedV11Capsule",
         "globalTeardownV3AcceptsOnlyExactPersistentLockIdentity",
         "globalTeardownV4AcceptsOnlyPersistentLockAndExactV13Capsule",
+        "schemaFiveBindsExactOrderedV13AndV16Capsules",
         "persistentGateObserverBindsExactPreservedV13WithoutMutation",
-        "independentVerifierAdmitsOnlySchemaFourWithExactPreservedV13Gate",
+        "independentVerifierReadsButDoesNotAdmitHistoricalSchemaFour",
+        "independentVerifierAdmitsSchemaFiveFromPersistentEvidenceParent",
+        "independentVerifierRejectsSchemaFiveFromTemporaryEvidenceParent",
+        "independentVerifierRejectsSchemaFiveFromWrongApplicationSupportSibling",
+        "persistentGateObserverRejectsV13V16DriftWithoutMutation",
+        "persistentGateObserverRejectsLiveCapsuleOverwriteDuringObservation",
+        "evidenceParentCreationSynchronizesContainingDirectory",
+        "evidenceParentSynchronizationFailureRemovesOnlyExactEmptyParent",
+        "writerInitializationFailurePreservesTypedPartialEvidenceResidue",
+        "productionInitialEvidencePublicationReportsTypedPreservedResidue",
         "independentVerifierRejectsIncompleteOrLegacySchemaThreePrefix",
         "persistentGateObserverBindsExactLockOnlyIdentityAndRejectsDrift",
         "persistentGateObserverDistinguishesAbsentBaseFromInvalidState",
@@ -14684,7 +14769,6 @@ required = {
         "independentVerifierRejectsAdmittingSchemaOneTeardown",
         "independentVerifierRejectsAdmittingSchemaTwoTeardownWithoutLiveGate",
         "independentVerifierReadsButDoesNotAdmitPersistentLockOnlyGate",
-        "independentVerifierAdmitsOnlySchemaFourWithExactPreservedV13Gate",
         "independentVerifierReadsButDoesNotAdmitExactPreservedV11GateWhenOptedIn",
         '"STORNAUT_TASK39_V11_GATE_BASE"',
         '"STORNAUT_TASK39_PERSISTENT_GATE_BASE"',
@@ -14711,7 +14795,17 @@ required = {
         '"preserved Gate capsule contract"',
         "if admitting:",
         '"admitting preserved persistent Gate schema"',
-        "elif teardown_schema == 4:",
+        "elif teardown_schema in (4, 5):",
+        '"admitting dual preserved persistent Gate schema"',
+        'expected_parent_leaf = (\n'
+        '                        "stornaut-iic-evidence-" + seal["campaignUUID"])',
+        'require(os.path.dirname(root_path) == expected_parent\n'
+        '                            and os.path.dirname(seal_path) == expected_parent\n'
+        '                            and os.path.basename(seal_path) == "seal.json",',
+        'parent_before = validate_open_fd(',
+        '"evidence parent final identity"',
+        '"evidence Application Support parent"',
+        "PRESERVED_V16_ATTEMPT",
         '"persistent Gate base inventory"',
         'home + "/" + evidence["persistentGateRelativePath"]',
         "path_identity(base_before) == expected_base",
@@ -15048,6 +15142,72 @@ function verify_iicc_v13_raw_evidence_loss_staged_scope() {
             && "$(print -r -- "$entry" | awk '{print $2}')" == \
             "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
             print -u2 "ii-c-c v13 raw evidence loss staged source drifted: $checkpoint_path"
+            return 1
+        }
+    done
+}
+
+function verify_iicc_persistent_evidence_p2_staged_scope() {
+    local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    local scope_root=${STORNAUT_IICC_SCOPE_WORKTREE_ROOT:-$repo_root}
+    [[ $scope_root == /* && -d $scope_root && ! -L $scope_root ]] || {
+        print -u2 "ii-c-c persistent evidence P2 scope root invalid"; return 1
+    }
+    local baseline=${1:-$iicc_persistent_evidence_p2_scope_baseline}
+    local expected_baseline=8a28c5b0ea36d13ae279c2f804b0a528603ddb23
+    [[ "$(git rev-parse "$baseline^{commit}" 2>/dev/null)" == \
+        $expected_baseline ]] || {
+        print -u2 "ii-c-c persistent evidence P2 baseline drifted"; return 1
+    }
+    local -A ceilings=(
+        Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift 80
+        Sources/StornautInvestigationMachineCampaign/main.swift 700
+        Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift 220
+        Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift 20
+        Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift 80
+        Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 900
+        Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 160
+        Tests/StornautInvestigationTests/InvestigationOwnerOnlyCapsuleTests.swift 160
+        scripts/verify-contract 350
+        scripts/verify-investigation-boundaries 450
+        scripts/verify-investigation-runtime-machine-report 350
+    )
+    local -a expected=(${(k)ceilings}) observed
+    local text checkpoint_path add delete total=0 mode entry
+    text=$(git diff --cached --name-only --diff-filter=ACMRD "$baseline" -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')
+    observed=(${(f)text})
+    (( ${#expected} == 11 && ${#observed} == 11 )) \
+        && [[ "${(j:\n:)${(@on)observed}}" == "${(j:\n:)${(@on)expected}}" ]] \
+        || { print -u2 "ii-c-c persistent evidence P2 paths drifted"; return 1; }
+    while IFS=$'\t' read -r add delete checkpoint_path; do
+        [[ $checkpoint_path == docs/* || $checkpoint_path == AGENTS.md \
+            || $checkpoint_path == README.md ]] && continue
+        [[ $add != - && $delete != - ]] || {
+            print -u2 "ii-c-c persistent evidence P2 binary path rejected"; return 1
+        }
+        (( add + delete <= ceilings[$checkpoint_path] )) || {
+            print -u2 "ii-c-c persistent evidence P2 path budget drifted: $checkpoint_path"
+            return 1
+        }
+        (( total += add + delete ))
+    done <<< "$(git diff --cached --numstat "$baseline" --)"
+    (( total <= 2_500 )) || {
+        print -u2 "ii-c-c persistent evidence P2 aggregate budget drifted"; return 1
+    }
+    [[ -z "$(git diff --name-only --diff-filter=ACMRD -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" \
+        && -z "$(git ls-files --others --exclude-standard -- \
+        | awk 'index($0,"docs/")!=1&&$0!="AGENTS.md"&&$0!="README.md"')" ]] \
+        || { print -u2 "ii-c-c persistent evidence P2 index/worktree drifted"; return 1; }
+    for checkpoint_path in "${expected[@]}"; do
+        mode=100644; [[ $checkpoint_path == scripts/* ]] && mode=100755
+        entry=$(git ls-files -s -- "$checkpoint_path")
+        [[ "$(print -r -- "$entry" | awk '{print $1, $3, $4}')" == \
+            "$mode 0 $checkpoint_path" \
+            && "$(print -r -- "$entry" | awk '{print $2}')" == \
+            "$(git hash-object -- "$scope_root/$checkpoint_path")" ]] || {
+            print -u2 "ii-c-c persistent evidence P2 staged source drifted: $checkpoint_path"
             return 1
         }
     done
@@ -20016,6 +20176,12 @@ if $iicc_v13_raw_evidence_loss_scope_only; then
     verify_iicc_v13_raw_evidence_loss_staged_scope \
         "$iicc_v13_raw_evidence_loss_scope_baseline"
     print "ii-c-c v13 raw evidence loss staged scope verification passed."
+    exit 0
+fi
+if $iicc_persistent_evidence_p2_scope_only; then
+    verify_iicc_persistent_evidence_p2_staged_scope \
+        "$iicc_persistent_evidence_p2_scope_baseline"
+    print "ii-c-c persistent evidence P2 staged scope verification passed."
     exit 0
 fi
 if $iicc_scope_contract_only; then

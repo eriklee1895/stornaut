@@ -635,6 +635,56 @@ struct InvestigationOwnerOnlyCapsuleTests {
     }
 
     @Test
+    func twoHistoricalCapsulesArePreservedWhileUnlistedStaleEntryIsRemoved() throws {
+        let firstBytes = try canonicalProjectedInput(
+            outerAttemptUUID: capsuleUUID(0xfa)).encoded()
+        let secondBytes = try canonicalProjectedInput(
+            outerAttemptUUID: capsuleUUID(0xfb)).encoded()
+        let firstRequest = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: firstBytes)
+        let secondRequest = try InvestigationOwnerOnlyCapsulePublicationRequest(
+            canonicalBytes: secondBytes)
+        let preserved = try [
+            InvestigationHistoricalGateCapsule(
+                outerAttemptUUID: firstRequest.outerAttemptUUID,
+                wholeInputSHA256: firstRequest.wholeInputSHA256,
+                byteCount: Int64(firstBytes.count), fileSHA256: .hashing(firstBytes)),
+            InvestigationHistoricalGateCapsule(
+                outerAttemptUUID: secondRequest.outerAttemptUUID,
+                wholeInputSHA256: secondRequest.wholeInputSHA256,
+                byteCount: Int64(secondBytes.count), fileSHA256: .hashing(secondBytes)),
+        ]
+        let stale = "attempt-00000000-0000-0000-0000-0000000000fd"
+        let freshBytes = try canonicalProjectedInput().encoded()
+        let ownership = CapsuleOwnershipSystem()
+        let system = CapsuleSemanticSystem(
+            bytes: freshBytes, inventory: .init(
+                entries: [fixedLockName, preserved[0].attemptName,
+                    preserved[1].attemptName, stale], reachedEnd: true))
+        system.staleLeaves[preserved[0].attemptName] = .final(
+            preserved[0].capsuleName)
+        system.staleLeaves[preserved[1].attemptName] = .final(
+            preserved[1].capsuleName)
+        system.staleBytes[preserved[0].attemptName] = firstBytes
+        system.staleBytes[preserved[1].attemptName] = secondBytes
+        system.staleLeaves[stale] = .empty
+
+        let lease = try InvestigationOwnerOnlyCapsulePublisher(
+            ownershipSystem: ownership, capsuleSystem: system,
+            preservedCapsules: preserved).publish(freshBytes)
+
+        #expect(system.recoveredAttemptNames == [stale])
+        #expect(preserved.allSatisfy { system.baseInventory.contains($0.attemptName) })
+        #expect(system.unlinkCalls.allSatisfy { call in
+            !preserved.contains { $0.capsuleName == call.name }
+        })
+        let proof = try lease.finishWithoutHandoff()
+        #expect(try lease.settle(neverHandedOff: proof) == .removed)
+        #expect(system.baseInventory == ([fixedLockName]
+            + preserved.map(\.attemptName)).sorted())
+    }
+
+    @Test
     func historicalCapsuleMismatchFailsBeforeCleanupOrPublication() throws {
         let historicalBytes = try canonicalProjectedInput(
             outerAttemptUUID: capsuleUUID(0xfe)
