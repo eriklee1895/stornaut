@@ -1,0 +1,21 @@
+{
+  "title" : "Stornaut App Icon — Nautilus Probe",
+  "generator" : {
+    "model" : "gpt-image-2",
+    "quality" : "high",
+    "size" : "1024x1024",
+    "background" : "opaque",
+    "generatedAt" : "2026-09-21T23:34:02+08:00"
+  },
+  "references" : [
+    "logo-final-premium-app-icon.webp",
+    "logo-h-nautilus-probe.webp"
+  ],
+  "selectedCandidate" : "B — bold silhouette",
+  "prompt" : "Create a production macOS application icon for Stornaut, a developer-focused intelligent disk scanner. Preserve the recognizable Nautilus Probe idea: one compact spiral shell fused with exactly one forward-facing cyan scanning lens. Design this as an original, premium native macOS utility icon, not a logo sheet and not a UI mockup. The icon should feel like a deep-ocean storage probe: precise, intelligent, calm, technical, and slightly mysterious. Use a dark abyssal navy rounded-square tile, a simplified indigo/violet shell with broad clean segments, a bright cyan lens, a very short restrained cyan scan wedge, and at most one tiny amber evidence light. Use subtle dimensional glass/metal materials, controlled rim lighting, and strong silhouette separation. The symbol must remain unmistakable at 16px, 32px, and 64px. Keep the central spiral large and simple. Use fewer shell seams than the references, thicker negative-space gaps, and no tiny decorative marks. Keep generous optical padding around the symbol. Center the visual mass. The icon must read clearly on both light and dark macOS desktops. No text, no letters, no S monogram, no numbers, no watermark, no trash can, no broom, no sparkles, no skull, no generic hard-drive platter, no Finder face, no Apple logo, no robot face, no excessive neon glow, no photorealistic sea animal, no thin hairline details, no transparent background, and no separate floating objects. Fill the full square canvas with the app-icon tile; do not add an outer screenshot frame or marketing mockup. Composition: larger shell, bolder silhouette, lens near upper-right third, minimal beam.",
+  "postProcessing" : {
+    "operation" : "A deterministic antialiased alpha mask removes only the generated black outer corners before the artwork is imported into Xcode 26 Icon Composer. Icon Composer applies the native platform mask, shadow, and glass treatment. No generative repainting.",
+    "master" : "../../../StornautApp/Resources/AppIcon.icon/Assets/stornaut-nautilus-probe.png",
+    "iconComposerSource" : "../../../StornautApp/Resources/AppIcon.icon"
+  }
+}

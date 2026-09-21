@@ -121,3 +121,21 @@ The silhouette reference and preferred starting point for the vector master. It 
 - Provide SVG/PDF vector sources plus an Xcode AppIcon asset catalog.
 - Check grayscale, high contrast, reduced transparency, and common color-vision deficiencies.
 - Do not add lettering, an `S`, a trash can, a broom, generic sparkles, or permanent warning/risk colors.
+
+## Production App icon
+
+The shipping App icon was generated with `gpt-image-2` on 2026-09-21 from the
+approved premium-icon and Nautilus Probe studies, then selected from three
+independent candidates after checking the silhouette at 128, 32, and 16 px.
+Candidate B was selected because its large spiral, single cyan lens, and short
+scan wedge survive small-size rendering without becoming a generic disk glyph.
+
+- Master: `../../../StornautApp/Resources/AppIcon.icon/Assets/stornaut-nautilus-probe.png`
+- Generation record: `stornaut-app-icon-master.metadata.json`
+- Native Xcode 26 source: `../../../StornautApp/Resources/AppIcon.icon/`
+
+The model output contained black pixels outside its rounded-square tile. The
+production master uses a deterministic antialiased alpha mask to remove only
+those outer corners. Xcode 26's Icon Composer source applies the final platform
+mask, shadow, and Liquid Glass treatment. The Nautilus Probe artwork itself was
+not repainted during production processing.
