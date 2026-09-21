@@ -1,0 +1,495 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+helper_source="$repo_root/scripts/with-clean-validation-snapshot"
+repo_parent=${repo_root:h}
+
+function fail_contract() {
+    print -u2 -- "$1"
+    exit 1
+}
+
+[[ "$repo_parent" == /Users/* ]] \
+    || fail_contract "Snapshot contract must run beneath /Users"
+[[ -x "$helper_source" ]] \
+    || fail_contract "Clean validation snapshot helper is unavailable"
+
+contract_root=$(mktemp -d \
+    "$repo_parent/stornaut-snapshot-contract.XXXXXX")
+synthetic_repo="$contract_root/repository"
+other_worktree="$contract_root/other-worktree"
+non_users_root=""
+signal_probe_pid_file="$contract_root/results/signal-probe.pid"
+signal_descendant_pid_file="$contract_root/results/signal-descendant.pid"
+
+function cleanup_contract() {
+    if [[ -s "$signal_probe_pid_file" ]]; then
+        local signal_probe_pid
+        signal_probe_pid=$(<"$signal_probe_pid_file")
+        if [[ "$signal_probe_pid" == <-> ]]; then
+            /bin/kill -TERM "$signal_probe_pid" >/dev/null 2>&1 || true
+        fi
+    fi
+    if [[ -s "$signal_descendant_pid_file" ]]; then
+        local signal_descendant_pid
+        signal_descendant_pid=$(<"$signal_descendant_pid_file")
+        if [[ "$signal_descendant_pid" == <-> ]]; then
+            /bin/kill -TERM "$signal_descendant_pid" \
+                >/dev/null 2>&1 || true
+        fi
+    fi
+    if [[ -n "$non_users_root" && -d "$non_users_root" ]]; then
+        /bin/rm -rf -- "$non_users_root"
+    fi
+    if [[ -d "$synthetic_repo/.git" ]]; then
+        git -C "$synthetic_repo" worktree remove --force -- \
+            "$other_worktree" >/dev/null 2>&1 || true
+    fi
+    if [[ -d "$contract_root" ]]; then
+        /bin/rm -rf -- "$contract_root"
+    fi
+}
+trap cleanup_contract EXIT
+
+mkdir -p "$synthetic_repo/scripts" "$contract_root/results"
+git -C "$synthetic_repo" init -q
+git -C "$synthetic_repo" config user.name 'Stornaut Contract'
+git -C "$synthetic_repo" config user.email \
+    'stornaut-contract@example.invalid'
+cp "$helper_source" \
+    "$synthetic_repo/scripts/with-clean-validation-snapshot"
+chmod 755 "$synthetic_repo/scripts/with-clean-validation-snapshot"
+cat > "$synthetic_repo/scripts/snapshot-probe" <<'SH'
+#!/bin/sh
+set -eu
+output=$1
+{
+    printf 'head=%s\n' "$(git rev-parse HEAD)"
+    printf 'binding=%s\n' "${STORNAUT_VALIDATION_COMMIT:-}"
+    printf 'source=%s\n' "${STORNAUT_VALIDATION_SOURCE:-}"
+    printf 'tracked=%s\n' "$(cat tracked.txt)"
+    if [ -e untracked.txt ]; then
+        printf 'untracked=present\n'
+    else
+        printf 'untracked=absent\n'
+    fi
+    if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
+        printf 'status=dirty\n'
+    else
+        printf 'status=clean\n'
+    fi
+} > "$output"
+SH
+chmod 755 "$synthetic_repo/scripts/snapshot-probe"
+cat > "$synthetic_repo/scripts/snapshot-security-probe" <<'SH'
+#!/bin/sh
+set -eu
+output=$1
+source_tracked=$2
+git_common_marker=$3
+other_tracked=$4
+
+attempt_write() {
+    label=$1
+    destination=$2
+    if (printf poison > "$destination") 2>/dev/null; then
+        printf '%s_write=allowed\n' "$label"
+    else
+        printf '%s_write=denied\n' "$label"
+    fi
+}
+
+{
+    poison_seen=none
+    for variable in \
+        GIT_DIR \
+        GIT_WORK_TREE \
+        GIT_CONFIG_COUNT \
+        GIT_CONFIG_KEY_0 \
+        GIT_CONFIG_VALUE_0 \
+        GIT_OBJECT_DIRECTORY \
+        GIT_ALTERNATE_OBJECT_DIRECTORIES \
+        STORNAUT_VALIDATION_TREE \
+        STORNAUT_VALIDATION_MANIFEST_SHA256 \
+        STORNAUT_VALIDATION_PROMPT_SHA256 \
+        STORNAUT_VALIDATION_ENVELOPE_SCHEMA_SHA256 \
+        STORNAUT_VALIDATION_FACADE_SHA256; do
+        if /usr/bin/env | /usr/bin/grep -q "^${variable}="; then
+            poison_seen=$variable
+            break
+        fi
+    done
+    printf 'poison=%s\n' "$poison_seen"
+    printf 'commit=%s\n' "${STORNAUT_VALIDATION_COMMIT:-}"
+    printf 'source=%s\n' "${STORNAUT_VALIDATION_SOURCE:-}"
+
+    attempt_write snapshot tracked.txt
+    attempt_write source "$source_tracked"
+    attempt_write git_common "$git_common_marker"
+    attempt_write other_worktree "$other_tracked"
+
+    printf 'snapshot_bytes=%s\n' "$(cat tracked.txt)"
+    printf 'source_bytes=%s\n' "$(cat "$source_tracked")"
+    printf 'git_common_bytes=%s\n' "$(cat "$git_common_marker")"
+    printf 'other_worktree_bytes=%s\n' "$(cat "$other_tracked")"
+    if git diff --quiet -- tracked.txt \
+        && git diff --cached --quiet -- tracked.txt; then
+        printf 'snapshot_tracked_status=unchanged\n'
+    else
+        printf 'snapshot_tracked_status=changed\n'
+    fi
+    printf 'regular_mode=%s\n' "$(/usr/bin/stat -f '%Lp' tracked.txt)"
+    printf 'executable_mode=%s\n' \
+        "$(/usr/bin/stat -f '%Lp' scripts/snapshot-security-probe)"
+
+    mkdir -p .build/contract-probe .derivedData/contract-probe
+    printf build-writable > .build/contract-probe/result
+    printf derived-writable > .derivedData/contract-probe/result
+    printf 'build_bytes=%s\n' "$(cat .build/contract-probe/result)"
+    printf 'derived_bytes=%s\n' \
+        "$(cat .derivedData/contract-probe/result)"
+} > "$output"
+SH
+chmod 755 "$synthetic_repo/scripts/snapshot-security-probe"
+cat > "$synthetic_repo/scripts/snapshot-signal-probe" <<'SH'
+#!/bin/sh
+set -eu
+started=$1
+finished=$2
+pid_file=$3
+descendant_pid_file=$4
+trap '' TERM
+printf '%s\n' "$$" > "$pid_file"
+(
+    trap '' TERM
+    while :; do
+        sleep 1
+    done
+) &
+descendant_pid=$!
+printf '%s\n' "$descendant_pid" > "$descendant_pid_file"
+printf started > "$started"
+while /bin/kill -0 "$descendant_pid" 2>/dev/null; do
+    wait "$descendant_pid" || true
+done
+printf finished > "$finished"
+SH
+chmod 755 "$synthetic_repo/scripts/snapshot-signal-probe"
+print -r -- 'version-one' > "$synthetic_repo/tracked.txt"
+chmod 644 "$synthetic_repo/tracked.txt"
+git -C "$synthetic_repo" add scripts tracked.txt
+git -C "$synthetic_repo" commit -q -m 'first snapshot'
+first_commit=$(git -C "$synthetic_repo" rev-parse HEAD)
+print -r -- 'version-two' > "$synthetic_repo/tracked.txt"
+git -C "$synthetic_repo" add tracked.txt
+git -C "$synthetic_repo" commit -q -m 'second snapshot'
+head_commit=$(git -C "$synthetic_repo" rev-parse HEAD)
+
+git -C "$synthetic_repo" worktree add --detach -- \
+    "$other_worktree" "$first_commit" >/dev/null
+other_before=$(git -C "$synthetic_repo" worktree list --porcelain)
+other_status_before=$(
+    git -C "$other_worktree" status --porcelain=v1 --untracked-files=all
+)
+git_common_marker="$synthetic_repo/.git/stornaut-contract-protected"
+print -r -- 'git-common-original' > "$git_common_marker"
+
+print -r -- 'staged-version' > "$synthetic_repo/tracked.txt"
+git -C "$synthetic_repo" add tracked.txt
+print -r -- 'unstaged-version' > "$synthetic_repo/tracked.txt"
+print -r -- 'must-not-enter-snapshot' \
+    > "$synthetic_repo/untracked.txt"
+source_status_before=$(
+    git -C "$synthetic_repo" status --porcelain=v1 --untracked-files=all
+)
+
+(
+    cd "$synthetic_repo"
+    scripts/with-clean-validation-snapshot -- \
+        scripts/snapshot-probe "$contract_root/results/head.txt"
+)
+head_result=$(<"$contract_root/results/head.txt")
+for expected in \
+    "head=$head_commit" \
+    "binding=$head_commit" \
+    'source=commit' \
+    'tracked=version-two' \
+    'untracked=absent' \
+    'status=clean'; do
+    [[ "$head_result" == *"$expected"* ]] \
+        || fail_contract "HEAD snapshot omitted $expected"
+done
+
+(
+    cd "$synthetic_repo"
+    scripts/with-clean-validation-snapshot \
+        --commit "$first_commit" -- \
+        scripts/snapshot-probe "$contract_root/results/old.txt"
+)
+old_result=$(<"$contract_root/results/old.txt")
+for expected in \
+    "head=$first_commit" \
+    "binding=$first_commit" \
+    'source=commit' \
+    'tracked=version-one' \
+    'untracked=absent' \
+    'status=clean'; do
+    [[ "$old_result" == *"$expected"* ]] \
+        || fail_contract "Historical snapshot omitted $expected"
+done
+
+(
+    cd "$synthetic_repo"
+    scripts/with-clean-validation-snapshot --staged -- \
+        scripts/snapshot-probe "$contract_root/results/staged.txt"
+)
+staged_result=$(<"$contract_root/results/staged.txt")
+staged_head=$(print -r -- "$staged_result" \
+    | sed -n 's/^head=//p')
+[[ -n "$staged_head" && "$staged_head" != "$head_commit" ]] \
+    || fail_contract "Staged snapshot did not create an exact commit"
+for expected in \
+    "binding=$staged_head" \
+    'source=staged' \
+    'tracked=staged-version' \
+    'untracked=absent' \
+    'status=clean'; do
+    [[ "$staged_result" == *"$expected"* ]] \
+        || fail_contract "Staged snapshot omitted $expected"
+done
+
+security_status=0
+(
+    cd "$synthetic_repo"
+    umask 077
+    /usr/bin/env \
+        GIT_DIR=caller-poison-git-dir \
+        GIT_WORK_TREE=caller-poison-work-tree \
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0=core.hooksPath \
+        GIT_CONFIG_VALUE_0=caller-poison-hooks \
+        GIT_OBJECT_DIRECTORY=caller-poison-object-directory \
+        GIT_ALTERNATE_OBJECT_DIRECTORIES=caller-poison-alternates \
+        STORNAUT_VALIDATION_COMMIT=caller-poison-commit \
+        STORNAUT_VALIDATION_SOURCE=caller-poison-source \
+        STORNAUT_VALIDATION_TREE=caller-poison-tree \
+        STORNAUT_VALIDATION_MANIFEST_SHA256=caller-poison-manifest \
+        STORNAUT_VALIDATION_PROMPT_SHA256=caller-poison-prompt \
+        STORNAUT_VALIDATION_ENVELOPE_SCHEMA_SHA256=caller-poison-envelope \
+        STORNAUT_VALIDATION_FACADE_SHA256=caller-poison-facade \
+        scripts/with-clean-validation-snapshot -- \
+        scripts/snapshot-security-probe \
+        "$contract_root/results/security.txt" \
+        "$synthetic_repo/tracked.txt" \
+        "$git_common_marker" \
+        "$other_worktree/tracked.txt"
+) || security_status=$?
+(( security_status == 0 )) \
+    || fail_contract \
+        "Snapshot security probe returned $security_status"
+security_result=$(<"$contract_root/results/security.txt")
+for expected in \
+    'poison=none' \
+    "commit=$head_commit" \
+    'source=commit' \
+    'snapshot_write=denied' \
+    'source_write=denied' \
+    'git_common_write=denied' \
+    'other_worktree_write=denied' \
+    'snapshot_bytes=version-two' \
+    'source_bytes=unstaged-version' \
+    'git_common_bytes=git-common-original' \
+    'other_worktree_bytes=version-one' \
+    'snapshot_tracked_status=unchanged' \
+    'regular_mode=644' \
+    'executable_mode=755' \
+    'build_bytes=build-writable' \
+    'derived_bytes=derived-writable'; do
+    [[ "$security_result" == *"$expected"* ]] \
+        || fail_contract "Snapshot security contract omitted $expected"
+done
+[[ "$(<"$synthetic_repo/tracked.txt")" == 'unstaged-version' ]] \
+    || fail_contract "Snapshot security probe modified source bytes"
+[[ "$(<"$git_common_marker")" == 'git-common-original' ]] \
+    || fail_contract "Snapshot security probe modified Git common bytes"
+[[ "$(<"$other_worktree/tracked.txt")" == 'version-one' ]] \
+    || fail_contract "Snapshot security probe modified other-worktree bytes"
+source_status_after_security=$(
+    git -C "$synthetic_repo" status --porcelain=v1 --untracked-files=all
+)
+other_status_after_security=$(
+    git -C "$other_worktree" status --porcelain=v1 --untracked-files=all
+)
+[[ "$source_status_after_security" == "$source_status_before" ]] \
+    || fail_contract "Snapshot security probe modified source status"
+[[ "$other_status_after_security" == "$other_status_before" ]] \
+    || fail_contract "Snapshot security probe modified other-worktree status"
+
+symlink_blob=$(
+    print -rn -- 'tracked.txt' \
+        | git -C "$synthetic_repo" hash-object -w --stdin
+)
+symlink_tree=$(
+    /usr/bin/printf '120000 blob %s\tunsupported-link\0' "$symlink_blob" \
+        | git -C "$synthetic_repo" mktree -z
+)
+symlink_commit=$(
+    print -r -- 'unsupported symlink snapshot' \
+        | git -C "$synthetic_repo" commit-tree \
+            "$symlink_tree" -p "$head_commit"
+)
+gitlink_tree=$(
+    /usr/bin/printf '160000 commit %s\tunsupported-gitlink\0' \
+        "$first_commit" \
+        | git -C "$synthetic_repo" mktree -z
+)
+gitlink_commit=$(
+    print -r -- 'unsupported gitlink snapshot' \
+        | git -C "$synthetic_repo" commit-tree \
+            "$gitlink_tree" -p "$head_commit"
+)
+for unsupported_case in \
+    "symlink:$symlink_commit" \
+    "gitlink:$gitlink_commit"; do
+    unsupported_label=${unsupported_case%%:*}
+    unsupported_commit=${unsupported_case#*:}
+    unsupported_marker="$contract_root/results/$unsupported_label-command-executed"
+    unsupported_status=0
+    (
+        cd "$synthetic_repo"
+        scripts/with-clean-validation-snapshot \
+            --commit "$unsupported_commit" -- \
+            /bin/sh -c 'printf executed > "$1"' \
+            "unsupported-$unsupported_label" "$unsupported_marker"
+    ) >/dev/null 2>&1 || unsupported_status=$?
+    (( unsupported_status == 70 )) \
+        || fail_contract \
+            "Unsupported $unsupported_label returned $unsupported_status"
+    [[ ! -e "$unsupported_marker" ]] \
+        || fail_contract \
+            "Unsupported $unsupported_label executed the validation command"
+    unsupported_residue=$(
+        find "$contract_root" -maxdepth 1 -type d \
+            -name 'stornaut-validation.*' -print
+    )
+    [[ -z "$unsupported_residue" ]] \
+        || fail_contract \
+            "Unsupported $unsupported_label retained snapshot: $unsupported_residue"
+done
+
+command_status=0
+(
+    cd "$synthetic_repo"
+    scripts/with-clean-validation-snapshot -- /bin/sh -c 'exit 23'
+) || command_status=$?
+(( command_status == 23 )) \
+    || fail_contract "Snapshot helper did not preserve command status 23"
+
+signal_started="$contract_root/results/signal.started"
+signal_finished="$contract_root/results/signal.finished"
+(
+    cd "$synthetic_repo"
+    scripts/with-clean-validation-snapshot -- \
+        scripts/snapshot-signal-probe \
+        "$signal_started" \
+        "$signal_finished" \
+        "$signal_probe_pid_file" \
+        "$signal_descendant_pid_file"
+) >"$contract_root/results/signal.log" 2>&1 &
+snapshot_wrapper_pid=$!
+for _ in {1..100}; do
+    [[ -s "$signal_started" ]] && break
+    sleep 0.02
+done
+[[ -s "$signal_started" ]] \
+    || fail_contract "Snapshot signal probe did not start"
+/bin/kill -TERM "$snapshot_wrapper_pid"
+signal_status=0
+wait "$snapshot_wrapper_pid" || signal_status=$?
+(( signal_status == 143 )) \
+    || fail_contract \
+        "Snapshot helper mapped SIGTERM to status $signal_status"
+[[ ! -e "$signal_finished" ]] \
+    || fail_contract "Interrupted snapshot command reached normal completion"
+signal_probe_pid=$(<"$signal_probe_pid_file")
+signal_descendant_pid=$(<"$signal_descendant_pid_file")
+for _ in {1..100}; do
+    if ! /bin/kill -0 "$signal_probe_pid" 2>/dev/null \
+        && ! /bin/kill -0 "$signal_descendant_pid" 2>/dev/null; then
+        break
+    fi
+    sleep 0.02
+done
+if /bin/kill -0 "$signal_probe_pid" 2>/dev/null \
+    || /bin/kill -0 "$signal_descendant_pid" 2>/dev/null; then
+    fail_contract "Snapshot helper left its command process group alive"
+fi
+rm -f -- "$signal_probe_pid_file" "$signal_descendant_pid_file"
+for _ in {1..100}; do
+    if ! find "$contract_root" -maxdepth 1 -type d \
+        -name 'stornaut-validation.*' | grep -q .; then
+        break
+    fi
+    sleep 0.02
+done
+if find "$contract_root" -maxdepth 1 -type d \
+    -name 'stornaut-validation.*' | grep -q .; then
+    fail_contract "Interrupted snapshot left its worktree behind"
+fi
+
+source_status_after=$(
+    git -C "$synthetic_repo" status --porcelain=v1 --untracked-files=all
+)
+[[ "$source_status_after" == "$source_status_before" ]] \
+    || fail_contract "Snapshot helper modified the source worktree"
+other_after=$(git -C "$synthetic_repo" worktree list --porcelain)
+[[ "$other_after" == "$other_before" ]] \
+    || fail_contract "Snapshot helper modified another registered worktree"
+[[ "$(<"$other_worktree/tracked.txt")" == 'version-one' ]] \
+    || fail_contract "Snapshot helper modified another worktree's content"
+if find "$contract_root" -maxdepth 1 -type d \
+    -name 'stornaut-validation.*' | grep -q .; then
+    fail_contract "Snapshot helper left its temporary worktree behind"
+fi
+
+for invalid_case in \
+    '--commit missing-revision -- /usr/bin/true' \
+    '--commit' \
+    '--staged'; do
+    invalid_status=0
+    (
+        cd "$synthetic_repo"
+        scripts/with-clean-validation-snapshot \
+            ${(z)invalid_case}
+    ) >/dev/null 2>&1 || invalid_status=$?
+    (( invalid_status == 64 )) \
+        || fail_contract \
+            "Invalid snapshot CLI returned $invalid_status: $invalid_case"
+done
+
+non_users_root=$(mktemp -d \
+    "${TMPDIR:-/tmp}/stornaut-snapshot-path-contract.XXXXXX")
+mkdir -p "$non_users_root/repository/scripts"
+cp "$helper_source" \
+    "$non_users_root/repository/scripts/with-clean-validation-snapshot"
+chmod 755 \
+    "$non_users_root/repository/scripts/with-clean-validation-snapshot"
+git -C "$non_users_root/repository" init -q
+git -C "$non_users_root/repository" config user.name 'Stornaut Contract'
+git -C "$non_users_root/repository" config user.email \
+    'stornaut-contract@example.invalid'
+print -r -- 'outside-users' > "$non_users_root/repository/tracked.txt"
+git -C "$non_users_root/repository" add .
+git -C "$non_users_root/repository" commit -q -m outside
+outside_status=0
+(
+    cd "$non_users_root/repository"
+    scripts/with-clean-validation-snapshot -- /usr/bin/true
+) >/dev/null 2>&1 || outside_status=$?
+(( outside_status == 64 )) \
+    || fail_contract \
+        "Snapshot helper accepted a repository outside /Users"
+
+print "Clean validation snapshot contract passed."

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "canonicalManifest": {
+    "schemaVersion": 1,
+    "domain": "stornaut.task39.machine.git-manifest.v1",
+    "command": "/usr/bin/git",
+    "commandArguments": [
+      "ls-tree",
+      "-rz",
+      "--full-tree",
+      "--long"
+    ],
+    "treeArgument": "validationTree",
+    "digestInput": [
+      "domain-utf8",
+      "nul",
+      "raw-command-stdout"
+    ],
+    "requiredObjectType": "blob",
+    "digestAlgorithm": "sha256",
+    "digestEncoding": "lowercase-hex"
+  },
+  "artifacts": {
+    "promptRelativePath": "Sources/StornautInvestigation/Resources/investigation-prompt-v1.txt",
+    "envelopeSchemaRelativePath": "Sources/StornautCodex/Schemas/investigation-envelope-v2.schema.json",
+    "task38FacadeRelativePath": "Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift"
+  }
+}

@@ -1,0 +1,185 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+typeset -gr automation_mode_tool=/usr/bin/automationmodetool
+
+function automation_mode_is_ready() {
+    local output=$1
+    local normalized=${output//$'\r'/}
+    local -a lines
+    lines=("${(@f)normalized}")
+
+    if [[ ${#lines[@]} -ne 2 ]]; then
+        return 1
+    fi
+
+    local mode_line=${lines[1]:l}
+    local policy_line=${lines[2]:l}
+    local requires_line="this device requires user authentication to enable automation mode."
+    local no_auth_line="this device does not require user authentication to enable automation mode."
+
+    if [[ "$policy_line" != "$requires_line" && "$policy_line" != "$no_auth_line" ]]; then
+        return 1
+    fi
+
+    if [[ "$mode_line" == "automation mode is enabled." ]]; then
+        return 0
+    fi
+
+    [[ "$mode_line" == "automation mode is disabled." ]] \
+        && [[ "$policy_line" == "$no_auth_line" ]]
+}
+
+function automation_mode_requires_auth_prompt() {
+    local output=$1
+    local normalized=${output//$'\r'/}
+    local -a lines
+    lines=("${(@f)normalized}")
+
+    [[ ${#lines[@]} -eq 2 ]] \
+        && [[ "${lines[1]:l}" == "automation mode is disabled." ]] \
+        && [[ "${lines[2]:l}" == \
+            "this device requires user authentication to enable automation mode." ]]
+}
+
+function run_self_test() {
+    automation_mode_is_ready \
+        $'Automation Mode is enabled.\nThis device requires user authentication to enable Automation Mode.'
+    automation_mode_is_ready \
+        $'Automation Mode is ENABLED.\nThis device requires user authentication to enable Automation Mode.'
+    automation_mode_is_ready \
+        $'Automation Mode is disabled.\nThis device does not require user authentication to enable Automation Mode.'
+    automation_mode_is_ready \
+        $'Automation Mode is disabled.\nThis device DOES NOT REQUIRE user authentication to enable Automation Mode.'
+    automation_mode_requires_auth_prompt \
+        $'Automation Mode is disabled.\nThis device requires user authentication to enable Automation Mode.'
+    automation_mode_requires_auth_prompt \
+        $'Automation Mode is DISABLED.\nThis device REQUIRES user authentication to enable Automation Mode.'
+
+    if automation_mode_is_ready \
+        $'Automation Mode is disabled.\nThis device requires user authentication to enable Automation Mode.'
+    then
+        print -u2 "Authentication-required Automation Mode was accepted."
+        return 1
+    fi
+
+    if automation_mode_requires_auth_prompt \
+        $'Automation Mode is enabled.\nThis device requires user authentication to enable Automation Mode.'
+    then
+        print -u2 "Enabled Automation Mode was treated as requiring a prompt."
+        return 1
+    fi
+
+    if automation_mode_requires_auth_prompt \
+        $'Automation Mode is disabled.\nThis device does not require user authentication to enable Automation Mode.'
+    then
+        print -u2 "Authentication-free Automation Mode was treated as requiring a prompt."
+        return 1
+    fi
+
+    if automation_mode_requires_auth_prompt \
+        $'Automation Mode is disabled.\nThis device requires user authentication to enable Automation Mode.\nunexpected trailing status'
+    then
+        print -u2 "Trailing Automation Mode output was accepted for an authentication prompt."
+        return 1
+    fi
+
+    if automation_mode_is_ready \
+        $'Automation Mode is ENABLED.\nAutomation Mode is disabled.\nThis device DOES NOT REQUIRE user authentication to enable Automation Mode.'
+    then
+        print -u2 "Contradictory Automation Mode status was accepted."
+        return 1
+    fi
+
+    if automation_mode_is_ready \
+        $'Automation Mode is disabled.\nThis device requires user authentication to enable Automation Mode.\nThis device DOES NOT REQUIRE user authentication to enable Automation Mode.'
+    then
+        print -u2 "Contradictory authentication policy was accepted."
+        return 1
+    fi
+
+    if automation_mode_is_ready \
+        $'Automation Mode is ENABLED.\nThis device requires user authentication to enable Automation Mode.\nThis device DOES NOT REQUIRE user authentication to enable Automation Mode.'
+    then
+        print -u2 "Enabled state accepted a contradictory authentication policy."
+        return 1
+    fi
+
+    if automation_mode_is_ready \
+        $'Automation Mode is ENABLED.\nThis device requires user authentication to enable Automation Mode.\nunexpected trailing status'
+    then
+        print -u2 "Automation Mode status with trailing output was accepted."
+        return 1
+    fi
+
+    if automation_mode_is_ready "unexpected status"; then
+        print -u2 "Unknown Automation Mode status was accepted."
+        return 1
+    fi
+
+    local shadow_dir shadow_marker script_path
+    shadow_dir=$(mktemp -d "${TMPDIR:-/tmp}/stornaut-automation-shadow.XXXXXX")
+    shadow_marker="$shadow_dir/shadow-was-launched"
+    script_path=${0:A}
+    cat > "$shadow_dir/automationmodetool" <<EOF
+#!/bin/sh
+printf launched > "$shadow_marker"
+printf '%s\n' 'Automation Mode is ENABLED.' \
+    'This device requires user authentication to enable Automation Mode.'
+EOF
+    chmod 700 "$shadow_dir/automationmodetool"
+    PATH="$shadow_dir:$PATH" "$script_path" >/dev/null 2>&1 || true
+    if [[ -e "$shadow_marker" ]]; then
+        rm -rf "$shadow_dir"
+        print -u2 "A PATH-shadowed automationmodetool was executed."
+        return 1
+    fi
+    rm -rf "$shadow_dir"
+
+    print "Automation Mode readiness parser self-test passed."
+}
+
+if [[ ${1:-} == "--self-test" ]]; then
+    [[ $# -eq 1 ]]
+    run_self_test
+    exit 0
+fi
+
+allow_auth_prompt=false
+if [[ ${1:-} == "--allow-auth-prompt" ]]; then
+    [[ $# -eq 1 ]]
+    allow_auth_prompt=true
+else
+    [[ $# -eq 0 ]]
+fi
+
+if [[ ! -x "$automation_mode_tool" ]]; then
+    print -u2 "automationmodetool is unavailable on this macOS host."
+    exit 1
+fi
+
+automation_state=$("$automation_mode_tool" 2>&1)
+if automation_mode_is_ready "$automation_state"; then
+    print -r -- "$automation_state"
+    print "UI Automation readiness gate passed."
+    exit 0
+fi
+
+if $allow_auth_prompt \
+    && automation_mode_requires_auth_prompt "$automation_state"
+then
+    print -r -- "$automation_state"
+    print \
+        "UI Automation requires standard user authentication; start XCUITest immediately so the user can approve Apple's prompt."
+    print \
+        "This gate is read-only and did not change Automation Mode, its authentication policy, TCC, Accessibility, Event Synthesizing, SIP, or any daemon."
+    exit 0
+fi
+
+print -u2 -r -- "$automation_state"
+print -u2 \
+    "UI Automation is not ready for a standalone check. Start an immediate UI-only XCTest request and let the user approve Apple's prompt."
+print -u2 \
+    "This gate is read-only and did not change Automation Mode, TCC, Accessibility, Event Synthesizing, SIP, or any daemon."
+exit 1

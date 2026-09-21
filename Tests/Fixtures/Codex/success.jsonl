@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"thread-fixture"}
+{"type":"turn.started"}
+{"type":"future.event","phase":"fixture","sequence":1,"nested":{"ignored":"raw"}}
+{"type":"item.completed","item":{"id":"message-fixture","type":"agent_message","text":"{\"summary\":\"Static fixture result\",\"findings\":[{\"targetID\":\"target-1\",\"summary\":\"No cleanup action was evaluated\"}],\"unresolvedTargetIDs\":[]}"}}
+{"type":"turn.completed","usage":{"input_tokens":12,"cached_input_tokens":3,"cache_write_input_tokens":0,"output_tokens":8,"reasoning_output_tokens":2}}

@@ -1,0 +1,6637 @@
+import Foundation
+import Testing
+
+@Suite("Task 39 trusted machine target boundary")
+struct InvestigationMachineTargetBoundaryTests {
+    @Test
+    func preArmFailureRepairHasDedicatedSourceAndScopeGates() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        for marker in [
+            "--iic-c-prearm-failure-source-contract-only",
+            "--iic-c-prearm-failure-staged-scope-contract-only",
+            "function verify_iicc_prearm_failure_source_contract()",
+            "function verify_iicc_prearm_failure_staged_scope()",
+            "51ea8c28b9431280bb0e8b7e6373e2e1ad538298",
+            "pre-arm failure teardown order drifted",
+            "pre-arm failure non-admission drifted",
+            "pre-arm failure classifier order drifted",
+            "physicalCompactPreArmFailurePreservesVerifiedExitAndZeroResidue",
+        ] {
+            #expect(boundary.contains(marker), "missing: (marker)")
+        }
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(contract.contains(
+            "--iic-c-prearm-failure-source-contract-only"))
+        #expect(contract.contains(
+            "pre-arm failure scope negative inventory drifted"))
+    }
+
+    @Test
+    func iiCCPreArmVerifierPinsHistoricalAndCurrentClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+
+        for marker in [
+            "--iic-c-prearm-staged-scope-contract-only",
+            "function verify_iicc_prearm_staged_scope()",
+            "62ee47091e338107e182233eaed80ed1ecc059cc",
+            "ii-c-c pre-arm aggregate budget drifted",
+            "ii-c-c source path identity drifted",
+            "contract-aggregate-call-drop",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "2a29aff40fb39ec6465f75b2e70d43e3ba42ed4e",
+            "b5b4170f942fc92872c2d82f54baf2943f3e176f",
+            "3e49956f6f8e44d5d191d47c9e86856dd00d6966",
+            "223c407b1e02d1cbaf230e30d0c1aa38b31397f9",
+            "849e454de2cfd07f3d326e2a5df0c0a305678f0c",
+            "f6c36d2fb18f0a742e7ff26568e2eff67cc8784b",
+            "ii-c-c mutation diagnostic drifted:",
+            "ii-c-c protocol mutation accepted:",
+            "ii-c-c pre-arm scope negative inventory drifted",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+        let aggregateCall = "STORNAUT_IICC_SKIP_COMPONENT_BUILD=1 "
+            + "\\" + "\n"
+            + "    verify_iicc_contract \"$contract_root/iicc\""
+        #expect(contract.contains(aggregateCall))
+
+        let replay = try #require(contract.range(
+            of: "function replay_historical_contract()"
+        ))
+        let replayEnd = try #require(contract.range(
+            of: "function verify_iic0biia_historical_contract()"
+        ))
+        #expect(!contract[replay.lowerBound..<replayEnd.lowerBound].contains(
+            "scripts/verify-contract --iic-c-contract-only"
+        ))
+    }
+
+    @Test
+    func iiCCSuspendedSudoRepairPinsRestrictedAPIReplacement() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+
+        for marker in [
+            "--iic-c-suspended-sudo-contract-only",
+            "function verify_iicc_suspended_sudo_contract()",
+            "KERN_PROC_PID",
+            "ii-c-c suspended-sudo restricted API returned",
+            "ii-c-c suspended-sudo fixture can continue child",
+            "realSudoSuspendedChildRemainsContainedBeforeAnyCredentialPrompt",
+            "kernelProcessIdentityReadsSuspendedSetuidChildWhenProcPidinfoCannot",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "suspended-sudo-kernel-selector",
+            "suspended-sudo-start-time",
+            "suspended-sudo-continuation",
+            "suspended-sudo-output-vacuity",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        for marker in [
+            "--iic-c-suspended-sudo-component-boundary-only",
+            "function verify_iicc_suspended_sudo_component_boundary()",
+            "InvestigationMachineKernelChildIdentityReader",
+            "ii-c-c suspended-sudo Gate gained authority",
+        ] {
+            #expect(release.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
+    func rootDriverLineageCrossUIDVerifierPinsCommittedRepair() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--root-driver-lineage-cross-uid-source-contract-only",
+            "--root-driver-lineage-cross-uid-mutation-contract-only",
+            "--root-driver-lineage-cross-uid-staged-scope-contract-only",
+            "function verify_root_driver_lineage_cross_uid_source_contract()",
+            "function verify_root_driver_lineage_cross_uid_staged_scope()",
+            "stornaut_investigation_process_snapshot_for_pid",
+            "proc_pidpath(processID",
+            "kSecGuestAttributePid: NSNumber(value: processID)",
+            "InvestigationMachineGateObservedProcessIdentity",
+            "claim.auditTokenWords[0] == observed.auditUserID",
+            "lhs.startSeconds == rhs.startSeconds",
+            "current.processGroupID != original.processGroupID ||",
+            "retirementAcceptsReuseOutsideOldProcessGroupInSameSession",
+            "arguments: [0, 1, 2]",
+            "@Test(arguments: GateFailurePoint.allCases)",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for forbidden in [
+            "stornaut_investigation_identity_for_pid",
+            "proc_pidpath_audittoken", "kSecGuestAttributeAudit",
+            "task_name_for_pid", "TASK_AUDIT_TOKEN",
+        ] {
+            #expect(boundary.contains(forbidden))
+        }
+        for marker in [
+            "--root-driver-lineage-cross-uid-contract-only",
+            "b664299983a6311dde4ee6982f180ba9b7fab1ab",
+            "474f63455f7f962f5537fdd9f6d7e55e01242c51",
+            "8ac3c409e56b5216a2715ec5eb59d729302d849b",
+            "== 412", "cross-UID mutation accepted:",
+            "b4c632e68e2f28ef67b9734bce82dac61bdc7bed",
+            "d099939defebc83374c0bdc8452f938d13aa90d4",
+            "== 31", "retirement-cohort-conjunction",
+            "cross-UID mutation diagnostic drifted:",
+            "cross-UID protocol mutation accepted:",
+            "unknown-name", "wrong-slot", "malformed-sha",
+            "wrong-sha", "unchanged-source", "unrecognized-content",
+            "two-changed-slots",
+            "cross-UID unchanged-slot alternate path accepted",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "verify_root_driver_lineage_cross_uid_contract",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
+    func v16RepairPinsKernelAndAuditAnchorJoin() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-c-v16-repair-source-contract-only",
+            "--iic-c-v16-repair-mutation-contract-only",
+            "--iic-c-v16-repair-staged-scope-contract-only",
+            "function verify_iicc_v16_repair_source_contract()",
+            "function verify_iicc_v16_repair_staged_scope()",
+            "child-bsm-return", "kernel-resample-drop",
+            "self-audit-pid-substitution", "audit-anchor-join-drop",
+            "root-observation-drop",
+            "v16 repair aggregate budget drifted",
+            "4d71ae29474425b8fedecf6f9ac97517d68fd506",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "--iic-c-v16-repair-contract-only",
+            "v16 repair mutation accepted:",
+            "v16 repair protocol mutation accepted:",
+            "verify_iicc_v16_repair_contract",
+            "--iic-c-v16-repair-staged-scope-contract-only",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "aggregate-budget staged-worktree-divergence wrong-baseline",
+            "v16 repair scope mutation accepted:",
+            "v16 repair scope diagnostic drifted:",
+            "v16 repair scope mutation accepted: untracked",
+        ] {
+            #expect(contract.contains(marker), "missing: \(marker)")
+        }
+    }
+
+    @Test
+    func cleanupAttributionPinsSchemaThreeAndAggregateScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let dedicated = try String(contentsOf: root.appending(
+            path: "scripts/verify-iic-cleanup-attribution-contract"),
+            encoding: .utf8)
+        for marker in [
+            "--iic-c-cleanup-attribution-source-contract-only",
+            "--iic-c-cleanup-attribution-mutation-contract-only",
+            "--iic-c-cleanup-attribution-staged-scope-contract-only",
+            "function verify_iicc_cleanup_attribution_source_contract()",
+            "function verify_iicc_cleanup_attribution_staged_scope()",
+            "cleanup attribution aggregate budget drifted",
+            "1ec24e4d6b35e43c8caa332cf6232cb7b026a0d6",
+        ] { #expect(boundary.contains(marker), "missing: (marker)") }
+        for marker in [
+            "--iic-c-cleanup-attribution-contract-only",
+            "function run_iicc_cleanup_attribution_contract()",
+            "cleanup attribution verifier identity drifted",
+            "private let forbiddenAuthority = \"sudo\"",
+        ] { #expect(contract.contains(marker), "missing: (marker)") }
+        #expect(boundary.contains(
+            "if not line.lstrip().startswith(\"//\")"
+        ))
+        for marker in [
+            "schema-selection-drop", "typed-deadline-drop", "typed-errno-drop",
+            "schema-three-drop", "covered-token-drop", "cleanup-zero-drop",
+            "receipt-eof-drop", "terminal-eof-drop", "residue-complete-drop",
+            "other-cleanup-drop", "python-schema-three-drop",
+            "python-covered-token-drop",
+            "cleanup_attribution_self_sha=",
+            "cleanup attribution verifier self-seal drifted",
+            "cleanup attribution unconditional-success replacement accepted",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "aggregate-budget staged-worktree-divergence wrong-baseline",
+            "cleanup attribution scope mutation accepted: untracked",
+        ] { #expect(dedicated.contains(marker), "missing: (marker)") }
+    }
+
+    @Test
+    func v17AuthorizationPinsExactRepairBaselineAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-c-v17-authorization-staged-scope-contract-only",
+            "function verify_iicc_v17_authorization_staged_scope()",
+            "iicc_v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625",
+            "ii-c-c v17 authorization aggregate budget drifted",
+            "ii-c-c v17 authorization index/worktree drifted",
+        ] { #expect(boundary.contains(marker), "missing: \(marker)") }
+        for marker in [
+            "v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625",
+            "v17_authorization_scope_fixtures=(extra missing binary wrong-mode",
+            "ii-c-c v17 authorization scope negative inventory drifted",
+            "v17_total == 801",
+            "iicc-v17-authorization-untracked.swift",
+            "$v17_authorization_scope_mode",
+            "v17-authorization-scope-actual.log",
+        ] { #expect(contract.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
+    func v13RawEvidenceLossIsReadOnlyNonAdmittingAndExact() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-iic-v13-raw-evidence-loss"), encoding: .utf8)
+        let parent = try String(contentsOf: root.appending(
+            path: "scripts/verify-iic-v13-raw-evidence-loss-contract"),
+            encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let receipt = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v13-raw-evidence-loss.json"),
+            encoding: .utf8)
+        for marker in [
+            "v13-raw-loss-self-seal", "exactRetainedEmptyPhaseTree",
+            "v16 retained evidence verification",
+            "phase changed during verification",
+            "admission rejected; retry forbidden",
+        ] { #expect(verifier.contains(marker), "missing: \(marker)") }
+        for forbidden in [
+            "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+            "os.remove", "os.unlink", "os.rename", "os.mkdir",
+            "SIGTERM", "SIGKILL",
+        ] { #expect(!verifier.contains(forbidden), "forbidden: \(forbidden)") }
+        for marker in [
+            "v13_raw_loss_contract_self_sha=", "O_NOFOLLOW",
+            "requires verified-byte execution", "expected_loss=",
+            "expected_failure=", "input=loss_source",
+            "pass_fds=(failure_fd,)",
+            #"for mutation in ("unknown", "missing", "actor", "relationship")"#,
+            #""missing-phase", "create-delete")"#, "fake child output",
+        ] { #expect(parent.contains(marker), "missing: \(marker)") }
+        for marker in [
+            "v13_loss_scope_fixtures=(extra missing binary wrong-mode",
+            "${#v13_loss_scope_fixtures} + 1 == 9",
+            "iicc-v13-loss-untracked.swift",
+        ] { #expect(contract.contains(marker), "missing: \(marker)") }
+        for marker in [
+            #""classification" : "externalRawEvidenceLoss""#,
+            #""admission" : "rejected""#,
+            #""retry" : "forbidden""#,
+            #""relationship" : "strongTemporalCorrelationOnly""#,
+            #""deletingActor" : "notIndependentlyBound""#,
+            "exactRawArtifactBytesUnavailable",
+        ] { #expect(receipt.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
+    func iiCRootDriverLineageL2PinsExactScopeAndVerifierWiring() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-root-driver-lineage-l2-source-contract-only",
+            "--iic-root-driver-lineage-l2-mutation-contract-only",
+            "--iic-root-driver-lineage-l2-staged-scope-contract-only",
+            "cd8fc5d8645a8d40fb7571e4be41b8b9d1a70725",
+            "total<=3950",
+            "len(paths)!=15",
+            "InvestigationMachineZeroArgumentEntry.swift 950",
+            "InvestigationMachineGateCoordinatorComposition.swift 30",
+            "InvestigationMachineGateTransport.swift 320",
+            "InvestigationMachineFixedGateLauncher.swift 300",
+            "DarwinInvestigationMachineFixedGateSystem.swift 650",
+            "InvestigationMachineCampaignEvidenceContract.swift 250",
+            "InvestigationMachineCampaign/main.swift 180",
+            "InvestigationMachineZeroArgumentEntryTests.swift 800",
+            "InvestigationSudoShapedDriverLauncherTests.swift 550",
+            "InvestigationMachineCampaignEvidenceTests.swift 400",
+            "InvestigationFixedGateHandoffPhysicalTests.swift 60",
+            "InvestigationMachineTargetBoundaryTests.swift 60",
+            "verify-investigation-runtime-machine-report 300",
+            "source path identity drifted",
+            "completionArtifactMatchesFixed180ByteV3Layout",
+            "outerRoleWritesFramedClaimBeforeBusinessAndThenCompletionV3",
+            "launcherValidatesBootstrapBeforeBusinessContinuation",
+            "resolvedRootValidationRequiresPIDBoundPublicObservation() throws",
+            "productionEpochCorpusRoundTripsThroughAllIndependentDecoders",
+            "swiftValidatorRejectsRootDriverLineageDrift",
+            "userOwnedTemporaryGateFailsClosedBeforeSpawn",
+        ] { #expect(boundary.contains(marker)) }
+        #expect(!boundary.contains(
+            "resolvedRootValidationRequiresAuditTokenBoundExecutablePathReads"))
+        for marker in [
+            "--iic-root-driver-lineage-l2-contract-only",
+            "entry-prebind-drop", "transport-validation-event-drop",
+            "coordinator-output-count-vacuity",
+            "darwin-self-stop-drop", "launcher-business-continuation-drop",
+            "evidence-lineage-join-drop", "campaign-output-digest-drop",
+            "report-output-digest-drop",
+            "unknown-name", "wrong-slot", "malformed-sha",
+            "wrong-sha", "unchanged-source", "unrecognized-content",
+            "two-changed-slots", "alternate-canonical-path",
+            "for fixture in extra missing binary wrong-mode over-budget",
+            "worktree-divergence wrong-baseline; do",
+            "expected='checkpoint paths drifted'",
+            "expected='path budget drifted'", "expected='index/worktree drifted'",
+            "expected='checkpoint baseline drifted'",
+            "verify_iic_root_driver_lineage_l2_contract \"$contract_root/iic-lineage-l2\"\n",
+            "474f63455f7f962f5537fdd9f6d7e55e01242c51",
+            "13ce41f3957701daaca46a5613e40acfcc6224bb",
+            "ii-c root-driver lineage L2 historical replay failed",
+        ] { #expect(contract.contains(marker)) }
+        #expect(!contract.contains(
+            "verify_iic_root_driver_lineage_l2_component_boundary"))
+    }
+
+    @Test
+    func iiCRootDriverLineageL1PinsPackageGraphAndVerifierInventory() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try String(contentsOf: root.appending(path: "Package.swift"), encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let gateMarker = "        .target(\n"
+            + "            name: \"StornautInvestigationMachineGateSupport\""
+        let gateStart = try #require(package.range(of: gateMarker))
+        let gateSuffix = package[gateStart.lowerBound...]
+        let gateEnd = try #require(gateSuffix.range(of: "\n        ),"))
+        let gate = String(gateSuffix[..<gateEnd.upperBound])
+        for marker in [
+            "StornautInvestigationHandoffContract",
+            "CInvestigationIdentitySupport",
+            "StornautInvestigationInstalledL2",
+            ".linkedFramework(\"Security\")",
+        ] { #expect(gate.contains(marker)) }
+        for forbidden in [
+            "StornautCore", "StornautExecution",
+            "CampaignSupport", "StornautProduct",
+        ] { #expect(!gate.contains(forbidden)) }
+        for marker in [
+            "InvestigationResolvedRootDriverLineageContract.swift",
+            "InvestigationMachineResolvedRootDriverClaim.swift",
+            "InvestigationMachineResolvedRootDriverValidator.swift",
+            "InvestigationResolvedRootDriverLineageContractTests.swift",
+            "InvestigationMachineResolvedRootDriverClaimTests.swift",
+            "InvestigationMachineResolvedRootDriverValidatorTests.swift",
+            "--iic-root-driver-lineage-l1-source-contract-only",
+            "--iic-root-driver-lineage-l1-mutation-contract-only",
+            "--iic-root-driver-lineage-l1-staged-scope-contract-only",
+            "0815ee26624f83520e30ce68aa54396761c14566",
+            "total <= 3900",
+        ] { #expect(boundary.contains(marker)) }
+        #expect(contract.contains(
+            "--iic-root-driver-lineage-l1-contract-only"))
+        #expect(contract.contains("release-path-unexport"))
+        #expect(release.contains(
+            "--iic-root-driver-lineage-l1-component-boundary-only"))
+        #expect(release.contains(
+            "local -x PATH=/usr/bin:/bin:/usr/sbin:/sbin; local require_staged"))
+        #expect(release.contains(
+            "verify_iic_root_driver_lineage_l1_component_boundary false"))
+    }
+
+    @Test
+    func iiCB2B2PhysicalCampaignPinsFinalNonPrivilegedBoundary() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try String(contentsOf: root.appending(
+            path: "Package.swift"), encoding: .utf8)
+        let executable = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationMachineCampaign/main.swift"), encoding: .utf8)
+        let fixture = try String(contentsOf: root.appending(
+            path: "Tests/Fixtures/InvestigationMachineCampaignCoordinator/main.swift"), encoding: .utf8)
+        let physical = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift"), encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(package.contains("name: \"StornautInvestigationMachineCampaign\""))
+        for marker in [
+            "CampaignDarwinSystem",
+            "bootstrapVerified", "proc_listallpids",
+            "StornautInvestigationMachineCampaignCoordinator",
+            "deadlineWindowNanoseconds", "static func main() { exit(78) }",
+            "private enum LifecycleAction: String",
+            "Stornaut Task 39 ii-c install authorization: ",
+            "Stornaut Task 39 ii-c uninstall authorization: ",
+            "[\"-k\",\"-p\",action.prompt,\"--\"",
+            "script.root,action.rawValue",
+        ] { #expect(executable.contains(marker)) }
+        for marker in [
+            "action:LifecycleAction)throws->CommandCapture{try runFixed",
+            "Self.runLifecycle(script, action: .install)",
+            "Self.runLifecycle(script, action: .uninstall)",
+            "lifecyclePayload, action: .uninstall",
+        ] { #expect(executable.contains(marker)) }
+        #expect(executable.components(separatedBy: "Self.runLifecycle(").count - 1 == 3)
+        #expect(executable.components(separatedBy: "runLifecycle(").count - 1 == 4)
+        #expect(executable.components(separatedBy: "Self.runFixed(").count - 1 == 2)
+        #expect(executable.components(separatedBy: "runFixed(").count - 1 == 4)
+        #expect(executable.components(separatedBy: "posix_spawn(").count - 1 == 1)
+        #expect(executable.components(separatedBy: "/usr/bin/sudo").count - 1 == 3)
+        #expect(!executable.contains("Password:"))
+        #expect(!executable.contains("action:String"))
+        for forbidden in [
+            "ProcessInfo", "getenv(", "environ", "Foundation.Process(", "NSTask",
+        ] { #expect(!executable.contains(forbidden)) }
+        for marker in [
+            "expected_lifecycle_source = '''",
+            "lifecycle_source != expected_lifecycle_source",
+            "ii-c-b2b2 lifecycle action binding drifted",
+            "ii-c-b2b2 lifecycle call-graph drifted",
+            "ii-c-b2b2 debug executable drifted",
+            "debug_executable = executable[:executable.index(debug_end)]",
+            "3dc4965de2e781653f5ea9954106e2cbbb03d2e93efbdfc65bdaa569c93586e3",
+            "actor_source = executable.split(actor_marker, 1)[1]",
+            "ii-c-b2b2 lifecycle actor drifted",
+            "actor_block = executable[executable.index(actor_marker):",
+            "b789b30bd0bd298fdfb0b9a4c64526047864a52945c29d7806f19ecbc56a185a",
+            "require_body_digest(",
+            "fea0c249566d0f57babb384980713873ed4a303e7943e5490d25d01e1357215c",
+            "037bc8ce96570079c793a68644e061d9670dc1fd0c014f328cd731418fb1edd7",
+            "1a6411186393b37b8339281174ef1d803d9404d762aea161a2e120c160f23b2e",
+            "active_executable.count('Self.runLifecycle(') != 3",
+            "active_executable.count('runFixed(') != 4",
+            "active_executable.count('posix_spawn(') != 1",
+            "active_executable.count('/usr/bin/sudo') != 3",
+            "'ProcessInfo', 'getenv(', 'environ'",
+            "expected_lifecycle_action = '''private enum LifecycleAction: String {",
+            "ii-c-c lifecycle action contract drifted",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "lifecycle-open-action", "lifecycle-generic-prompt",
+            "lifecycle-environment-prompt",
+            "lifecycle-extra-call",
+            "lifecycle-open-route",
+            "lifecycle-inline-comment",
+            "lifecycle-unreachable-call",
+            "lifecycle-string-camouflage",
+            "lifecycle-init-spawn-alias",
+            "lifecycle-outer-main-spawn-alias",
+            "len(M)!=29", "assert len(m)==29",
+        ] { #expect(boundary.contains(marker) || contract.contains(marker)) }
+        for marker in [
+            "CAMPAIGN_FIXTURE_TRUNCATED", "CAMPAIGN_FIXTURE_TRAILING",
+            "CAMPAIGN_FIXTURE_MISSING_EOF", "CAMPAIGN_FIXTURE_NONZERO",
+        ] { #expect(fixture.contains(marker)) }
+        #expect(physical.contains(
+            "physicalExecutableUsesControllingPTYAndExactFD3"))
+        #expect(physical.contains(
+            "physicalFailuresRemainBoundedAndLeaveZeroResidue"))
+        for marker in [
+            "--iic-b2b2-source-contract-only",
+            "--iic-b2b2-staged-scope-contract-only",
+            "function verify_iicb2b2_source_contract()",
+        ] { #expect(boundary.contains(marker)) }
+        #expect(release.contains("--iic-b2b2-component-boundary-only"))
+        #expect(contract.contains("--iic-b2b2-contract-only"))
+    }
+
+    @Test
+    func campaignComponentGateInspectsDebugWithoutLaunchingIt() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let start = try #require(source.range(
+            of: "function verify_iicb2b2_component_boundary() ("))
+        let end = try #require(source.range(
+            of: "\nfunction verify_iicc_suspended_sudo_component_boundary()",
+            range: start.upperBound..<source.endIndex))
+        let component = String(source[start.lowerBound..<end.lowerBound])
+        #expect(!component.contains("\n    \"$debug\""))
+        #expect(component.contains("xcrun nm -j \"$debug\""))
+        #expect(component.contains("xcrun nm -j \"$release\""))
+        let authorityCheck = try #require(component.range(
+            of: "ii-c-b2b2 campaign authority leaked into Release"))
+        let releaseRun = try #require(component.range(of: "\"$release\" >/dev/null"))
+        #expect(authorityCheck.lowerBound < releaseRun.lowerBound)
+    }
+
+    @Test
+    func iiCB2B1TransportPinsScopeAndBoundaries() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try String(contentsOf: root.appending(path: "Package.swift"), encoding: .utf8)
+        let header = try String(contentsOf: root.appending(
+            path: "Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h"), encoding: .utf8)
+        let c = try String(contentsOf: root.appending(
+            path: "Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c"), encoding: .utf8)
+        let harness = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignHarness.swift"), encoding: .utf8)
+        let tests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignHarnessTests.swift"), encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(package.contains("CInvestigationMachineCampaignSupport"))
+        for marker in [
+            "STORNAUT_INVESTIGATION_CAMPAIGN_RECEIPT_FD 3",
+            "stornaut_investigation_campaign_spawn_fixed",
+            "parent_transfer_close_error",
+        ] { #expect(header.contains(marker)) }
+        for marker in [
+            "posix_spawn(", "POSIX_SPAWN_SETSID",
+            "stornaut_investigation_campaign_bootstrap_fixed",
+            "TIOCSCTTY", "tcsetpgrp(", "dup2(", "execve(",
+            "FD_CLOEXEC", "stornaut_campaign_preserve_terminal_output_bytes",
+            "attributes.c_oflag &= (tcflag_t)~ONLCR",
+        ] { #expect(c.contains(marker)) }
+        let terminalConfiguration = try #require(c.firstRange(of:
+            "stornaut_campaign_preserve_terminal_output_bytes(descriptors[1])"))
+        let processSpawn = try #require(c.firstRange(of: "posix_spawn("))
+        #expect(terminalConfiguration.lowerBound < processSpawn.lowerBound)
+        #expect(!c.contains("fork("))
+        #expect(!c.contains("forkpty("))
+        for marker in [
+            "package actor InvestigationMachineCampaignHarness",
+            "case readBootstrap", "CAMPAIGN_BOOTSTRAP_READY",
+            "value == outerIdentity", "terminateOwnedGroup",
+            "waitExact", "closeParentChannels", "observeResidue",
+        ] { #expect(harness.contains(marker)) }
+        for marker in [
+            "validFragmentedReceiptUsesOneDeadlineAndFairDrain",
+            "concurrentAndRepeatedCallsSpawnExactlyOnce",
+            "childCreationUncertaintyRemainsOwned",
+            "outerAndInnerIdentityRemainIndependent",
+            "residueAndCleanupFailuresRemainFailClosed",
+        ] { #expect(tests.contains(marker)) }
+        for marker in [
+            "--iic-b2b1-source-contract-only",
+            "--iic-b2b1-mutation-contract-only",
+            "--iic-b2b1-staged-scope-contract-only",
+            "function verify_iicb2b1_source_contract()",
+            "function verify_iicb2b1_staged_scope()",
+            "ii-c-b2b1 checkpoint budget drifted",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "--iic-b2b1-contract-only",
+            "function verify_iicb2b1_contract()",
+            "c-bootstrap-cloexec", "harness-outer-stability",
+            "boundary-vacuity",
+        ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
+    func iiCCCredentialDeadlineContractIsClosed() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let header = try String(contentsOf: root.appending(path:
+            "Sources/CInvestigationMachineCampaignSupport/include/CInvestigationMachineCampaignSupport.h"), encoding: .utf8)
+        let c = try String(contentsOf: root.appending(path:
+            "Sources/CInvestigationMachineCampaignSupport/CInvestigationMachineCampaignSupport.c"), encoding: .utf8)
+        let campaign = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineCampaign/main.swift"), encoding: .utf8)
+        let fixture = try String(contentsOf: root.appending(path:
+            "Tests/Fixtures/InvestigationMachineCampaignCredential/main.c"), encoding: .utf8)
+        let tests = try String(contentsOf: root.appending(path:
+            "Tests/StornautInvestigationTests/InvestigationMachineCampaignCredentialDeadlineTests.swift"), encoding: .utf8)
+        let boundary = boundarySource(root)
+        let aggregate = try String(contentsOf: root.appending(path:
+            "scripts/verify-contract"), encoding: .utf8)
+
+        #expect(header.contains(
+            "STORNAUT_INVESTIGATION_CAMPAIGN_MAX_CREDENTIAL_BYTES 1023"))
+        for marker in [
+            "CLOCK_UPTIME_RAW", "/dev/tty", "proc_pidpath(",
+            "POSIX_SPAWN_START_SUSPENDED", "POSIX_SPAWN_SETPGROUP",
+            "STORNAUT_INVESTIGATION_CAMPAIGN_CREDENTIAL_FD",
+            "tcsetpgrp(terminal_descriptor, child)",
+            "tcsetpgrp(terminal_descriptor, parent_group)",
+            "stornaut_campaign_terminate_and_reap",
+            "kill(child, SIGTERM)", "kill(child, SIGKILL)", "memset_s",
+            "stornaut_investigation_campaign_relay_single_credential",
+            "attributes.c_cc[VEOF]",
+            "(attributes.c_iflag & INLCR) != 0",
+            "frame[credential_length + 1] = end_of_input",
+        ] { #expect(c.contains(marker), "missing: \(marker)") }
+        #expect(c.components(separatedBy: "readpassphrase(").count == 2)
+        for forbidden in ["SIGALRM", "alarm(", "setitimer(",
+                          "pthread_create(", "pthread_cancel(", "pthread_join("] {
+            #expect(!(c + campaign).contains(forbidden), "forbidden: \(forbidden)")
+        }
+        #expect(campaign.contains(
+            "stornaut_investigation_campaign_readpassphrase_bounded"))
+        #expect(campaign.contains(
+            "stornaut_investigation_campaign_relay_single_credential"))
+        #expect(campaign.contains("--stornaut-credential-reader-v1"))
+        #expect(fixture.contains("forkpty(&master"))
+        #expect(tests.contains(
+            "controllingTTYReadIsBoundedRestoresEchoAndNeverEchoesCredential"))
+        for marker in [
+            "--iic-c-credential-deadline-contract-only",
+            "--iic-c-credential-deadline-mutation-contract-only",
+            "function verify_iicc_credential_deadline_contract()",
+        ] { #expect(boundary.contains(marker), "missing: \(marker)") }
+        for marker in [
+            "credential-deadline-mutations",
+            "deadline-classification", "foreground-handoff", "exact-wait",
+            "child-mode", "credential-cap", "test-vacuity", "absolute-deadline",
+            "deadline-recheck", "reap-ownership", "reap-test-vacuity",
+            "bounded-prompt-owner", "single-attempt-eof",
+            "control-byte-rejection", "inlcr-rejection",
+            "reader-nul-sentinel",
+            "control-test-vacuity",
+        ] { #expect(aggregate.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
+    func iiCCPersistentGatePathIsOwnerPrivateAndNonPurgeable() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = boundarySource(root)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let aggregate = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--iic-c-persistent-gate-contract-only",
+            "--iic-c-persistent-gate-mutation-contract-only",
+            "function verify_iicc_persistent_gate_contract()",
+            "cache-regression", "base-mode", "ownership-test-vacuity",
+            "capsule-test-vacuity", "fixture-path", "physical-path",
+        ] { #expect(boundary.contains(marker), "missing: \(marker)") }
+        #expect(release.contains(
+            "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"))
+        #expect(release.contains(
+            "--iic-c-persistent-gate-component-boundary-only"))
+        #expect(release.contains(
+            "function verify_iicc_persistent_gate_component_boundary()"))
+        for marker in [
+            "component-function", "component-call-edge",
+        ] { #expect(aggregate.contains(marker), "missing: \(marker)") }
+    }
+
+    @Test
+    func iiCB2A2IndependentVerifierPinsScopeAndBoundaries() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-runtime-machine-report"),
+            encoding: .utf8)
+        let evidenceTests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
+            encoding: .utf8)
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        #expect(verifier.hasPrefix("#!/bin/zsh -f\n"))
+        for marker in [
+            "/usr/bin/python3 -I", "Foundation.framework/Foundation",
+            "canonical_absolute_path", "O_NOFOLLOW_ANY", "O_RESOLVE_BENEATH",
+            "select.kqueue()", "KQ_FILTER_VNODE", "evidence changed during verification",
+            "O_UNIQUE", "os.pread", "follow_symlinks=False",
+            "stornaut.task39.iic.raw-evidence-manifest.v1",
+            "stornaut.task39.iic.raw-evidence-entry.v1",
+            "stornaut.task39.iic.attempt-summary.v1",
+            "stornaut.task39.iic.attempt-event.v1",
+            "stornaut.task39.machine.gate-coordinator-receipt.v1",
+            "manifest requires an exact external seal",
+        ] { #expect(verifier.contains(marker)) }
+        #expect(evidenceTests.contains(
+            "92418d3ce5be398d842763863f001a39340ba2c1d80407a95ca4719c90ebdf2d"))
+        for marker in [
+            "--iic-b2a2-source-contract-only",
+            "--iic-b2a2-mutation-contract-only",
+            "--iic-b2a2-staged-scope-contract-only",
+            "function verify_iicb2a2_source_contract()",
+            "ii-c-b2a2 checkpoint paths drifted",
+            "ii-c-b2a2 boundary assertions became vacuous",
+            "(( changed <= 2000 ))",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "--iic-b2a2-component-boundary-only",
+            "function verify_iicb2a2_component_boundary()",
+            "function verify_iicb2a2_negative_macho()",
+            "ii-c-b2a2 campaign namespace leaked into closed image",
+        ] { #expect(release.contains(marker)) }
+        for marker in [
+            "--iic-b2a2-contract-only",
+            "function verify_iicb2a2_contract()",
+            "manifest-without-seal", "verifier-canonical-reencode",
+            "verifier-held-named-identity", "verifier-event-chain",
+            "verifier-receipt-self-hash", "verifier-component-vacuity",
+        ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
+    func iiCCPreservedHistoricalGateCapsuleContractIsClosed() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = boundarySource(root)
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-runtime-machine-report"),
+            encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift"),
+            encoding: .utf8)
+        let capsule = try String(contentsOf: root.appending(
+            path: "Sources/StornautInvestigationMachineLaunchSupport/InvestigationOwnerOnlyCapsule.swift"),
+            encoding: .utf8)
+        for marker in [
+            "--iic-c-preserved-capsule-contract-only",
+            "--iic-c-preserved-capsule-mutation-contract-only",
+            "--iic-c-preserved-capsule-staged-scope-contract-only",
+            "function verify_iicc_preserved_capsule_contract()",
+            "function verify_iicc_preserved_capsule_staged_scope()",
+            "ii-c-c preserved-capsule verifier gained authority",
+            "ii-c-c preserved-capsule verifier self-seal drifted",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "def open_preserved_gate(owner):",
+            "def revalidate_preserved_gate(gate, owner):",
+            "preserved Gate base inventory",
+            "preserved Gate capsule contract",
+        ] {
+            #expect(verifier.contains(marker), "missing: \(marker)")
+        }
+        #expect(contract.contains("struct InvestigationHistoricalGateCapsule"))
+        #expect(contract.contains("static func retainedV11() throws -> Self"))
+        #expect(capsule.contains("for preserved in preserving"))
+        #expect(capsule.contains(
+            "InvestigationHandoffSHA256.hashing(file.bytes) == expected.fileSHA256"
+        ))
+        let evidenceTests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
+            encoding: .utf8)
+        #expect(evidenceTests.contains(
+            "independentVerifierReadsButDoesNotAdmitExactPreservedV11GateWhenOptedIn"
+        ))
+        #expect(evidenceTests.contains(
+            "independentVerifierRejectsAdmittingSchemaOneTeardown"
+        ))
+        #expect(verifier.contains(
+            "admitting preserved persistent Gate schema"))
+        for forbidden in [
+            "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+            "os.remove", "os.unlink", "os.rename", "os.mkdir",
+            "shutil", "SIGTERM", "SIGKILL",
+            "signedInvestigationRuntimeReady",
+        ] {
+            #expect(!verifier.contains(forbidden), "forbidden: \(forbidden)")
+        }
+        let aggregate = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "production-preservation-regression", "producer-schema-downgrade",
+            "producer-cache-path", "producer-inventory-bypass",
+            "producer-lock-bypass", "producer-close-bypass",
+            "swift-schema-five-drop",
+            "swift-lock-exclusive-bypass", "verifier-admission-downgrade",
+            "verifier-evidence-path-bypass",
+            "verifier-path-regression", "verifier-lock-bypass",
+            "verifier-identity-bypass", "verifier-revalidation-bypass",
+            "snapshot-xattr-drop",
+        ] {
+            #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "preserved_scope_mode=--iic-c-preserved-capsule-staged-scope-contract-only",
+            "preserved_scope_commit=facf3eae2fbee83056189e2cfd54cf974ae1421b",
+            "preserved_scope_tree=a25134f6bcd37852b8ce38502301f95cc7b55d34",
+            "\"$preserved_scope_commit:$preserved_scope_item\"",
+            "STORNAUT_IICC_SCOPE_WORKTREE_ROOT=\"$preserved_scope_worktree\"",
+            "preserved_scope_fixtures=(extra missing binary wrong-mode",
+            "over-budget aggregate-budget staged-worktree-divergence wrong-baseline",
+            "ii-c-c preserved scope negative inventory drifted",
+            "iicc-preserved-untracked.swift",
+            "evidence_scope_mode=--iic-c-evidence-closure-staged-scope-contract-only",
+            "evidence_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea",
+            "evidence_scope_commit=103a4836f4aa80c5d3739ca357364ad5c9200cf6",
+            "evidence_scope_tree=0cfccbf6e8a500365837b4cb9551f6ff70af4bbf",
+            "${evidence_scope_commit}:$evidence_scope_item",
+            "evidence_scope_fixtures=(extra missing binary wrong-mode",
+            "${#evidence_scope_fixtures} + 1 == 9",
+            "STORNAUT_IICC_SCOPE_WORKTREE_ROOT=\"$evidence_scope_worktree\"",
+            "ii-c-c evidence scope negative inventory drifted",
+            "iicc-evidence-untracked.swift",
+            "authorization_scope_mode=--iic-c-v16-authorization-staged-scope-contract-only",
+            "authorization_scope_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6",
+            "authorization_scope_commit=9bc6d8d879bcae500137879b8ad5080d72f136ca",
+            "authorization_scope_tree=5512a8adab652c41693f1b9a8870c3132ee63765",
+            "ii-c-c immutable v16 authorization checkpoint drifted",
+            "authorization-scope-actual.log",
+            "authorization_scope_fixtures=(extra missing binary wrong-mode",
+            "${#authorization_scope_fixtures} + 1 == 9",
+            "STORNAUT_IICC_SCOPE_WORKTREE_ROOT=\"$authorization_scope_target_worktree\"",
+            "ii-c-c authorization scope negative inventory drifted",
+            "iicc-authorization-untracked.swift",
+            "p2_scope_mode=--iic-c-persistent-evidence-p2-staged-scope-contract-only",
+            "p2_scope_baseline=8a28c5b0ea36d13ae279c2f804b0a528603ddb23",
+            "p2_scope_fixtures=(extra missing binary wrong-mode over-budget",
+            "aggregate-budget index-divergence wrong-baseline",
+            "${#p2_scope_fixtures} + 1 == 9",
+            "ii-c-c persistent evidence P2 scope negative inventory drifted",
+            "iicc-p2-untracked.swift",
+        ] {
+            #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "--iic-c-evidence-closure-staged-scope-contract-only",
+            "function verify_iicc_evidence_closure_staged_scope()",
+            "iicc_evidence_closure_scope_baseline=03daf8c919bad654143f03b976e74b152d5cd3ea",
+            "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift 100",
+            "Tests/StornautInvestigationTests/InvestigationMachineTargetBoundaryTests.swift 120",
+            "scripts/verify-contract 420",
+            "scripts/verify-investigation-boundaries 180",
+            "${#expected} == 4 && ${#observed} == 4",
+            "total <= 700",
+            "ii-c-c evidence-closure index/worktree drifted",
+            "--iic-c-v16-authorization-staged-scope-contract-only",
+            "function verify_iicc_v16_authorization_staged_scope()",
+            "iicc_v16_authorization_scope_baseline=103a4836f4aa80c5d3739ca357364ad5c9200cf6",
+            "${#expected} == 3 && ${#observed} == 3",
+            "ii-c-c v16 authorization aggregate budget drifted",
+            "ii-c-c v16 authorization index/worktree drifted",
+            "--iic-c-v17-authorization-staged-scope-contract-only",
+            "function verify_iicc_v17_authorization_staged_scope()",
+            "iicc_v17_authorization_scope_baseline=a69bd33df8b27e0660e628ec59be308342141625",
+            "ii-c-c v17 authorization aggregate budget drifted",
+            "ii-c-c v17 authorization index/worktree drifted",
+        ] {
+            #expect(boundary.contains(marker), "missing: \(marker)")
+        }
+        let evidenceScopeStart = try #require(aggregate.range(
+            of: "local -a evidence_scope_fixtures="
+        ))
+        let evidenceScopeEnd = try #require(aggregate.range(
+            of: "ii-c-c evidence scope negative inventory drifted",
+            range: evidenceScopeStart.lowerBound..<aggregate.endIndex
+        ))
+        let evidenceScopeBlock = String(aggregate[
+            evidenceScopeStart.lowerBound..<evidenceScopeEnd.upperBound
+        ])
+        for marker in [
+            "extra", "missing", "binary", "wrong-mode", "over-budget",
+            "aggregate-budget", "staged-worktree-divergence",
+            "wrong-baseline", "${#evidence_scope_fixtures} + 1 == 9",
+        ] {
+            #expect(evidenceScopeBlock.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "private static func extendedAttributeSnapshot(_ path: String) throws",
+            "listxattr(path, nil, 0, XATTR_NOFOLLOW)",
+            "getxattr(", "nameHex",
+            "InvestigationHandoffSHA256.hashing(value).lowercaseHex",
+            "let xattrs = try extendedAttributeSnapshot(url.path)",
+            "digest, xattrs",
+        ] {
+            #expect(evidenceTests.contains(marker), "missing: \(marker)")
+        }
+        for marker in [
+            "os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)",
+            "staging = \".stornaut-p2-gate-\" + secrets.token_hex(16)",
+            "os.mkdir(staging, 0o700, dir_fd=staging_parent_fd)",
+            "os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NONBLOCK",
+            "| 0x20000000 | 0x00001000 | 0x00002000",
+            "\".owner-lock-v1\", lock_flags, 0o600, dir_fd=base_fd",
+            "named_lock = os.stat(",
+            "held_lock = os.fstat(lock_fd)",
+            "rename_flags = 0x00000004 | 0x00000010 | 0x00000020",
+            "libc.renameatx_np(",
+            "staging_parent_fd, staging.encode(),",
+            "parent_fd, leaf.encode(), rename_flags",
+            "function create_persistent_gate() {",
+            "physical_out=$(cd \"$out\" && /bin/pwd -P)",
+            "scratch_base=\"$scratch_parent/com.eriklee.stornaut.task39-machine-gate\"",
+            "create_persistent_gate \"$scratch_base\" \"$physical_out\"",
+            "attack_base=\"$attack_parent/com.eriklee.stornaut.task39-machine-gate\"",
+            "/bin/ln -s \"$attack_target\" \"$attack_base\"",
+            "(( attack_status != 0 )) || exit 1",
+            "$(/usr/bin/stat -f '%Lp' \"$attack_target\")",
+            "create_persistent_gate \"$persistent_base\" \"$physical_out\"",
+            "STORNAUT_TASK39_PERSISTENT_GATE_BASE=\"$persistent_base\"",
+        ] {
+            #expect(aggregate.contains(marker), "missing: \(marker)")
+        }
+        for forbidden in [
+            "cleanup_persistent_gate_fixture",
+            "/usr/bin/touch \"$persistent_lock\"",
+            "/bin/chmod 600 \"$persistent_lock\"",
+            "os.mkdir(leaf, 0o700, dir_fd=parent_fd)",
+            "os.unlink(\".owner-lock-v1\", dir_fd=base_fd)",
+            "os.rmdir(base)", "os.rmdir(leaf, dir_fd=parent_fd)",
+            "quarantine_leaf = \".stornaut-p2-gate-\"",
+        ] {
+            #expect(!aggregate.contains(forbidden), "forbidden: \(forbidden)")
+        }
+    }
+
+    @Test
+    func iiCCPersistentGateSchemaV4AdmissionContractIsClosed() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let campaign = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineCampaign/main.swift"),
+            encoding: .utf8)
+        let evidence = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineCampaignSupport/InvestigationMachineCampaignEvidenceContract.swift"),
+            encoding: .utf8)
+        let verifier = try String(contentsOf: root.appending(path:
+            "scripts/verify-investigation-runtime-machine-report"),
+            encoding: .utf8)
+        let coordinator = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineGateCoordinatorSupport/InvestigationMachineGateCoordinatorComposition.swift"),
+            encoding: .utf8)
+        let handoff = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationMachineLaunchSupport/DarwinInvestigationFixedGateHandoffSystem.swift"),
+            encoding: .utf8)
+        let physical = try String(contentsOf: root.appending(path:
+            "Tests/StornautInvestigationTests/InvestigationFixedGateHandoffPhysicalTests.swift"),
+            encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(path:
+            "Sources/StornautInvestigationHandoffContract/InvestigationProjectedCohortInput.swift"),
+            encoding: .utf8)
+        for marker in [
+            "InvestigationMachinePersistentGateObserver",
+            "observeIfPresent(basePath: String)",
+            "persistentGateRelativePath", "persistentGateBaseDevice",
+            "persistentGateLockInode", "persistentGateLockExclusive",
+            "schemaVersion:5", "observePreservingV13AndV16",
+            "preservedGateCapsules", "Application Support",
+        ] { #expect(campaign.contains(marker), "missing: \(marker)") }
+        #expect(evidence.contains("? [schemaVersion, 2, 3, 4, 5]"))
+        for marker in [
+            "def open_persistent_gate(owner, evidence):",
+            "def revalidate_persistent_gate(gate, owner):",
+            "admitting preserved persistent Gate schema",
+            "persistent Gate base inventory",
+        ] { #expect(verifier.contains(marker), "missing: \(marker)") }
+        #expect(contract.contains("static func retainedV13() throws -> Self"))
+        #expect(contract.contains("static func retainedV16() throws -> Self"))
+        #expect(coordinator.contains(
+            "productionProfile: .replacementAfterV13AndV16"))
+        #expect(!coordinator.contains("preservedCapsules:"))
+        #expect(!coordinator.contains("InvestigationFixedGateHandoff()"))
+        #expect(!handoff.contains("package convenience init()"))
+        #expect(handoff.contains(
+            "#if STORNAUT_FIXED_GATE_PHYSICAL_FIXTURE"))
+        #expect(handoff.contains(
+            "physicalFixtureProfile: InvestigationFixedGateHandoffPhysicalFixtureProfile"))
+        #expect(physical.contains(
+            "-DSTORNAUT_FIXED_GATE_PHYSICAL_FIXTURE"))
+        #expect(campaign.contains(
+            "observePreservingV13AndV16(basePath: base)"))
+        #expect(campaign.contains("schemaVersion:5"))
+        #expect(verifier.contains(
+            "admitting dual preserved persistent Gate schema"))
+    }
+
+    @Test
+    func iiCCFailureDispositionVerifierRemainsReadOnlyAndNonAdmitting() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let verifier = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-runtime-machine-failure"),
+            encoding: .utf8)
+        let evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v8-failure-disposition.json"),
+            encoding: .utf8)
+        let v9Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v9-failure-disposition.json"),
+            encoding: .utf8)
+        let v10Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v10-failure-disposition.json"),
+            encoding: .utf8)
+        let v11Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v11-failure-disposition.json"),
+            encoding: .utf8)
+        let v12Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v12-failure-disposition.json"),
+            encoding: .utf8)
+        let v13Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v13-failure-disposition.json"),
+            encoding: .utf8)
+        let v16Evidence = try String(contentsOf: root.appending(
+            path: "docs/reports/evidence/task-39-iic-v16-failure-disposition.json"),
+            encoding: .utf8)
+
+        for marker in [
+            "iicc_failure_self_sha=", "/usr/bin/python3 -I",
+            "profile in (1, 2, 3, 4, 5, 6, 7, 8, 9)",
+            "f\"stornaut.task39.iic.failure-disposition.v{profile}\"",
+            "consumedTransportLoss", "admission\"] == \"rejected",
+            "retry\"] == \"forbidden",
+            "[\"prepared\", \"armedConsumed\", \"spawnUncertain\"]",
+            "manifest.bin", "../seal.json",
+            "05-uninstall/uninstall.json",
+            "06-verifier/global-post-teardown.json",
+            "fixed Stornaut process present", "gate base residue inventory",
+            "historical attempt residue unexpectedly present",
+            "consumed Gate attempt absent",
+            "required Gate base absent",
+            "pwd.getpwuid(user_id)", "record.pw_dir",
+            "consumedDriverExecutionPolicyDenial",
+            "consumedCampaignDeadlineExhaustion",
+            "consumedPostArmFailureUnclassified",
+            "consumedPostArmAuthorizationDeadlineExhaustion",
+            "consumedClosedPostArmFailure",
+            "notCampaignArtifactBound",
+            "persistentOwnConsumedAttemptPresent",
+            "persistentOwnAndPriorConsumedAttemptsPresent",
+            "priorPersistentGateObservation",
+            "gateBaseAbsentAfterObservedResidueLoss",
+            "externalGateCacheResidueLost",
+            "unattributedExternalRemoval",
+            "closed failure projection reason",
+            "ownConsumedAttemptPresent",
+            "ownConsumedAttemptRemovedByTestFixture",
+            "testFixtureStaleRecoveryRemovedConsumedGateResidue",
+            "exactCapsuleBytesUnavailable",
+            "AMFI root-cause observation",
+            "AMFI supplemental observation",
+            "hold_v16_launcher",
+            "revalidate_v16_launcher",
+            "close_v16_launcher",
+            "hold_reported_artifacts",
+            "revalidate_reported_artifacts",
+            "close_reported_artifacts",
+        ] {
+            #expect(verifier.contains(marker), "missing: \(marker)")
+        }
+        let singleStart = try #require(verifier.range(of: "def verify("))
+        let jointStart = try #require(verifier.range(
+            of: "def verify_joint_successor(",
+            range: singleStart.lowerBound..<verifier.endIndex))
+        let single = String(verifier[
+            singleStart.lowerBound..<jointStart.lowerBound])
+        let singleHold = try #require(single.range(
+            of: "launcher_records = hold_v16_launcher("))
+        let singleFinalRevalidation = try #require(single.range(
+            of: "revalidate_v16_launcher(launcher_records)",
+            options: .backwards))
+        let singleClose = try #require(single.range(
+            of: "close_v16_launcher(launcher_records)"))
+        #expect(singleHold.lowerBound < singleFinalRevalidation.lowerBound)
+        #expect(singleFinalRevalidation.lowerBound < singleClose.lowerBound)
+        let joint = String(verifier[jointStart.lowerBound...])
+        let jointHold = try #require(joint.range(
+            of: "phase_records, artifact_files = hold_reported_artifacts("))
+        let jointPredecessor = try #require(joint.range(
+            of: "predecessor_root, predecessor_report_path, expected_self_sha"))
+        let jointSuccessor = try #require(joint.range(
+            of: "successor_root, successor_report_path, expected_self_sha"))
+        let jointFinalRevalidation = try #require(joint.range(
+            of: "revalidate_reported_artifacts("))
+        let jointClose = try #require(joint.range(
+            of: "close_reported_artifacts(phase_records, artifact_files)"))
+        #expect(jointHold.lowerBound < jointPredecessor.lowerBound)
+        #expect(jointPredecessor.lowerBound < jointSuccessor.lowerBound)
+        #expect(jointSuccessor.lowerBound < jointFinalRevalidation.lowerBound)
+        #expect(jointFinalRevalidation.lowerBound < jointClose.lowerBound)
+        let pathComponentIdentity = """
+        def path_component_identity(value):
+            return (value.st_dev, value.st_ino, value.st_gen, value.st_uid,
+                    value.st_gid, stat.S_IMODE(value.st_mode),
+                    stat.S_IFMT(value.st_mode), getattr(value, "st_flags", 0))
+        """
+        #expect(verifier.contains(pathComponentIdentity))
+        let ancestorSelectors = [
+            "identity = (file_identity if final and final_regular\n"
+                + "                        else node_identity if final\n"
+                + "                        else path_component_identity)",
+            "final = descriptor == walk[\"fds\"][-1]\n"
+                + "        identity = (file_identity if regular else node_identity if final\n"
+                + "                    else path_component_identity)",
+        ]
+        for marker in ancestorSelectors {
+            #expect(verifier.contains(marker), "missing: \(marker)")
+        }
+        let campaignTests = try String(contentsOf: root.appending(
+            path: "Tests/StornautInvestigationTests/InvestigationMachineCampaignEvidenceTests.swift"),
+            encoding: .utf8)
+        for marker in [
+            "failureDispositionVerifierNormalizesOnlyExplicitMissingGateStates",
+            "checkedV12FailureDispositionRejectsClaimAndLossForgeryWhenAvailable",
+            "STORNAUT_TASK39_V12_EVIDENCE_ROOT",
+            "Opt in to the read-only frozen v12 failure-evidence verification",
+            "Opt in to the read-only frozen v12 forgery-rejection verification",
+            "let churnCountBeforeVerification = await state.successCount",
+            "#expect(successfulChurns > churnCountBeforeVerification)",
+            "#expect(churnFailure == nil)",
+        ] {
+            #expect(campaignTests.contains(marker), "missing: \(marker)")
+        }
+        for forbidden in [
+            "O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC",
+            "os.remove", "os.unlink", "os.rename", "os.mkdir",
+            "shutil", "kill(", "SIGTERM", "SIGKILL",
+            "signedInvestigationRuntimeReady",
+            "os.path.expanduser",
+        ] {
+            #expect(!verifier.contains(forbidden), "forbidden: \(forbidden)")
+        }
+        #expect(verifier.range(
+            of: #"(?m)^\s*rm\s+"#,
+            options: .regularExpression
+        ) == nil, "forbidden shell rm command")
+        let evidenceObject = try #require(JSONSerialization.jsonObject(
+            with: Data(evidence.utf8)) as? [String: Any])
+        #expect(evidenceObject["classification"] as? String
+            == "consumedTransportLoss")
+        #expect(evidenceObject["admission"] as? String == "rejected")
+        #expect(evidenceObject["retry"] as? String == "forbidden")
+        #expect((evidenceObject["verifierExecutableSHA256"] as? String)?.count
+            == 64)
+        #expect(boundarySource(root).contains(
+            "ii-c-c checked failure disposition digest drifted"))
+        #expect(boundarySource(root).contains(
+            "--iic-c-v12-external-evidence-only"))
+        #expect(boundarySource(root).contains(
+            "function verify_iicc_v12_external_evidence() {"))
+        #expect(boundarySource(root).contains(
+            "ii-c-c frozen v12 evidence root unavailable or noncanonical"))
+        #expect(boundarySource(root).contains(
+            "--iic-c-v13-external-evidence-only"))
+        #expect(boundarySource(root).contains(
+            "function verify_iicc_v13_external_evidence() {"))
+        #expect(boundarySource(root).contains(
+            "--iic-c-v16-external-evidence-only"))
+        #expect(boundarySource(root).contains(
+            "function verify_iicc_v16_external_evidence() {"))
+        #expect(boundarySource(root).contains(
+            "ii-c-c frozen v13/v16 evidence roots unavailable or noncanonical"))
+        #expect(boundarySource(root).contains(
+            "ii-c-c blocked status docs drifted"))
+        #expect(boundarySource(root).contains("active_status_entries"))
+        let pinnedStatusDocs = [
+            "(Path(\"AGENTS.md\"), \"23a9b511299dff9989062d796314f4e84309218c41e5f6729790e0c4e4fac8eb\")",
+            "(Path(\"README.md\"), \"9bccf3a6b72d7e9f895049351512c103ccb81f26cf32050c062f4f7b0f09dc9b\")",
+            "(Path(\"docs/README.md\"), \"c481766d1d0ac018b212f3b383c5919a4bea044636b37291e61cd5fb6209474d\")",
+            "(Path(\"docs/agent/coding-agent-handoff.md\"), \"3cf2bb174adfdd2009fa6090a9c8526c6251e5af4cdf6fdf1b0c6d860792add3\")",
+            "(Path(\"docs/plans/active/README.md\"), \"ea5e5d57c4b763acb842fc02b5c28ad476dafb4e16567c07bf57a11d40942a98\")",
+            "(Path(\"docs/plans/active/phase-d-conditional-deep-dive.md\"), \"3b837315ecf9b65c6c6b0c1caaeeaaeb80de2b3fdbbc3becec84633f8e80ac32\")",
+            "(Path(\"docs/plans/active/task-39-implementation-brief.md\"), \"ca36c4a5d9fda34077eda97674f26af6177d582a467ebace6600ffd4a882cc1b\")",
+            "(Path(\"docs/plans/active/task-40-implementation-brief.md\"), \"52fbd6f5533dadabfaba61ff232c5f6980ea64bfcfb8eaaafe31d9450ccf27f8\")",
+            "(Path(\"docs/plans/roadmap.md\"), \"eef39b7de75f76584e298799b9c33f138e8eb21d17aa41910088421e8b99425f\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md\"), \"dfb997cf597989375c8a25e7e6df84564b327ddf676e61b8a6ff800f16444601\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v10-replacement-campaign-authorization.md\"), \"2168787caf0feae915959022b766e6b30202e7a1b2ee4803722d85f305a7cc12\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md\"), \"3d69328d0880e0b54dffc125fc472f81d77e2f65dab99c8f6cf9d37205bedb12\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v12-replacement-campaign-authorization.md\"), \"a51525b39602dad0b3cb6b73c2d37ed69a33f2f8b5e164bd43ae244f13768433\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v13-replacement-campaign-authorization.md\"), \"9323ecd738bb5fba142b0cdcf189a2cad39514ecb23b1f286c73009994536bf9\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-fresh-replacement-campaign-preflight.md\"), \"c6ebe53446c6b0c9125fd0114713df20d8f9e2a5005a18be2799451a440d0682\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md\"), \"84c10e60fe8fd9b5e8e56b97d9e039a8d8c8c9d7cf59d05a25652a6a16432011\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v14-replacement-campaign-authorization.md\"), \"e9ac6d2d1aeb53469390edd3382e46bf8c9a8303bddb89e5edd2b6221a7917eb\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v15-replacement-campaign-authorization.md\"), \"499a1086c3a2f4b3307faf6d81937bf46e2649529cc60d393122f895876b464d\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v16-replacement-campaign-authorization.md\"), \"2504457bd050c2599d3e9d10a0eb0874a05a778b823f3c5995af8b0b803321ec\")",
+            "(Path(\"docs/reports/phase-d-task-39b2c-iic-v17-replacement-campaign-authorization.md\"), \"95f22675a1e2230326f0e70a005122b1a5a2e0c2fa74684672f18a5a187c4a53\")",
+            "len(active_status_entries) != 20",
+            "len(set(active_status_paths)) != len(active_status_paths)",
+            "set(active_status_paths) != active_status_expected_paths",
+            "ii-c-c blocked status docs inventory drifted",
+            "ii-c-c blocked status semantics drifted",
+            "ii-c-c stale active frontier text admitted",
+            "That v9-era status is historical",
+            "were subsequently authorized and consumed",
+            "consumedPostArmAuthorizationDeadlineExhaustion",
+            "Status: consumed / non-admitting / non-retryable",
+            "consumedClosedPostArmFailure",
+            "v13 is consumed/non-admitting/non-retryable",
+            "authorization-window/one-attempt EOF repair are\\n> complete/non-admitting",
+            "a supplemental sudo/PAM observation\\nis not campaign-bound",
+            "v8-v13 and v16 consumed",
+            "v8-v13 and v16 consumed",
+            "v13 purge disposition -> future evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
+            "aggregate scope/xattr no-mutation evidence gaps",
+            "Status: superseded before launch / unconsumed / reauthorization required",
+            "v14 authorization based on `d5a7df3` was stopped before launch",
+            "One fresh v15 was > authorized from `facf3ea`",
+            "v15 is superseded/unconsumed",
+            "Pre-arm suspension",
+            "No campaign UUID",
+            "Status: consumed / non-admitting / non-retryable",
+            "103a4836f4aa80c5d3739ca357364ad5c9200cf6",
+            "0cfccbf6e8a500365837b4cb9551f6ff70af4bbf",
+            "The authorized invocation subsequently ran exactly once",
+            "Current authorization: v17",
+            "a69bd33df8b27e0660e628ec59be308342141625",
+            "f32d41c4a7bdf24519016666c942fe9ec5cf3789",
+            "Once v17 durably records",
+            "No v17 campaign UUID",
+            "v17 remains unconsumed but is superseded",
+            "v13 purge disposition -> future evidence persistent-path repair -> fresh authorization -> replacement campaign -> L3c3d -> L3c4",
+            "ii-c-c v13 supplemental observation became causal",
+            "Historical sequential text required a pushed Ready baseline before Task 40",
+        ]
+        for marker in pinnedStatusDocs {
+            #expect(boundarySource(root).contains(marker), "missing: \(marker)")
+        }
+        #expect(!evidence.contains("signedInvestigationRuntimeReady"))
+        let v9Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v9Evidence.utf8)) as? [String: Any])
+        #expect(v9Object["classification"] as? String
+            == "consumedDriverExecutionPolicyDenial")
+        #expect(v9Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v9Object["admission"] as? String == "rejected")
+        #expect(v9Object["retry"] as? String == "forbidden")
+        #expect(v9Object["schemaVersion"] as? Int == 5)
+        let currentObservation = try #require(
+            v9Object["systemObservation"] as? [String: Any])
+        #expect(currentObservation["gateBaseState"] as? String
+            == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent")
+        let subsequentObservation = try #require(
+            v9Object["subsequentCampaignObservation"] as? [String: Any])
+        #expect(subsequentObservation["classification"] as? String
+            == "consumedPostArmFailureUnclassified")
+        #expect(subsequentObservation["attemptUUID"] as? String
+            == "18a85048-5e1c-40c5-99e4-3785185070d3")
+        #expect(!v9Evidence.contains("signedInvestigationRuntimeReady"))
+        let v10Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v10Evidence.utf8)) as? [String: Any])
+        #expect(v10Object["classification"] as? String
+            == "consumedCampaignDeadlineExhaustion")
+        #expect(v10Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v10Object["admission"] as? String == "rejected")
+        #expect(v10Object["retry"] as? String == "forbidden")
+        let v10Observation = try #require(
+            v10Object["systemObservation"] as? [String: Any])
+        #expect(v10Observation["gateBaseState"] as? String
+            == "ownConsumedAttemptRemovedWithSubsequentAttemptPresent")
+        #expect(!v10Evidence.contains("signedInvestigationRuntimeReady"))
+        let v11Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v11Evidence.utf8)) as? [String: Any])
+        #expect(v11Object["classification"] as? String
+            == "consumedPostArmFailureUnclassified")
+        #expect(v11Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v11Object["schemaVersion"] as? Int == 6)
+        #expect(v11Object["admission"] as? String == "rejected")
+        #expect(v11Object["retry"] as? String == "forbidden")
+        #expect(!v11Evidence.contains("signedInvestigationRuntimeReady"))
+        let v12Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v12Evidence.utf8)) as? [String: Any])
+        #expect(v12Object["classification"] as? String
+            == "consumedPostArmAuthorizationDeadlineExhaustion")
+        #expect(v12Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain"])
+        #expect(v12Object["schemaVersion"] as? Int == 7)
+        #expect(v12Object["admission"] as? String == "rejected")
+        #expect(v12Object["retry"] as? String == "forbidden")
+        let v12Observation = try #require(
+            v12Object["systemObservation"] as? [String: Any])
+        #expect(v12Observation["gateBaseState"] as? String
+            == "gateBaseAbsentAfterObservedResidueLoss")
+        #expect(!v12Evidence.contains("signedInvestigationRuntimeReady"))
+        let v13Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v13Evidence.utf8)) as? [String: Any])
+        #expect(v13Object["classification"] as? String
+            == "consumedClosedPostArmFailure")
+        #expect(v13Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v13Object["schemaVersion"] as? Int == 8)
+        #expect(v13Object["admission"] as? String == "rejected")
+        #expect(v13Object["retry"] as? String == "forbidden")
+        let v13Observation = try #require(
+            v13Object["systemObservation"] as? [String: Any])
+        #expect(v13Observation["gateBaseState"] as? String
+            == "persistentOwnConsumedAttemptPresent")
+        #expect(!v13Evidence.contains("signedInvestigationRuntimeReady"))
+        let v16Object = try #require(JSONSerialization.jsonObject(
+            with: Data(v16Evidence.utf8)) as? [String: Any])
+        #expect(v16Object["classification"] as? String
+            == "consumedClosedPostArmFailure")
+        #expect(v16Object["eventChain"] as? [String]
+            == ["prepared", "armedConsumed", "spawnUncertain", "terminal"])
+        #expect(v16Object["schemaVersion"] as? Int == 9)
+        #expect(v16Object["admission"] as? String == "rejected")
+        #expect(v16Object["retry"] as? String == "forbidden")
+        let v16Observation = try #require(
+            v16Object["systemObservation"] as? [String: Any])
+        #expect(v16Observation["gateBaseState"] as? String
+            == "persistentOwnAndPriorConsumedAttemptsPresent")
+        #expect(!v16Evidence.contains("signedInvestigationRuntimeReady"))
+    }
+
+    private func boundarySource(_ root: URL) -> String {
+        (try? String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8)) ?? ""
+    }
+
+    @Test
+    func iiCB1RootOwnedGateVerifierPinsCurrentTreeContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let release = try String(contentsOf: root.appending(
+            path: "scripts/verify-app-release-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        let combined = boundary + release + contract
+        #expect([boundary, release, contract].allSatisfy { $0.hasPrefix("#!/bin/zsh -f\n") })
+        for marker in [
+            "--iic-b1-root-owned-gate-source-contract-only",
+            "--iic-b1-root-owned-gate-mutation-contract-only",
+            "--iic-b1-root-owned-gate-staged-scope-contract-only",
+            "--iic-b1-root-owned-gate-component-boundary-only",
+            "--iic-b1-root-owned-gate-contract-only",
+            "function verify_iicb1_root_owned_gate_source_contract()",
+            "function verify_iicb1_root_owned_gate_staged_scope()",
+            "function verify_iicb1_root_owned_gate_component_boundary()",
+            "function verify_iicb1_root_owned_gate_contract()",
+            "ii-c-b1 Gate file ownership drifted",
+            "ii-c-b1 process identity drifted",
+            "ii-c-b1 executable admission sequence drifted",
+            "ii-c-b1 focused tests became vacuous",
+            "ii-c-b1 prohibited authority drifted",
+            "ii-c-b1 checkpoint paths drifted",
+            "ii-c-b1 checkpoint budget drifted",
+            "(( ${#expected} == 7 && ${#observed} <= 7 ))",
+            "ii-c-b1 physical rejection test became vacuous",
+            "41f5dba1b7ff7f1272d5a2607ae9794b266e6c47",
+            "(( changed <= 1900 ))",
+            "gate-owner-current-user",
+            "gate-group-current-user",
+            "gate-owner-fallback",
+            "gate-pre-spawn-revalidation-removed",
+            "gate-post-spawn-revalidation-removed",
+            "gate-process-user-root",
+            "gate-process-group-wheel",
+            "gate-root-success-vacuity",
+            "gate-post-spawn-drift-vacuity",
+            "gate-physical-coordinator-uid-vacuity",
+            "gate-physical-owner-vacuity",
+            "gate-physical-error-vacuity",
+            "gate-physical-pid-vacuity",
+            "gate-physical-coordinator-reap-vacuity",
+            "gate-physical-pid-record-vacuity",
+            "gate-physical-capsule-vacuity",
+            "gate-physical-foreground-vacuity",
+            "gate-physical-attempt-vacuity",
+            "gate-physical-observed-uid-spoof",
+            "ii-c-b1 mutation accepted:",
+            "immutable-scope-and-mutations",
+            "77cde61b8c09e739ab5268531e83bcd333dcdc28",
+            "9c59f241ffbfc6bc6c2a6810a9a0ce2c57b23c4b",
+            "InvestigationFixedGateDarwinLifecycle.(validateExecutable",
+            "InvestigationMachineFixedGateContract.requiredUserID",
+            "InvestigationMachineFixedGateContract.requiredGroupID",
+            "ii-c-b1 diagnostic Coordinator gained execution authority",
+            "ii-c-b1 closed image contains symlink",
+            "component-symlink-vacuity",
+            "component-symlink-reset-vacuity",
+            "component-provenance-reset-vacuity",
+            "component-provenance-head-vacuity",
+            "component-provenance-match-vacuity",
+            "component-validation-build-setting-vacuity",
+            "component-public-dispatch-vacuity",
+            "component-snapshot-umask-vacuity",
+            "component-source-git-env-vacuity",
+            "component-snapshot-early-return-vacuity",
+            "component-source-contract-early-return-vacuity",
+            "component-runtime-early-return-vacuity",
+            "component-snapshot-shadow-vacuity",
+            "component-source-contract-shadow-vacuity",
+            "component-runtime-shadow-vacuity",
+            "component-independent-tree-vacuity",
+            "component-native-sandbox-vacuity",
+            "run_iicb1_root_owned_gate_component_snapshot",
+            "ii-c-b1 independent snapshot post-build drifted",
+            "ii-c-b1 validation snapshot provenance unavailable",
+            "ii-c-b1 diagnostic Coordinator build provenance drifted",
+            "stornaut.task39.machine.build-provenance.v1",
+            "ii-c-b1 Gate lifecycle leaked into closed image",
+            "verify_iica_component_boundary",
+        ] {
+            #expect(combined.contains(marker))
+        }
+        let mutationNames = [
+            "gate-owner-current-user", "gate-group-current-user",
+            "gate-owner-501", "gate-group-20",
+            "gate-owner-fallback", "gate-group-fallback",
+            "gate-owner-comment-spoof", "gate-sibling-path-bypass",
+            "gate-held-named-identity-bypass", "gate-size-bound-bypass",
+            "gate-metadata-mode-widened", "gate-link-count-bypass",
+            "gate-flags-bypass", "gate-acl-bypass",
+            "gate-xattr-bypass", "gate-xattr-uniqueness-bypass",
+            "gate-sha-bypass", "gate-acquisition-removed",
+            "gate-pre-spawn-revalidation-removed",
+            "gate-post-spawn-revalidation-removed",
+            "gate-pre-spawn-node-equality-removed",
+            "gate-post-spawn-node-equality-removed",
+            "gate-prohibited-authority", "gate-recorder-current-owner",
+            "gate-recorder-current-group", "gate-root-success-vacuity",
+            "gate-revalidation-count-vacuity",
+            "gate-negative-case-removed", "gate-post-spawn-drift-vacuity",
+            "gate-post-spawn-owner-case-removed",
+            "gate-nonroot-case-vacuity", "gate-nonwheel-case-vacuity",
+            "gate-boundary-marker-vacuity", "gate-process-user-root",
+            "gate-process-group-wheel", "gate-physical-test-vacuity",
+            "gate-physical-coordinator-uid-vacuity",
+            "gate-physical-coordinator-gid-vacuity",
+            "gate-physical-owner-vacuity", "gate-physical-group-vacuity",
+            "gate-physical-error-vacuity", "gate-physical-pid-vacuity",
+            "gate-physical-pgid-vacuity",
+            "gate-physical-coordinator-reap-vacuity",
+            "gate-physical-pid-record-vacuity",
+            "gate-physical-capsule-vacuity",
+            "gate-physical-foreground-vacuity",
+            "gate-physical-attempt-vacuity", "gate-physical-early-return",
+            "gate-physical-observed-uid-spoof",
+            "gate-physical-observed-gid-spoof",
+        ]
+        #expect(mutationNames.count == 51)
+        for name in mutationNames {
+            #expect(boundary.contains("\"\(name)\": ("))
+            #expect(contract.contains("(\"\(name)\","))
+        }
+        let componentMutationNames = [
+            "component-positive-vacuity",
+            "component-process-identity-vacuity",
+            "component-authority-vacuity",
+            "component-symlink-enumeration-vacuity",
+            "component-symlink-vacuity",
+            "component-symlink-reset-vacuity",
+            "component-provenance-reset-vacuity",
+            "component-provenance-head-vacuity",
+            "component-provenance-match-vacuity",
+            "component-validation-build-setting-vacuity",
+            "component-public-dispatch-vacuity",
+            "component-snapshot-umask-vacuity",
+            "component-source-git-env-vacuity",
+            "component-snapshot-early-return-vacuity",
+            "component-source-contract-early-return-vacuity",
+            "component-runtime-early-return-vacuity",
+            "component-snapshot-shadow-vacuity",
+            "component-source-contract-shadow-vacuity",
+            "component-runtime-shadow-vacuity",
+            "component-independent-tree-vacuity",
+            "component-native-sandbox-vacuity",
+            "component-negative-image-vacuity",
+        ]
+        #expect(componentMutationNames.count == 22)
+        for name in componentMutationNames {
+            #expect(contract.contains("(\"\(name)\","))
+        }
+        #expect(contract.contains(
+            "done <\"$component_mutation_root/component-mutations.txt\""))
+        #expect(contract.contains("component-binding-mutations.txt") && contract.contains("len(binding_names) != 13"))
+        #expect(!contract.contains(
+            "for component_mutation in component-positive-vacuity"))
+        #expect(contract.contains(
+            "ii-c-b1 arbitrary component reuse entry accepted"))
+        #expect(contract.contains("component-reuse-entry.log"))
+    }
+    @Test
+    func fixedGateDeadlineCleanupVerifierPinsClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(contentsOf: root.appending(
+            path: "scripts/verify-investigation-boundaries"), encoding: .utf8)
+        let contract = try String(contentsOf: root.appending(
+            path: "scripts/verify-contract"), encoding: .utf8)
+        for marker in [
+            "--fixed-gate-deadline-cleanup-contract-only",
+            "--fixed-gate-deadline-cleanup-staged-scope-contract-only",
+            "function verify_fixed_gate_deadline_cleanup_contract()",
+            "fixed-gate cleanup regained an observation-count limit",
+            "fixed-gate cleanup deadline binding drifted",
+            "fixed-gate cleanup critical lifecycle code drifted",
+            "fixed-gate cleanup focused tests became vacuous",
+            "fixed-gate cleanup checkpoint paths drifted",
+            "fixed-gate cleanup checkpoint budget drifted",
+        ] { #expect(boundary.contains(marker)) }
+        for marker in [
+            "fixed-observation-cap", "cleanup-deadline-drift",
+            "unreachable-call-spoof", "deadline-rebinding",
+            "response-helper-observation-cap",
+            "adapter-counter-cap", "adapter-comment-spoof",
+            "delayed-test-vacuity", "deadline-test-vacuity",
+            "fixed-gate cleanup mutation accepted:",
+        ] { #expect(contract.contains(marker)) }
+    }
+
+    @Test
+    func concreteEntryRemainsPackageClosedNoAuthAndScopeBounded() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib3c-concrete-entry-contract-only",
+            "--iib3c-staged-scope-contract-only",
+            "ii-b3c concrete authority widened",
+            "ii-b3c staged checkpoint paths drifted",
+            "ii-b3c staged checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "b3c_concrete_markers=(",
+            "b3c_closed_images=(",
+            "ii-b3c concrete entry missing from diagnostic Debug image",
+            "ii-b3c concrete entry leaked into a closed image",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "b3c-public", "b3c-auth", "b3c-business-io",
+            "b3c-digest", "b3c-peer-binding", "b3c-store",
+            "for fixture in extra-path over-budget deleted-path",
+            "b3c-$fixture.index",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func startRetireSeamRemainsPackageClosedAndUnreachable() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let transport = try String(
+            contentsOf: root.appending(path:
+                "Sources/StornautInvestigationRuntime/InvestigationLifecycleAppServerTransport.swift"),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        #expect(transport.contains(
+            "package func startAndRetireWithEvidence() async throws"))
+        #expect(!transport.contains(
+            "public func startAndRetireWithEvidence() async throws"))
+        for marker in [
+            "--iib3b-start-retire-contract-only",
+            "--iib3b-staged-scope-contract-only",
+            "start-retire seam gained prohibited surface",
+            "ii-b3b staged checkpoint paths drifted",
+            "ii-b3b staged checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "start_retire_seam_forbidden_markers=(",
+            "start_retire_seam_closed_images=(",
+            "Start-retire seam leaked into a closed image",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "start-retire-public", "start-retire-write",
+            "start-retire-caller-cleanup",
+            "start-retire-forwarding",
+            "start-retire-comment-brace",
+            "start-retire-alias",
+            "start-retire-backtick",
+            "for fixture in extra-path over-budget deleted-path",
+            "start-retire-$fixture.index",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func appPeerAdmissionReturnsOnlyPackageScopedStableObservation() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/LifecycleAppAuthorization.swift"
+            ),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "package struct LifecycleMachineDriverPeerAdmissionEvidence",
+            "package func authorizeAndObserveStableEvidence(",
+            "authorizeAndObserveStableEvidence(identity) != nil",
+            "This is current-peer evidence, not installer-authenticated provenance.",
+            "signingEvidence: staticEvidence",
+            "--app-peer-admission-contract-only",
+        ] {
+            #expect(source.contains(marker) || boundaries.contains(marker))
+        }
+        #expect(!source.contains(
+            "public struct LifecycleMachineDriverPeerAdmissionEvidence"
+        ))
+        #expect(!source.contains("expectedExecutableSHA256"))
+    }
+
+    @Test
+    func liveClaimServerLinksOnlyTheHelperAndFreezesTheArtifactMatrix() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: root.appending(
+                path: "Stornaut.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+        #expect(
+            project.components(
+                separatedBy: "productName = StornautInvestigationMachineClaimServer;"
+            ).count == 2
+        )
+        #expect(
+            project.components(
+                separatedBy: "StornautInvestigationMachineClaimServer in Frameworks"
+            ).count == 3
+        )
+        let helperStart = try #require(
+            project.range(
+                of: "A00000000000000000000004 /* StornautLifecycleHelper */ = {"
+            )
+        )
+        let helperSuffix = project[helperStart.lowerBound...]
+        let helperEnd = try #require(
+            helperSuffix.range(of: "\n\t\t};")
+        )
+        let helper = String(helperSuffix[..<helperEnd.upperBound])
+        #expect(helper.contains("StornautInvestigationMachineClaimServer"))
+        #expect(
+            project.components(
+                separatedBy: "/* StornautInvestigationMachineClaimServer */"
+            ).count == 4
+        )
+
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "helper claim-server Mach-O positive drifted",
+            "non-helper claim-server Mach-O leakage",
+            "claim-server two-selector surface drifted",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "live claim server helper-only linkage drifted",
+            "StornautInvestigationMachineClaimServer in Frameworks",
+            "live claim server public extension drifted",
+            "iii-b-ii checkpoint paths drifted",
+            "iii-b-ii checkpoint budget drifted",
+            "live claim server physical clock drifted",
+            "live claim server physical scheduler drifted",
+            "live claim server physical terminal drifted",
+            "claim server physical terminal authority drifted",
+            "live claim server helper physical composition drifted",
+            "live claim server helper retained physical adapter",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "helper-claim-server-linkage",
+            "helper-claim-server-positive",
+            "non-helper-claim-server-leak",
+            "live-claim-server-public-extension",
+            "live-claim-server-admission-order",
+            "live-claim-server-physical-clock",
+            "live-claim-server-physical-scheduler",
+            "live-claim-server-physical-terminal",
+            "live-claim-server-helper-composition",
+            "claim-server-terminal-authority",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "claim_server_module_symbols=(",
+            "for marker in \"${claim_server_module_symbols[@]}\"",
+        ] {
+            #expect(release.contains(marker))
+        }
+    }
+
+    @Test
+    func machineClaimServerOwnsStrictTypedStateTranslationOnly() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let adapter = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerAdapter.swift"
+            ),
+            encoding: .utf8
+        )
+        let effects = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineClaimServer/InvestigationMachineClaimServerEffects.swift"
+            ),
+            encoding: .utf8
+        )
+        let deadlineState = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/LifecycleMachineRetirementEscrowDeadlineState.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(adapter.contains(
+            "package final class InvestigationMachineClaimServerAdapter:"
+        ))
+        #expect(adapter.contains(
+            "transfer: LifecycleMachineRetirementReservationTransfer"
+        ))
+        #expect(!adapter.contains(
+            "InvestigationMachineClaimServerReservationSeed"
+        ))
+        #expect(adapter.contains(
+            "LifecycleInteractiveWorkerRetirementObservation"
+        ))
+        #expect(adapter.contains(
+            "LifecycleInvestigationResidueObservation"
+        ))
+        #expect(adapter.contains("transfer.ownerRetirementObservation"))
+        #expect(adapter.contains("transfer.residueObservation"))
+        #expect(adapter.contains(
+            "transfer.validBeforeUTCMicroseconds"
+        ))
+        #expect(!adapter.contains(
+            "transfer.validBefore.timeIntervalSince1970"
+        ))
+        #expect(!adapter.contains(
+            "LifecycleMachineRetirementReservationTransfer("
+        ))
+        #expect(!adapter.contains(
+            "expectedReleaseChallenge: release.releaseChallenge"
+        ))
+        #expect(adapter.contains("state.commitClaimResponse("))
+        #expect(adapter.contains("state.commitReleaseResponse("))
+        #expect(adapter.contains("private let evidenceLock = NSLock()"))
+        #expect(effects.contains("callbackFinished"))
+        for marker in [
+            "InvestigationMachineClaimServerPhysicalClock",
+            "InvestigationMachineClaimServerPhysicalScheduler",
+            "InvestigationMachineClaimServerPhysicalTerminal",
+            "DarwinInvestigationMachineClaimServerPhysicalClockSource",
+            "ContinuousInvestigationMachineClaimServerTaskFactory",
+            "DarwinInvestigationMachineClaimServerPhysicalTerminalAction",
+        ] {
+            #expect(effects.contains(marker))
+        }
+        let armTransition = try #require(
+            effects.range(of: "let armed = state.armSucceeded(ticket)")
+        )
+        let handleInstall = try #require(
+            effects.range(of: "perform(slot.install(handle), ticket: ticket)")
+        )
+        #expect(armTransition.lowerBound < handleInstall.lowerBound)
+        #expect(deadlineState.contains(
+            "package func rejectOperationObservation("
+        ))
+    }
+
+    @Test
+    func handoffContractTargetRemainsAuthorityFreeAndNonProduct() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let package = try String(
+            contentsOf: root.appending(path: "Package.swift"),
+            encoding: .utf8
+        )
+        let marker = ".target(\n            name: \"StornautInvestigationHandoffContract\""
+        let start = try #require(package.range(of: marker))
+        let suffix = package[start.lowerBound...]
+        let end = try #require(suffix.range(of: "\n        ),"))
+        let target = String(suffix[..<end.upperBound])
+        #expect(target.contains("dependencies: []"))
+        #expect(
+            package.components(
+                separatedBy: "\"StornautInvestigationHandoffContract\""
+            ).count == 11
+        )
+
+        let sourceRoot = root.appending(path: "Sources/StornautInvestigationHandoffContract")
+        let names = try Set(FileManager.default.contentsOfDirectory(atPath: sourceRoot.path))
+        #expect(names == [
+            "HandoffBinaryTranscript.swift",
+            "InvestigationCohortCapsuleContract.swift",
+            "InvestigationHandoffEpochBootstrapContract.swift",
+            "InvestigationHandoffFrameContract.swift",
+            "InvestigationInstalledL2ProjectionContract.swift",
+            "InvestigationMachineClaimContract.swift",
+            "InvestigationProjectedCohortInput.swift",
+            "InvestigationResolvedRootDriverLineageContract.swift",
+        ])
+        for name in names {
+            let source = try String(
+                contentsOf: sourceRoot.appending(path: name),
+                encoding: .utf8
+            )
+            if name == "InvestigationMachineClaimContract.swift" {
+                #expect(
+                    source.components(separatedBy: "public " ).count == 2
+                )
+                #expect(source.contains(
+                    "public protocol InvestigationMachineClaimXPCWire"
+                ))
+                #expect(source.contains(
+                    "@objc(StornautInvestigationMachineClaimXPCWire)"
+                ))
+            } else {
+                #expect(!source.contains("public "))
+            }
+            for forbidden in [
+                    "NSXPCConnection", "NSXPCListener", "Timer(",
+                    "DispatchSource", "DispatchQueue", "RunLoop",
+                    "Task.sleep", "Task.detached", "ContinuousClock",
+                    "SuspendingClock", "Date()", "Date.now",
+                    "CFAbsoluteTimeGetCurrent",
+                    "ProcessInfo.processInfo.systemUptime",
+                    "mach_continuous_time", "mach_wait_until",
+                    "nanosleep(", "usleep(", "sleep(",
+                    "clock_gettime", "gettimeofday", "mach_absolute_time",
+                    "FileHandle", "InputStream", "OutputStream",
+                    "FileWrapper", "NSData", "Data(contentsOf:",
+                    "String(contentsOf:", ".write(to:",
+                    "Darwin.open", "Darwin.read", "pread(",
+                    "stat(", "lstat(", "fstat(", "readlink(",
+                    "opendir(", "readdir(", "closedir(",
+                    "NSLock", "actor ", "class ", "static var ",
+                    "import Security",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+            for forbidden in ["Codable", "NSXPC", "Process(", "FileManager", "URLSession", "posix_spawn", "Darwin.write", "O_WRONLY", "import Stornaut"] {
+                #expect(!source.contains(forbidden))
+            }
+        }
+    }
+
+    @Test
+    func iiC0AProjectionCapsuleVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iic0a-projection-capsule-contract-only",
+            "--iic0a-staged-scope-contract-only",
+            "--iic0a-replay-source-contract-only",
+            "ii-c0a projection public surface drifted",
+            "ii-c0a projection gained Codable surface",
+            "ii-c0a paired selection surface drifted",
+            "ii-c0a checkpoint paths drifted",
+            "ii-c0a checkpoint mode drifted",
+            "ii-c0a checkpoint deleted an existing path",
+            "ii-c0a binary checkpoint path rejected",
+            "function verify_iic0a_index_semantics()",
+            "ii-c0a staged verifier source seal drifted:",
+            "replay.count(\"|| exit $?\") != 4",
+            "(( changed <= 2600 ))",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "--iic0a-source-contract-only",
+            "ii-c0a projection import surface drifted",
+            "ii-c0a intake import surface drifted",
+            "ii-c0a source-only App boundary verification passed.",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iic0a-public",
+            "iic0a-codable",
+            "iic0a-binding-epoch",
+            "iic0a-binding-nonce",
+            "iic0a-binding-configuration",
+            "iic0a-binding-runtime",
+            "iic0a-canonical-reencode",
+            "iic0a-intake-projection",
+            "iic0a-runtime-authority",
+            "iic0a-projection-data-write",
+            "iic0a-intake-data-write",
+            "iic0a-intake-file-manager",
+            "iic0a-projection-mutable-data",
+            "iic0a-projection-connection",
+            "iic0a-intake-system",
+            "iic0a-intake-spawnp",
+            "iic0a-projection-raw-open",
+            "iic0a-intake-socketpair",
+            "iic0a-projection-sendto",
+            "iic0a-intake-user-defaults",
+            "iib0a-boundary iib5biid-boundary iib5biid-app",
+            "iib0a-boundary-guard iib5biid-boundary-guard",
+            "iib5biid-app-guard iib5biid-scope-guard",
+            "substitute-contract substitute-boundary substitute-app",
+            "--historical-freeze-contract-only",
+            "35946583cfb286dd2ac20aab23fe12668f232d83",
+            "d89d201448a99281a554d9b3fca00512b4f0c0be",
+            "94958088fe271139c9ebb4cd1e2df2c0830d2f72",
+            "a50dd817adc470fe37e5199c73c686f0976738c6",
+            "74877ec7a1cdd442e8333a1fd77c259edd67a36c",
+            "c6905e2173b858550078ccc07ac915b67912c3d6",
+            "ii-b0a historical line count drifted",
+            "ii-b5b-ii-d historical line count drifted",
+            "ii-b0a historical script SHA drifted",
+            "ii-b5b-ii-d historical script SHA drifted",
+            "ii-c0a historical replay failure propagation drifted",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiC0BICanonicalProducerVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let author = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationDiagnostic/InvestigationProjectedCohortAuthor.swift"
+            ),
+            encoding: .utf8
+        )
+        let composition = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationDiagnostic/InvestigationRuntimeDiagnosticComposition.swift"
+            ),
+            encoding: .utf8
+        )
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iic0bi_staged_scope", in: boundaries
+        )
+
+        for marker in [
+            "#if DEBUG",
+            "package struct InvestigationProjectedCohortInstalledBinding",
+            "struct InvestigationProjectedCohortGeneratedIdentifiers",
+            "package struct InvestigationProjectedCohortAuthor",
+            "package init()",
+            "package func author(",
+            "configurationData: [Data]",
+            "installedBinding: InvestigationProjectedCohortInstalledBinding",
+        ] {
+            #expect(author.contains(marker))
+        }
+        #expect(!author.contains("public "))
+        #expect(!author.contains("Codable"))
+        for marker in [
+            "package enum InvestigationHandoffScenarioMapping",
+            "package static func handoffScenario(",
+        ] {
+            #expect(composition.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-i-producer-contract-only",
+            "--iic0b-i-staged-scope-contract-only",
+            "function verify_iic0bi_producer_contract()",
+            "function verify_iic0bi_index_semantics()",
+            "function verify_iic0bi_staged_scope()",
+            "ii-c0b-i author DEBUG boundary drifted",
+            "ii-c0b-i package-only or Codable surface drifted",
+            "ii-c0b-i injectable production constructor drifted",
+            "ii-c0b-i scenario mapping ownership drifted",
+            "ii-c0b-i producer gained premature production call site",
+            "ii-c0b-i producer source seal drifted",
+            "ii-c0b-i producer gained prohibited authority",
+            "ii-c0b-i focused tests became vacuous",
+            "ii-c0b-i focused test source seal drifted",
+            "ii-c0b-i checkpoint path ceiling drifted",
+            "ii-c0b-i checkpoint baseline drifted",
+            "ii-c0b-i checkpoint deleted an existing path",
+            "ii-c0b-i binary checkpoint path rejected",
+            "ii-c0b-i checkpoint paths drifted",
+            "ii-c0b-i checkpoint mode drifted",
+            "ii-c0b-i checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "e5ed33e27195d9252f02a89ab39664df3848f1ed",
+            "(( ${#expected} == 7 ))",
+            "(( changed <= 1900 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-i-source-contract-only",
+            "--iic0b-i-component-boundary-only",
+            "function verify_iic0bi_source_contract()",
+            "iic0bi_component_symbols=(",
+            "iic0bi_swiftpm_debug_object=",
+            "iic0bi_swiftpm_release_object=",
+            "iic0bi_debug_diagnostic_image=",
+            "iic0bi_debug_machine_drivers=(",
+            "iic0bi_closed_images=(",
+            "ii-c0b-i Debug SwiftPM object positive control is missing",
+            "ii-c0b-i Debug diagnostic carriage positive control is missing",
+            "ii-c0b-i Debug Machine driver negative control is missing",
+            "ii-c0b-i producer leaked into Release SwiftPM object",
+            "ii-c0b-i producer leaked into a final image",
+            "xcrun swift-demangle) || exit $?",
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "iic0bi_baseline=e5ed33e27195d9252f02a89ab39664df3848f1ed",
+            "\"$iic0bi_app_gate\" --iic0b-i-component-boundary-only",
+            "ii-c0b-i mutation accepted:",
+            "ii-c0b-i scope mutation accepted:",
+            "public-author", "codable-binding", "debug-guard-bypass",
+            "injectable-production-constructor",
+            "second-scenario-mapping", "production-call-site",
+            "extension-wrapper",
+            "stored-wrapper-call-site",
+            "internal-wrapper-call-site",
+            "data-extension-wrapper",
+            "data-static-wrapper",
+            "authority-import", "command-line-selector",
+            "command-line-argc-selector",
+            "command-line-unsafe-argv-selector",
+            "process-arguments-selector", "environment-selector",
+            "user-defaults-selector", "libc-environment-selector",
+            "focused-test-vacuity",
+            "installed-binding-test-vacuity",
+            "focused-assertion-vacuity",
+            "extra-path", "missing-path", "over-budget", "deleted",
+            "binary", "mode", "wrong-baseline",
+            "--iic0a-replay-source-contract-only",
+            "ii-c0a historical replay failure propagation drifted",
+            "ii-c0a replay current-verifier substitution accepted:",
+            "iib5biii_b2b1b_implementation_commit=1c8ab1d5c06f87f7d2af548228835adcd43a1ae9",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiC0BIIAOwnershipVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let scope = try l3c3biiFunction(
+            "verify_iic0biia_staged_scope", in: boundaries
+        )
+        for marker in [
+            "--iic0b-ii-a-ownership-contract-only", "--iic0b-ii-a-staged-scope-contract-only",
+            "function verify_iic0biia_ownership_contract()", "function verify_iic0biia_index_semantics()", "function verify_iic0biia_staged_scope()",
+            "ii-c0b-ii-a target dependency surface drifted", "ii-c0b-ii-a package-only or Codable surface drifted",
+            "ii-c0b-ii-a path or descriptor exposure drifted", "ii-c0b-ii-a fixed ownership path drifted",
+            "ii-c0b-ii-a lock acquisition flags drifted",
+            "ii-c0b-ii-a ownership flag shape drifted", "ii-c0b-ii-a ownership flag count drifted",
+            "ii-c0b-ii-a lock descriptor inheritance drifted", "ii-c0b-ii-a named descriptor identity revalidation drifted",
+            "ii-c0b-ii-a ownership mutex linearization drifted", "ii-c0b-ii-a explicit close reporting drifted",
+            "ii-c0b-ii-a permanent lock invariant drifted", "ii-c0b-ii-a contention classification drifted",
+            "ii-c0b-ii-a ownership heuristic drifted", "ii-c0b-ii-a source or focused-test seal drifted", "ii-c0b-ii-a compiled semantic surface drifted",
+            "ii-c0b-ii-a checkpoint path ceiling drifted", "ii-c0b-ii-a checkpoint baseline drifted",
+            "ii-c0b-ii-a checkpoint deleted an existing path", "ii-c0b-ii-a binary checkpoint path rejected",
+            "ii-c0b-ii-a checkpoint paths drifted", "ii-c0b-ii-a checkpoint mode drifted",
+            "ii-c0b-ii-a checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad",
+            "(( ${#expected} == 4 ))",
+            "(( changed <= 1200 && 1981 + changed <= 2870 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "--iic0b-ii-a-source-contract-only", "--iic0b-ii-a-component-boundary-only",
+            "function verify_iic0biia_source_contract()", "function verify_iic0biia_component_boundary()",
+            "iic0biia_component_symbols=(", "iic0biia_swiftpm_debug_objects=(",
+            "iic0biia_swiftpm_release_objects=(", "iic0biia_closed_images=(", "iic0biia_required_executables=(",
+            "ii-c0b-ii-a Debug SwiftPM object positive control is missing",
+            "ii-c0b-ii-a Release SwiftPM object negative control is missing", "ii-c0b-ii-a fixed ownership string boundary drifted",
+            "ii-c0b-ii-a source leaked into Release SwiftPM object", "ii-c0b-ii-a source leaked into a closed image",
+            "ii-c0b-ii-a fixed ownership string leaked into a closed image", "ii-c0b-ii-a required executable negative control is missing",
+            "ii-c0b-ii-a Machine object negative control is incomplete", "ii-c0b-ii-a closed-image enumeration failed",
+            "ii-c0b-ii-a target became a package product", "ii-c0b-ii-a target gained Xcode membership",
+            "ii-c0b-ii-a source flag shape drifted", "ii-c0b-ii-a source flag count drifted",
+            "xcrun swift-demangle) || exit $?",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "function verify_iic0biia_historical_contract()",
+            "local baseline=fe3ea757432c4dc9cf960f210c167916697ce601",
+            "local a1=d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007",
+            "9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21",
+            "local a2=f11eea42ef295f49b20e1c0f3912d4b32448b968",
+            "local a2_tree=d0683495ea37d0692677c98f491f3037eaedba4c",
+            "scripts/verify-contract --iic0b-ii-a-contract-only",
+            "ii-c0b-ii-a2 historical replay failed",
+            "a1-source-identity", "a1-focused-test-identity",
+            "a1-physical-probe-identity", "a2-historical-replay",
+            "ii-c0b-ii-a historical contract verification passed.",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiC0BIIA3RetainedBaseVerifierPinsContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let scope = try l3c3biiFunction(
+            "verify_iic0biia3_staged_scope", in: boundaries
+        )
+
+        for marker in [
+            "--iic0b-ii-a3-retained-base-contract-only",
+            "--iic0b-ii-a3-staged-scope-contract-only",
+            "function verify_iic0biia3_retained_base_contract()",
+            "function verify_iic0biia3_index_semantics()",
+            "function verify_iic0biia3_staged_scope()",
+            "ii-c0b-ii-a3 retained-base API drifted",
+            "ii-c0b-ii-a3 source or focused-test seal drifted",
+            "ii-c0b-ii-a3 descriptor or capability exposure drifted",
+            "ii-c0b-ii-a3 no-argument owned-base API drifted",
+            "ii-c0b-ii-a3 owned-base operation exposed authority",
+            "ii-c0b-ii-a3 callback surface drifted",
+            "ii-c0b-ii-a3 owner member allowlist drifted",
+            "ii-c0b-ii-a3 acquirer member allowlist drifted",
+            "ii-c0b-ii-a3 acquirer security body drifted",
+            "ii-c0b-ii-a3 base and lock transfer order drifted",
+            "ii-c0b-ii-a3 per-operation revalidation drifted",
+            "ii-c0b-ii-a3 revalidation-before-operation order drifted",
+            "ii-c0b-ii-a3 held and named revalidation drifted",
+            "ii-c0b-ii-a3 base-before-lock close order drifted",
+            "ii-c0b-ii-a3 descriptor close cardinality drifted",
+            "ii-c0b-ii-a3 terminal close routing drifted",
+            "ii-c0b-ii-a3 gained capsule mutation or prohibited authority",
+            "ii-c0b-ii-a3 focused tests became vacuous",
+            "ii-c0b-ii-a3 checkpoint path ceiling drifted",
+            "ii-c0b-ii-a3 checkpoint baseline drifted",
+            "ii-c0b-ii-a3 checkpoint deleted an existing path",
+            "ii-c0b-ii-a3 binary checkpoint path rejected",
+            "ii-c0b-ii-a3 checkpoint paths drifted",
+            "ii-c0b-ii-a3 checkpoint mode drifted",
+            "ii-c0b-ii-a3 checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "fe3ea757432c4dc9cf960f210c167916697ce601",
+            "9533824602ff18b35581f191f9ff0140a52ec53c",
+            "(( ${#expected} == 6 ))",
+            "(( changed <= 2750 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-ii-a3-source-contract-only",
+            "--iic0b-ii-a3-component-boundary-only",
+            "function verify_iic0biia3_source_contract()",
+            "function verify_iic0biia3_component_boundary()",
+            "iic0biia3_component_symbols=(",
+            "iic0biia3_swiftpm_debug_objects=(",
+            "iic0biia3_swiftpm_release_objects=(",
+            "iic0biia3_closed_images=(",
+            "iic0biia3_required_executables=(",
+            "ii-c0b-ii-a3 Debug SwiftPM object positive control is missing",
+            "ii-c0b-ii-a3 Release SwiftPM object negative control is missing",
+            "ii-c0b-ii-a3 source leaked into Release SwiftPM object",
+            "ii-c0b-ii-a3 source leaked into a closed image",
+            "ii-c0b-ii-a3 target became a package product",
+            "ii-c0b-ii-a3 target gained Xcode membership",
+            #"verify_iic0biia3_component_boundary "$derived_data" "$diagnostic_derived_data""#,
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "function verify_iic0biia3_contract()",
+            "iic0biia3_baseline=fe3ea757432c4dc9cf960f210c167916697ce601",
+            "d18354bc7ca7dd2ddb04180298f9fb4f2e7c60e3",
+            "d6a4b0ea9f6ee53101fb986fdab5ac4b509de7ad",
+            "15bc5ce89b4a1c416df9c332cad2306cc26299f7903a0de15707f5e0cfbcab8f",
+            "eedda4e3a843a76898ddea4bc8fd243b6357efcbf17a4ea9e8438fdc0d561007",
+            "9ffdfa9d956655b05cf9813658a0d00449f38a075f991737f460b2864c8a1e21",
+            "731b613e4b8c1c5c09e34e412b5c7ea25630a8ac2f9e6549131482770bc0acf6",
+            "f11eea42ef295f49b20e1c0f3912d4b32448b968",
+            "d0683495ea37d0692677c98f491f3037eaedba4c",
+            "--iic0b-ii-a-ownership-contract-only",
+            "--iic0b-ii-a-staged-scope-contract-only",
+            "--iic0b-ii-a-source-contract-only",
+            "--iic0b-ii-a-component-boundary-only",
+            "--iic0b-ii-a3-retained-base-contract-only",
+            "--iic0b-ii-a3-staged-scope-contract-only",
+            "--iic0b-ii-a3-source-contract-only",
+            "--iic0b-ii-a3-component-boundary-only",
+            "ii-c0b-ii-a3 mutation accepted:",
+            "ii-c0b-ii-a3 App mutation accepted:",
+            "ii-c0b-ii-a3 scope mutation accepted:",
+            "a1-source-identity",
+            "a1-focused-test-identity",
+            "a1-physical-probe-identity",
+            "a2-historical-replay",
+            "raw-descriptor-return",
+            "raw-descriptor-property",
+            "raw-descriptor-alias-function",
+            "allowed-method-signature-drift",
+            "raw-descriptor-extension",
+            "internal extension InvestigationMachineGateOwnership",
+            "attributed-raw-descriptor-return",
+            "attributed-computed-property",
+            "raw-descriptor-typealias",
+            "same-line-extra-declaration",
+            "same-line-after-member-close",
+            "comment-brace-hidden-method",
+            "comment-prefixed-attribute",
+            "top-level-capability-typealias",
+            "top-level-computed-property",
+            "indented-top-level-typealias",
+            "source-seal",
+            "ii-c0b-ii-a3 source seal admitted",
+            "escaping-owned-base",
+            "async-owned-base",
+            "acquirer-cint-callback",
+            "acquirer-qualified-int32-callback",
+            "acquirer-alias-callback",
+            "acquirer-optional-callback",
+            "acquirer-inout-callback",
+            "acquirer-nonfirst-multiline-sendable-callback",
+            "acquirer-attributed-callback-return",
+            "acquirer-raw-descriptor-return",
+            "darwin-system-raw-descriptor-return",
+            "metadata-snapshot-raw-descriptor-return",
+            "acquirer-held-named-short-circuit",
+            "root-path-literal-drift",
+            "nested-release-decoy",
+            "nested-deinit-decoy",
+            "expected_diagnostic",
+            "reversed-close-order",
+            "missing-operation-revalidation",
+            "revalidate-early-return",
+            "release-early-return",
+            "duplicate-descriptor",
+            "child-inheritable-descriptor",
+            "held-named-short-circuit",
+            "cloexec-short-circuit",
+            "lock-mutation",
+            "extra-path", "missing-path", "over-budget", "deleted",
+            "binary", "mode", "wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiC0BIIBCapsuleVerifierPinsAggregateContractAndScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let scope = try l3c3biiFunction(
+            "verify_iic0biib_staged_scope", in: boundaries
+        )
+
+        for marker in [
+            "--iic0b-ii-b-capsule-contract-only",
+            "--iic0b-ii-b-staged-scope-contract-only",
+            "function verify_iic0biib_capsule_contract()",
+            "function verify_iic0biib_index_semantics()",
+            "function verify_iic0biib_staged_scope()",
+            "ii-c0b-ii-b package-only or Codable surface drifted",
+            "ii-c0b-ii-b raw descriptor, path, URL or callback surface drifted",
+            "ii-c0b-ii-b broad cleanup or lock mutation drifted",
+            "ii-c0b-ii-b mutation before complete inventory drifted",
+            "ii-c0b-ii-b retry or heuristic boundary drifted",
+            "ii-c0b-ii-b close and reap binding drifted",
+            "ii-c0b-ii-b one-shot lease cardinality drifted",
+            "ii-c0b-ii-b inventory failure was swallowed",
+            "ii-c0b-ii-b product or privileged reachability drifted",
+            "ii-c0b-ii-b directory retry revalidation drifted",
+            "ii-c0b-ii-b directory retry revalidation order drifted",
+            "decoded.capsule.outerAttemptUUID == attemptUUID",
+            "stalePayloadMustMatchAttemptDirectoryUUID",
+            "directoryBusyRetryReopensAndFullyRevalidatesEmptyLeaf",
+            "directoryBusyRetryRejectsMetadataOrContentDrift",
+            "ii-c0b-ii-b focused tests became vacuous",
+            "ii-c0b-ii-b aggregate checkpoint paths drifted",
+            "ii-c0b-ii-b aggregate checkpoint mode drifted",
+            "ii-c0b-ii-b aggregate checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "30338abf8f179d2369f49d301045ebffea49237a",
+            "c4ca6ae2e9e262d30745e6b8548eeee10211722a",
+            "ii-c0b-ii-b child checkpoint drifted",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "cbc469403f0ecfcdab17fb93baadd24d3c12f1ff",
+            "8ec89e24cece79ad7559a25c0fad9681442bae5d",
+            "(( ${#expected} == 4 ))",
+            "(( changed <= 1800 ))",
+        ] {
+            #expect(scope.contains(marker) || boundaries.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-ii-b-source-contract-only",
+            "--iic0b-ii-b-component-boundary-only",
+            "function verify_iic0biib_source_contract()",
+            "function verify_iic0biib_component_boundary()",
+            "iic0biib_component_symbols=(",
+            "iic0biib_swiftpm_debug_objects=(",
+            "iic0biib_swiftpm_release_objects=(",
+            "iic0biib_closed_images=(",
+            "iic0biib_required_executables=(",
+            "iic0biib_module_namespace=",
+            "ii-c0b-ii-b Debug SwiftPM object positive control is missing",
+            "ii-c0b-ii-b Debug module namespace positive control is missing",
+            "ii-c0b-ii-b Release SwiftPM object negative control is missing",
+            "ii-c0b-ii-b source leaked into Release SwiftPM object",
+            "ii-c0b-ii-b module namespace leaked into Release SwiftPM object",
+            "ii-c0b-ii-b source leaked into a closed image",
+            "ii-c0b-ii-b module namespace leaked into a closed image",
+            "ii-c0b-ii-b source DEBUG boundary drifted",
+            "ii-c0b-ii-b target became a package product",
+            "ii-c0b-ii-b target gained Xcode membership",
+            "ii-c0b-ii-b target source inventory drifted",
+            "ii-c0b-ii-b existing component roots unavailable",
+            #"verify_iic0biib_component_boundary \"#,
+            #""$scratch/swiftpm-debug" "$scratch/swiftpm-release""#,
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "function verify_iic0biib_contract()",
+            "iic0biib_b1_commit=30338abf8f179d2369f49d301045ebffea49237a",
+            "iic0biib_b1_tree=c4ca6ae2e9e262d30745e6b8548eeee10211722a",
+            "iic0biib_b2_commit=cbc469403f0ecfcdab17fb93baadd24d3c12f1ff",
+            "iic0biib_b2_tree=8ec89e24cece79ad7559a25c0fad9681442bae5d",
+            "iic0biib_closure_commit=6ef304d2102121c9bee5fed363bd9a80c6d33bbc",
+            "iic0biib_closure_tree=8b1e7ae4a8c40bb0bce795d14477fd64864b4e18",
+            "ii-c0b-ii-b immutable closure replay failed",
+            "deadline_fix=bfb5d636c9eb1b6853d603c7e115f879ac6a5822",
+            "deadline_fix_tree=8b9e347dc29064ca0d2a0efae10de68e4244590a",
+            "bf7cee7e2aa06458c7978f74887cf54d2199daff3153af6a81f2a531beb83b68",
+            "6039a0b344b952314139a72d70f4c8d5a70014deca3c493978fce744d7a721d9",
+            "942c39d646bde28e62351890ef07caa922fdeab1209b652dd351134316d36826",
+            "0dc5c7f09f0831f0ee74020aff53ef7c2c353c4069dcff624627006ae2dd606a",
+            "61edc0a9c266249f83475eaf73ae58c8b476e3b1ce04c070b0dca36041415290",
+            "--iic0b-ii-b-capsule-contract-only",
+            "--iic0b-ii-b-staged-scope-contract-only",
+            "--iic0b-ii-b-source-contract-only",
+            "--iic0b-ii-b-component-boundary-only",
+            "ii-c0b-ii-b mutation accepted:",
+            "ii-c0b-ii-b generated mutation inventory drifted",
+            "ii-c0b-ii-b generated mutation inventory duplicated",
+            "ii-c0b-ii-b App mutation accepted:",
+            "recursive-cleanup", "ordinary-unlink",
+            "raw-descriptor", "path-surface", "url-surface",
+            "generic-callback", "multiple-lease", "lock-mutation",
+            "mutation-before-inventory", "deadline-bypass",
+            "wall-clock", "pid-heuristic", "mtime-heuristic",
+            "missing-close-reap-binding", "product-authority",
+            "swallowed-inventory-failure", "swallowed-command-failure",
+            "release-renamed-authority",
+            "target-extra-source", "verifier-command-failure",
+            "ii-c0b-ii-b verifier command failure was swallowed",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiC0BIII2AGateVerifierPinsNarrowTargetAndArtifactBoundary() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try l3c3biiSource(
+            "Package.swift", repositoryRoot: root)
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+        let checkpointStart = try #require(contract.range(
+            of: "function verify_iic0biii2a_contract() {"
+        ))
+        let checkpointSuffix = contract[checkpointStart.lowerBound...]
+        let checkpointEnd = try #require(checkpointSuffix.range(
+            of: "\nif [[ ${1:-} == --iic0b-ii-a-contract-only ]]; then"
+        ))
+        let checkpointContract = String(
+            checkpointSuffix[..<checkpointEnd.lowerBound]
+        )
+        let completedTree = try l3c3biiFunction(
+            "verify_iic0biii2a_completed_tree", in: boundaries
+        )
+        #expect(contract.contains("--iic0b-iii-2a-contract-only"))
+        #expect(contract.contains(
+            "verify_iic0biii2a_contract \"$out/c0b-iii\""
+        ))
+        #expect(!contract.contains(
+            "if [[ PENDING_A1_COMMIT != PENDING_A1_COMMIT ]]; then"
+        ))
+
+        for marker in [
+            "name: \"StornautInvestigationMachineGateSupport\"",
+            "name: \"StornautInvestigationMachineGate\"",
+            "\"StornautInvestigationMachineGateSupport\"",
+            "path: \"tools/StornautInvestigationMachineGate\"",
+        ] {
+            #expect(package.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-iii-2a-gate-contract-only",
+            "--iic0b-iii-2a-staged-scope-contract-only",
+            "--iic0b-iii-2a-completed-tree-contract-only",
+            "function verify_iic0biii2a_gate_contract()", "function verify_iic0biii2a_staged_scope()",
+            "function verify_iic0biii2a_completed_tree()",
+            "ii-c0b-iii-2a GateSupport target dependency surface drifted",
+            "ii-c0b-iii-2a Gate target dependency surface drifted", "ii-c0b-iii-2a GateSupport source inventory drifted",
+            "ii-c0b-iii-2a entry surface drifted", "ii-c0b-iii-2a Darwin authority allowlist drifted",
+            "ii-c0b-iii-2a bootstrap topology drifted", "ii-c0b-iii-2a pre-join settlement drifted",
+            "ii-c0b-iii-2a pending-before-terminal ordering drifted", "ii-c0b-iii-2a noninitial stop reap classification drifted",
+            "ii-c0b-iii-2a physical 5-test/8-case matrix drifted", "ii-c0b-iii-2a independent argv or TTY evidence drifted",
+            "pthread_sigmask(SIG_BLOCK, nil, &observed)", "if \"SIG_SETMASK\" in darwin",
+            "ii-c0b-iii-2a test fixture entered production graph",
+            "normalRecoveryGroupHandoffBindsDescriptorsAndRestoresTTY",
+            "everyForwardedGroupSignalHasOneForwarderAndCoordinatorSurvives",
+            "preFrameGateDeathUsesKnownRecoveryGroupAndReapsGateLast",
+            "postFrameGateDeathRevalidatesIdentityBeforeExactGroupSignals",
+            "ii-c0b-iii-2a source SHA pending",
+            "e832e8433137f9777aba77daba2ca248a563404d",
+            "local budget=1800",
+            "a1baf4318a3aeed74dba0a3b61e99fe8f6e9fdf1b59f16c13b94cc4179fc0f99",
+            "747df4e2df4840153c504f9a73ae590dfcae72542472caecf24750ae8b987be0",
+            "(( ${#expected} == 4 ))",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+
+        for marker in [
+            "--iic0b-iii-2a-source-contract-only",
+            "--iic0b-iii-2a-component-boundary-only", "--iic0b-iii-2a-closed-image-scan-contract-only",
+            "function verify_iic0biii2a_source_contract()", "function verify_iic0biii2a_closed_image()",
+            "function verify_iic0biii2a_component_boundary()", "iic0biii2a_positive_gates=(",
+            "iic0biii2a_closed_images=(", "iic0biii2a_gate_symbols=(",
+            "ii-c0b-iii-2a Debug Gate positive control is missing",
+            "ii-c0b-iii-2a Release Gate positive control is missing", "ii-c0b-iii-2a forbidden namespace or receipt domain leaked into a closed image",
+            "ii-c0b-iii-2a exact projection drifted",
+            "1b5cebd41795ac751c13f8bbf921b9947b09844293c5cd5d5e3f3bbdd136f74d",
+            "142b8cbec2040d67eb51f7499761186da50826d2b91acb7daa4bca29439eb527",
+        ] {
+            #expect(release.contains(marker))
+        }
+
+        for marker in [
+            "function verify_iic0biii2a_contract()", "ii-c0b-iii-2a replay cleanup left registration",
+            "ii-c0b-iii-2a mutation accepted:", "ii-c0b-iii-2a App mutation accepted:",
+            "ii-c0b-iii-2a scope mutation accepted:", "gate-extra-dependency",
+            "gatesupport-extra-source", "entry-selector", "production-stub",
+            "public-surface", "codable-receipt", "fixed-command-drift",
+            "darwin-authority-drift", "signal-mask-restoration",
+            "bootstrap-topology-bypass", "prejoin-settlement-bypass",
+            "pending-before-terminal-bypass", "noninitial-stop-reap-bypass",
+            "physical-matrix-vacuity", "argv-evidence-vacuity",
+            "tty-node-evidence-vacuity", "closed-image-removal", "projection-bypass",
+            "symbol-failure", "string-failure",
+            "find-failure", "file-failure",
+            "ii-c0b-iii-2a scanner mutation accepted:",
+            "extra-path", "extra-doc", "extra-agents", "extra-readme",
+            "missing-path", "over-budget", "deleted", "deleted-doc", "binary",
+            "mode", "wrong-baseline",
+            "staged-worktree-divergence", "worktree-path", "untracked-path",
+            "GIT_INDEX_FILE=\"$changed\" git update-index",
+            "require_fixed_text \"$log\" \"$expected\"",
+            "source-canonical.log",
+            "implementation=396c845884a18767e43971875c58eff80740d325",
+            "implementation_parent=e832e8433137f9777aba77daba2ca248a563404d",
+            "implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325",
+            "implementation_lines == 1797",
+            "586f58adabe748551dcef53be3e3746c445fe4127b967d10cce4ddd94760fd08",
+            "f680802bc44b9a02d7b8af91ec9ed996f859cbe8fd5ae53c1ee1be310e502b0a",
+            "449af3fbde599bf6a5fdad1668eedba441ca381c41a31ead6e1e90aa541858e1",
+            "43544e99add08781aa9a628d4db22e53f4befbcca99c07be4c4833247b55776a",
+            "ii-c0b-iii-2a historical contract replay failed",
+            "ii-c0b-iii-2a same-path substitution accepted:",
+            "Controlled same-path tamper",
+            "same-path-tampered",
+        ] {
+            #expect(checkpointContract.contains(marker))
+        }
+        #expect(completedTree.contains(
+            "544209f3cd4682b1c4d720931498c8daa5ccc325"
+        ))
+        #expect(!completedTree.contains("1800"))
+        #expect(!completedTree.contains("git diff --cached --numstat"))
+        #expect(!completedTree.contains("worktree"))
+        for pending in [
+            "PENDING_A1_COMMIT",
+            "PENDING_2A_LINE_BUDGET",
+            "PENDING_2A_IMPLEMENTATION_TREE",
+            "ii-c0b-iii-2a implementation tree pending",
+        ] {
+            #expect(!boundaries.contains(pending))
+        }
+        #expect(!checkpointContract.contains(
+            "print -r -- \"ii-c0b-iii-2a scope mutation accepted:"
+        ))
+    }
+
+    @Test
+    func iiC0BIVB1HandoffVerifierPinsPhysicalClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let package = try l3c3biiSource(
+            "Package.swift", repositoryRoot: root)
+        let boundaries = try l3c3biiSource(
+            "scripts/verify-investigation-boundaries", repositoryRoot: root)
+        let contract = try l3c3biiSource(
+            "scripts/verify-contract", repositoryRoot: root)
+
+        for marker in [
+            "name: \"StornautInvestigationMachineLaunchSupport\"",
+            "\"StornautInvestigationHandoffContract\"",
+            "\"StornautInvestigationMachineGateSupport\"",
+        ] {
+            #expect(package.contains(marker))
+        }
+        for marker in [
+            "--iic0b-iv-b1-handoff-contract-only",
+            "--iic0b-iv-b1b-ii-staged-scope-contract-only",
+            "function verify_iic0bivb1_handoff_contract()",
+            "function verify_iic0bivb1_staged_scope()",
+            "iv-b1 LaunchSupport dependency surface drifted",
+            "iv-b1 reverse GateSupport dependency drifted",
+            "iv-b1 LaunchSupport source inventory drifted",
+            "iv-b1 GateSupport immutable source inventory drifted",
+            "iv-b1 package-only or Codable surface drifted",
+            "iv-b1 raw capability or generic callback surface drifted",
+            "iv-b1 facade construction boundary drifted",
+            "iv-b1 injected system or receipt initializer escaped target",
+            "iv-b1b-ii checkpoint paths drifted",
+            "iv-b1b-ii checkpoint mode drifted",
+            "iv-b1b-ii checkpoint budget drifted",
+            "iv-b1b-ii staged/worktree source drifted",
+            "StornautInvestigationMachineGate",
+            "expected_physical_sha256",
+            "iv-b1b-ii physical source seal drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        #expect(contract.contains(
+            "verify_iic0bivb1_contract \"$contract_root/iic0bivb1\""
+        ))
+        for historical in [
+            "implementation=396c845884a18767e43971875c58eff80740d325",
+            "implementation_tree=544209f3cd4682b1c4d720931498c8daa5ccc325",
+            "ii-c0b-iii-2a historical contract replay failed",
+        ] {
+            #expect(contract.contains(historical))
+        }
+    }
+
+    @Test
+    func iiC0BIVB2VerifierPinsAggregateCompositionClosure() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract", "scripts/verify-app-release-boundaries"].map { try l3c3biiSource($0, repositoryRoot: root) }.joined()
+        for marker in ["extra-path", "missing-path", "over-budget", "binary-numstat", "mode", "wrong-baseline", "staged-worktree-divergence", "untracked", "source-call-edge", "source-clock", "component-call-edge", "subordinate-seal", "self-seal", "critical-test-composition-vacuity", "critical-test-receipt-vacuity", "critical-test-boundary-vacuity", "closed-image-coordinator-namespace", "closed-image-receipt-domain", "2493e0f28e0c8d406b4efcdbf17713bde3633449", "8155d64c4966fb83c332f7d195a92095e0af2ba9", "verify_iic0bivb2_subordinate_source_seals", "InvestigationHandoffAppLeafAdapterSystem.system.continuousNanoseconds", "DispatchTime\\s*\\.\\s*now", "ii-c0b-iv production clock drifted", "ii-c0b-iv-b2 mutation accepted", "ii-c0b-iv-b2 binary checkpoint path rejected", "ii-c0b-iv-b2 checkpoint untracked paths drifted", "ii-c0b-iv composition call-edge drifted", "ii-c0b-iv component call-edge drifted", "Machine driver verifier source seal drifted"] { #expect(source.contains(marker)) }
+    }
+
+    private func l3c3biiSource(
+        _ path: String,
+        repositoryRoot: URL
+    ) throws -> String {
+        try String(
+            contentsOf: repositoryRoot.appending(path: path),
+            encoding: .utf8
+        )
+    }
+
+    private func l3c3biiFunction(
+        _ name: String,
+        in source: String
+    ) throws -> String {
+        let starts = [
+            "\(name)() {",
+            "function \(name)() {",
+        ].compactMap { source.range(of: $0) }
+        let start = try #require(
+            starts.min(by: { $0.lowerBound < $1.lowerBound })
+        )
+        let suffix = source[start.lowerBound...]
+        let end = try #require(suffix.range(of: "\n}\n"))
+        return String(suffix[..<end.upperBound])
+    }
+
+    private func l3c3biiCaseArm(
+        _ label: String,
+        in source: String
+    ) throws -> String {
+        let start = try #require(source.range(of: "\n    \(label))"))
+        let suffix = source[start.lowerBound...]
+        let end = try #require(suffix.range(of: ";;"))
+        return String(suffix[..<end.upperBound])
+    }
+
+    private func l3c3biiFunction(
+        containing marker: String,
+        in source: String
+    ) throws -> String {
+        let markerRange = try #require(source.range(of: marker))
+        let expression = try NSRegularExpression(
+            pattern:
+                #"(?m)^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*\(\)[ \t]+\{"#
+        )
+        let prefixRange = NSRange(
+            source.startIndex..<markerRange.lowerBound,
+            in: source
+        )
+        let match = try #require(
+            expression.matches(in: source, range: prefixRange).last
+        )
+        let start = try #require(Range(match.range, in: source))
+        let suffix = source[start.lowerBound...]
+        let end = try #require(suffix.range(of: "\n}\n"))
+        return String(suffix[..<end.upperBound])
+    }
+
+    private func l3c3biiFlattened(_ source: String) -> String {
+        source
+            .replacingOccurrences(of: "\\\n", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+    }
+
+    private func l3c3biiRequireOrder(
+        _ markers: [String],
+        in source: String
+    ) throws {
+        var cursor = source.startIndex
+        for marker in markers {
+            let range = try #require(
+                source.range(of: marker, range: cursor..<source.endIndex)
+            )
+            cursor = range.upperBound
+        }
+    }
+
+    @Test
+    func driverRuntimeRemainsAuthorityClosedForNativePackaging() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let packageSource = try String(
+            contentsOf: repositoryRoot.appending(path: "Package.swift"),
+            encoding: .utf8
+        )
+        let supportURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachineDriverSupport/"
+                + "InvestigationMachineDriverSupport.swift"
+        )
+        let supportRoot = supportURL.deletingLastPathComponent()
+        let supportSourceNames = try Set(
+            FileManager.default.contentsOfDirectory(
+                atPath: supportRoot.path
+            ).filter { $0.hasSuffix(".swift") }
+        )
+        #expect(supportSourceNames == [
+            "DarwinInvestigationMachineInstalledDriverSystem.swift",
+            "InvestigationMachineClaimClient.swift",
+            "InvestigationMachineDarwinAppIdentityObservation.swift",
+            "InvestigationMachineDarwinEpochSession.swift",
+            "InvestigationMachineDarwinEpochRetirement.swift",
+            "InvestigationMachineDarwinDriverChildObservation.swift",
+            "InvestigationMachineDarwinOuterObservation.swift",
+            "InvestigationMachineDarwinOuterInnerComposition.swift",
+            "InvestigationMachineDarwinOuterInnerProtocol.swift",
+            "InvestigationMachineDarwinOuterInnerSession.swift",
+            "InvestigationMachineDriverSupport.swift",
+            "InvestigationMachineEightEpochCohort.swift",
+            "InvestigationMachineFixedCapsuleIntake.swift",
+            "InvestigationMachineHelperEpochContinuity.swift",
+            "InvestigationMachineInstalledDriverObservation.swift",
+            "InvestigationMachineInstalledDriverSystemSource.swift",
+            "InvestigationMachineResolvedRootDriverClaim.swift",
+            "InvestigationMachineSingleEpoch.swift",
+            "InvestigationMachineSingleEpochComposition.swift",
+            "InvestigationMachineSingleEpochInstalledL2Join.swift",
+            "InvestigationMachineSingleEpochPhysicalBridge.swift",
+            "InvestigationMachineZeroArgumentEntry.swift",
+        ])
+        #expect(FileManager.default.fileExists(atPath: supportURL.path))
+        let supportSource = try String(
+            contentsOf: supportURL,
+            encoding: .utf8
+        )
+        for marker in [
+            "import Darwin",
+            "public enum InvestigationMachineDriverSupport",
+            "package static let rootAuthorityRequiredExitStatus: Int32 = 77",
+            "package static let handoffUnavailableExitStatus: Int32 = 78",
+            "public static func run() async -> Int32",
+            "static func status(effectiveUserID: uid_t) -> Int32",
+        ] {
+            #expect(supportSource.contains(marker))
+        }
+        for forbidden in [
+            "StornautCore",
+            "StornautInvestigation",
+            "StornautLifecycle",
+            "StornautExecution",
+            "Cleanup",
+            "ActionPolicyGate",
+            "CleanupPolicyGate",
+            "CanonicalPathPolicy",
+            "RegisteredAction",
+            "Process(",
+            "posix_spawn",
+            "CommandLine.arguments",
+            "ProcessInfo.processInfo.environment",
+            "NSXPC",
+            "URLSession",
+            "readLine(",
+            "FileManager.default.",
+            "FileHandle(forWritingTo:",
+            "O_WRONLY",
+            "O_RDWR",
+            "O_CREAT",
+            "Darwin.write(",
+            "unlink(",
+            "rename(",
+            "mkdir(",
+            "chmod(",
+            "chown(",
+            "socket",
+            "connect",
+            "send(",
+            "recv(",
+            "kill(",
+        ] {
+            #expect(!supportSource.contains(forbidden))
+        }
+        #expect(!supportSource.contains("package static func status"))
+        #expect(!supportSource.contains("public static func status"))
+        #expect(
+            supportSource.components(separatedBy: "public static " ).count
+                == 2
+        )
+
+        let supportTargetStart = try #require(packageSource.range(
+            of: ".target(\n            name: \"StornautInvestigationMachineDriverSupport\""
+        ))
+        let supportTargetSuffix = packageSource[
+            supportTargetStart.lowerBound...
+        ]
+        let supportTargetEnd = try #require(
+            supportTargetSuffix.range(of: "\n        ),")
+        )
+        let supportTarget = String(
+            supportTargetSuffix[..<supportTargetEnd.upperBound]
+        )
+        #expect(supportTarget.contains("dependencies: ["))
+        #expect(supportTarget.contains(
+            "\"StornautInvestigationHandoffContract\""
+        ))
+        #expect(supportTarget.contains(
+            "\"StornautInvestigationInstalledL2\""
+        ))
+        #expect(supportTarget.contains(
+            ".linkedFramework(\"Security\")"
+        ))
+
+        let expectedImports: [String: Set<String>] = [
+            "DarwinInvestigationMachineInstalledDriverSystem.swift": [
+                "import CryptoKit",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+            ],
+            "InvestigationMachineDriverSupport.swift": ["import Darwin"],
+            "InvestigationMachineFixedCapsuleIntake.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineClaimClient.swift": [
+                "import CryptoKit",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineDarwinAppIdentityObservation.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineDarwinEpochSession.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+                "import Dispatch",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineDarwinEpochRetirement.swift": [
+                "import Darwin",
+                "import Dispatch",
+                "import Foundation",
+            ],
+            "InvestigationMachineDarwinDriverChildObservation.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+            ],
+            "InvestigationMachineDarwinOuterObservation.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineDarwinOuterInnerComposition.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineDarwinOuterInnerProtocol.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineDarwinOuterInnerSession.swift": [
+                "import Darwin",
+                "import Foundation",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineInstalledDriverObservation.swift": [
+                "import Darwin",
+            ],
+            "InvestigationMachineInstalledDriverSystemSource.swift": [
+                "import Darwin",
+            ],
+            "InvestigationMachineResolvedRootDriverClaim.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineSingleEpoch.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineSingleEpochComposition.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineHelperEpochContinuity.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineEightEpochCohort.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineSingleEpochInstalledL2Join.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+                "import StornautInvestigationInstalledL2",
+            ],
+            "InvestigationMachineSingleEpochPhysicalBridge.swift": [
+                "import Foundation",
+                "import StornautInvestigationHandoffContract",
+            ],
+            "InvestigationMachineZeroArgumentEntry.swift": [
+                "import CInvestigationIdentitySupport",
+                "import Darwin",
+                "import Foundation",
+                "import Security",
+                "import StornautInvestigationHandoffContract",
+            ],
+        ]
+        for sourceName in supportSourceNames {
+            let source = try String(
+                contentsOf: supportRoot.appending(path: sourceName),
+                encoding: .utf8
+            )
+            let imports = Set(
+                source.split(separator: "\n").map(String.init).filter {
+                    $0.hasPrefix("import ")
+                }
+            )
+            let expectedSourceImports = try #require(
+                expectedImports[sourceName]
+            )
+            #expect(imports == expectedSourceImports)
+            var authoritySource = source.replacingOccurrences(
+                of: "artifactCleanupFailure",
+                with: "artifactTerminalFailure"
+            )
+            if sourceName == "InvestigationMachineDarwinEpochSession.swift" {
+                let allowedCalls: [String: Int] = [
+                    "socketpair": 1,
+                    "posix_spawn": 1,
+                    "posix_spawn_file_actions_init": 1,
+                    "posix_spawn_file_actions_destroy": 1,
+                    "posix_spawn_file_actions_adddup2": 1,
+                    "posix_spawn_file_actions_addclose": 2,
+                    "posix_spawnattr_init": 1,
+                    "posix_spawnattr_destroy": 1,
+                    "posix_spawnattr_setflags": 1,
+                    "posix_spawnattr_setpgroup": 1,
+                    "fcntl": 3,
+                    "shutdown": 2,
+                    "getpgid": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    #expect(
+                        source.matches(
+                            of: try Regex("\\b" + name + "\\s*\\(")
+                        ).count == count
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedDarwinCall("
+                    )
+                }
+                for marker in [
+                    "InvestigationInstalledL2FixedPaths().appExecutable.path",
+                    "arguments: [",
+                    "environment: []",
+                    "POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT",
+                    "childTargetDescriptor: Self.fixedDescriptor",
+                    "terminalProven, terminalUncertain",
+                    "InvestigationMachineDarwinEpochRetirementOwning",
+                    "InvestigationMachineDarwinEpochPreparedAppIdentity",
+                ] {
+                    #expect(source.contains(marker))
+                }
+                #expect(source.matches(of: /Darwin\.send\s*\(/).count == 1)
+                #expect(source.matches(of: /Darwin\.recv\s*\(/).count == 1)
+                for forbidden in [
+                    "waitpid(", "waitid(", "kill(", "killpg(",
+                    "proc_signal", "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment", "posix_spawnp",
+                    "Codable", "public ",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            if sourceName == "InvestigationMachineDarwinEpochRetirement.swift" {
+                let allowedCalls: [String: Int] = [
+                    "proc_listpids": 1,
+                    "waitid": 1,
+                    "waitpid": 2,
+                    "nanosleep": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    let observedCount = source.matches(
+                        of: try Regex("\\b" + name + "\\s*\\(")
+                    ).count
+                    #expect(
+                        observedCount == count,
+                        "\(name): \(observedCount) != \(count)"
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedRetirementCall("
+                    )
+                }
+                for name in ["kill", "close"] {
+                    let qualified = "Darwin." + name + "("
+                    #expect(source.components(separatedBy: qualified).count - 1 == 1)
+                    authoritySource = authoritySource.replacingOccurrences(
+                        of: qualified, with: "allowedRetirementCall("
+                    )
+                }
+                for marker in [
+                    "maximumInventoryEntries = 4_096",
+                    "WEXITED | WNOHANG | WNOWAIT",
+                    "signal(-epoch.processGroupID, SIGTERM)",
+                    "signal(-epoch.processGroupID, SIGKILL)",
+                    "signal(epoch.processID, SIGKILL)",
+                    "postReapMembers.isEmpty",
+                ] {
+                    #expect(source.contains(marker))
+                }
+                for forbidden in [
+                    "killpg(", "SIGINT", "posix_spawn",
+                    "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            if sourceName
+                == "InvestigationMachineDarwinOuterInnerSession.swift"
+            {
+                let allowedCalls: [String: Int] = [
+                    "socketpair": 1,
+                    "pipe": 1,
+                    "fcntl": 12,
+                    "getsockopt": 1,
+                    "fstat": 2,
+                    "isatty": 1,
+                    "tcgetpgrp": 1,
+                    "poll": 1,
+                    "posix_spawn": 1,
+                    "posix_spawn_file_actions_init": 1,
+                    "posix_spawn_file_actions_destroy": 1,
+                    "posix_spawn_file_actions_addinherit_np": 1,
+                    "posix_spawn_file_actions_adddup2": 2,
+                    "posix_spawn_file_actions_addclose": 4,
+                    "posix_spawnattr_init": 1,
+                    "posix_spawnattr_destroy": 1,
+                    "posix_spawnattr_setflags": 1,
+                    "posix_spawnattr_setpgroup": 1,
+                    "getpid": 2,
+                    "getppid": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    let observedCount = source.matches(
+                        of: try Regex("\\b" + name + "\\s*\\(")
+                    ).count
+                    #expect(
+                        observedCount == count,
+                        "\(name): \(observedCount) != \(count)"
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedOuterInnerCall("
+                    )
+                }
+                for name in ["close", "read", "write"] {
+                    let qualified = "Darwin." + name + "("
+                    #expect(source.components(separatedBy: qualified).count == 2)
+                    authoritySource = authoritySource.replacingOccurrences(
+                        of: qualified, with: "allowedOuterInnerCall("
+                    )
+                }
+                // iii-b2a-ii-a1-v exact Darwin authority carve-out.
+                // iii-b2a-ii-a1-v Debug machine-driver positive gate.
+                // iii-b2a-ii-a1-v Release machine-driver dead-strip gate.
+                for forbidden in [
+                    "kill(", "killpg(", "waitpid(", "waitid(",
+                    "setuid(", "setgid(", "setsid(", "setpgid(",
+                    "posix_spawnp", "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment", "public ",
+                    "Codable",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            if [
+                "InvestigationMachineDarwinDriverChildObservation.swift",
+                "InvestigationMachineDarwinOuterInnerComposition.swift",
+                "InvestigationMachineDarwinOuterInnerSession.swift",
+            ].contains(sourceName) {
+                // iii-b2b-0 Release machine-driver graph closure.
+                #expect(!source.contains("#if DEBUG"))
+                #expect(!source.contains("#endif"))
+            }
+            if sourceName == "InvestigationMachineFixedCapsuleIntake.swift" {
+                let compactSource = source.filter { !$0.isWhitespace }
+                #expect(source.matches(of: /\bfcntl\s*\(/).count == 3)
+                for shape in [
+                    "fcntl(descriptor,F_GETFD)",
+                    "fcntl(descriptor,F_GETFL)",
+                    "fcntl(descriptor,F_SETFD,flags)",
+                ] {
+                    #expect(
+                        compactSource.components(separatedBy: shape).count == 2
+                    )
+                }
+                #expect(compactSource.components(
+                    separatedBy: "flags:initialFlags|FD_CLOEXEC"
+                ).count == 2)
+                #expect(compactSource.components(
+                    separatedBy: "&FD_CLOEXEC==FD_CLOEXEC"
+                ).count == 3)
+                #expect(compactSource.components(
+                    separatedBy: "&O_ACCMODE==O_RDONLY"
+                ).count == 3)
+                #expect(compactSource.components(
+                    separatedBy: "return.success(result==0)"
+                ).count == 2)
+                authoritySource = source.replacing(
+                    /\bfcntl\s*\(/, with: "fixedCapsuleFcntl("
+                )
+            }
+            if sourceName == "InvestigationMachineZeroArgumentEntry.swift" {
+                let allowedCalls: [String: Int] = [
+                    "fcntl": 6,
+                    "fstat": 2,
+                    "isatty": 1,
+                    "tcgetpgrp": 1,
+                    "poll": 1,
+                ]
+                for (name, count) in allowedCalls {
+                    let observedCount = source.matches(
+                        of: try Regex("\\b" + name + "\\s*\\(")
+                    ).count
+                    #expect(
+                        observedCount == count,
+                        "\(name): \(observedCount) != \(count)"
+                    )
+                    authoritySource = authoritySource.replacing(
+                        try Regex("\\b" + name + "\\s*\\("),
+                        with: "allowedZeroArgumentCall("
+                    )
+                }
+                #expect(source.matches(of: /Darwin\.write\s*\(/).count == 1)
+                authoritySource = authoritySource.replacingOccurrences(
+                    of: "Darwin.write(", with: "allowedZeroArgumentCall("
+                )
+                for marker in [
+                    "InvestigationMachineFixedCapsuleIntake().read()",
+                    "InvestigationMachineEightEpochCohort(",
+                    "InvestigationMachineDarwinOuterInnerExecutionFactory()",
+                    "InvestigationMachineDarwinOuterInnerComposition()",
+                    ".runInner()",
+                ] {
+                    #expect(source.contains(marker))
+                }
+                for forbidden in [
+                    "public ", "Codable", "JSONEncoder", "JSONDecoder",
+                    "CommandLine.arguments",
+                    "ProcessInfo.processInfo.environment", "FileManager",
+                    "FileHandle", "URLSession", "NSXPC", "readiness",
+                    "signedRuntimeReady", "MoveToTrash", "RegisteredAction",
+                ] {
+                    #expect(!source.contains(forbidden))
+                }
+            }
+            for forbidden in [
+                "import StornautCore",
+                "import StornautExecution",
+                "import StornautInvestigation\n",
+                "import StornautLifecycle",
+                "Cleanup",
+                "ActionPolicyGate",
+                "CleanupPolicyGate",
+                "CanonicalPathPolicy",
+                "Trash",
+                "Executor",
+                "RegisteredAction",
+                "FileManager.default",
+                "FileHandle",
+                "O_WRONLY",
+                "O_RDWR",
+                "O_CREAT",
+                "O_TRUNC",
+                "O_APPEND",
+                "Darwin.write",
+                "pwrite",
+                "unlink(",
+                "rename(",
+                "mkdir(",
+                "chmod(",
+                "chown(",
+                "chflags(",
+                "setxattr",
+                "removexattr",
+                "acl_set",
+                "Process(",
+                "OutputStream(",
+                "posix_spawn",
+                "setuid(",
+                "seteuid(",
+                "setreuid(",
+                "setresuid(",
+                "setgid(",
+                "setegid(",
+                "setregid(",
+                "setresgid(",
+                "initgroups(",
+                "setgroups(",
+                "setlogin(",
+                "pthread_setugid_np(",
+                "setsid(",
+                "setpgid(",
+                "daemon(",
+                "chdir(",
+                "fchdir(",
+                "chroot(",
+                "umask(",
+                "nice(",
+                "setpriority(",
+                "setrlimit(",
+                "fork(",
+                "vfork(",
+                "execv",
+                "execl",
+                "system(",
+                "popen(",
+                "dlopen(",
+                "dlsym(",
+                "syscall(",
+                "fcntl(",
+                "ioctl(",
+                "mmap(",
+                "msync(",
+                "openat(",
+                "creat(",
+                "mkstemp(",
+                "mkdtemp(",
+                "unlinkat(",
+                "renameat(",
+                "mkdirat(",
+                "ftruncate(",
+                "fchmod(",
+                "fchown(",
+                "fchflags(",
+                "lchflags(",
+                "linkat(",
+                "symlinkat(",
+                "utime(",
+                "utimes(",
+                "futimes(",
+                "setattrlist(",
+                "fsetattrlist(",
+                "copyfile(",
+                "fcopyfile(",
+                "clonefile(",
+                "socketpair",
+                "bind(",
+                "listen(",
+                "accept(",
+                "accept4(",
+                "getaddrinfo(",
+                "CFStream",
+                "InputStream(",
+                "NWConnection",
+                "WebSocket",
+                "URLSession",
+                "kill(",
+                "proc_listpids(",
+                "waitid(",
+                "waitpid(",
+                "killpg(",
+                "pthread_kill(",
+                "raise(",
+                "CommandLine.arguments",
+                "ProcessInfo.processInfo.environment",
+                "readLine(",
+                "signedInvestigationRuntimeReady",
+            ] {
+                let semanticException = (sourceName == "InvestigationMachineClaimClient.swift" && forbidden == "connect(")
+                    || (sourceName == "InvestigationMachineSingleEpoch.swift" && forbidden == "send(")
+                    || (sourceName == "InvestigationMachineDarwinOuterInnerProtocol.swift"
+                        && forbidden == "accept(")
+                    || (sourceName == "InvestigationMachineDarwinEpochSession.swift"
+                        && ["socketpair", "posix_spawn", "fcntl("].contains(forbidden))
+                    || (sourceName == "InvestigationMachineDarwinEpochRetirement.swift"
+                        && ["kill(", "proc_listpids(", "waitid(",
+                            "waitpid("].contains(forbidden))
+                    || (sourceName == "InvestigationMachineDarwinOuterInnerSession.swift"
+                        && ["O_WRONLY", "O_RDWR", "Darwin.write",
+                            "posix_spawn", "fcntl(", "socketpair"
+                        ].contains(forbidden))
+                    || (sourceName == "InvestigationMachineDarwinOuterInnerComposition.swift"
+                        && ["Darwin.write", "CommandLine.arguments",
+                            "accept("
+                        ].contains(forbidden))
+                    || (sourceName == "InvestigationMachineZeroArgumentEntry.swift"
+                        && ["O_WRONLY", "O_RDWR", "Darwin.write",
+                            "fcntl(", "raise("
+                        ].contains(forbidden))
+                if !semanticException {
+                    if forbidden == "Process(" {
+                        #expect(authoritySource.matches(
+                            of: /(?:^|[^A-Za-z0-9_])Process\s*\(/
+                        ).isEmpty)
+                    } else {
+                        #expect(!authoritySource.contains(forbidden))
+                    }
+                }
+            }
+            if sourceName != "InvestigationMachineClaimClient.swift" {
+                #expect(!source.contains("NSXPC"))
+            } else {
+                #expect(source.contains("NSXPCConnection"))
+                #expect(source.contains("setCodeSigningRequirement"))
+                #expect(!source.split(separator: "\n").contains(
+                    "import StornautInvestigation"
+                ))
+                #expect(!source.contains("kill("))
+            }
+            if sourceName
+                == "DarwinInvestigationMachineInstalledDriverSystem.swift"
+            {
+                let compactSource = source.filter { !$0.isWhitespace }
+                #expect(compactSource.components(
+                    separatedBy: "returnresult==0"
+                ).count == 3)
+            }
+            if sourceName
+                == "DarwinInvestigationMachineInstalledDriverSystem.swift"
+            {
+                let openCalls = source.matches(
+                    of: /\b(?:Darwin\.)?open\s*\(/
+                )
+                #expect(openCalls.count == 2)
+                for path in ["Self.path", "Self.manifestPath"] {
+                    #expect(source.contains(
+                        "let descriptor = open(\n"
+                            + "            \(path),\n"
+                            + "            O_RDONLY | O_CLOEXEC | "
+                            + "O_NOFOLLOW_ANY | O_UNIQUE | O_NONBLOCK\n"
+                            + "        )"
+                    ))
+                }
+                let allowedSecuritySymbols: Set<String> = [
+                    "SecCSFlags",
+                    "SecCode",
+                    "SecCodeCheckValidity",
+                    "SecCodeCopySelf",
+                    "SecCodeCopySigningInformation",
+                    "SecCodeCopyStaticCode",
+                    "SecRequirement",
+                    "SecRequirementCopyData",
+                    "SecRequirementGetTypeID",
+                    "SecStaticCode",
+                    "SecStaticCodeCheckValidity",
+                    "SecStaticCodeCreateWithPath",
+                    "kSecCSRequirementInformation",
+                    "kSecCSSigningInformation",
+                    "kSecCSStrictValidate",
+                    "kSecCodeInfoDesignatedRequirement",
+                    "kSecCodeInfoFlags",
+                    "kSecCodeInfoIdentifier",
+                    "kSecCodeInfoUnique",
+                ]
+                let observedSecuritySymbols = Set(
+                    source.matches(
+                        of: /\b(?:(?:Sec|kSec)[A-Z]|Authorization|CSSM)[A-Za-z0-9_]*\b/
+                    )
+                        .map { String($0.output) }
+                )
+                #expect(observedSecuritySymbols == allowedSecuritySymbols)
+            } else {
+                #expect(source.matches(
+                    of: /\b(?:Darwin\.)?open\s*\(/
+                ).isEmpty)
+            }
+        }
+
+        let driverTargetStart = try #require(packageSource.range(
+            of: ".executableTarget(\n            name: \"StornautInvestigationMachineDriver\""
+        ))
+        let driverTargetSuffix = packageSource[driverTargetStart.lowerBound...]
+        let driverTargetEnd = try #require(
+            driverTargetSuffix.range(of: "\n        ),")
+        )
+        let driverTarget = String(
+            driverTargetSuffix[..<driverTargetEnd.upperBound]
+        )
+        #expect(driverTarget.contains(
+            "\"StornautInvestigationMachineDriverSupport\""
+        ))
+        #expect(!driverTarget.contains("\"StornautInvestigationMachine\""))
+
+    }
+
+    @Test
+    func iiB4VerifierPinsDriverSupportMarkersWithoutReplacingHistoricalGate()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-contract"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "[[ $1 == --iib4-driver-support-contract-only ]]",
+            "[[ $1 == --iib4-staged-scope-contract-only ]]",
+            "ii-b4 driver support source contains comment camouflage",
+            "ii-b4 driver support package dependency drifted",
+            "ii-b4 fixed helper service drifted",
+            "ii-b4 static/dynamic audit-token binding drifted",
+            "ii-b4 delayed invalidation drifted",
+            "ii-b4 helper absence handling drifted",
+            "ii-b4 outcomeUnknown priority drifted",
+            "ii-b4 broad lifecycle machine-claim client remains",
+            "ii-b4 driver support regained prohibited authority",
+            "ii-b4 checkpoint paths drifted",
+            "ii-b4 checkpoint budget drifted",
+            "ii-b4 staged checkpoint deleted a required path",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "iib4_commit=8ba49c1a02acab556df474d334cb2f9c01eb639f",
+            "iib4_parent=6367c3b4a0b98eeb2877706ef016612cfd59e6a1",
+            "--iib4-staged-scope-contract-only \"$iib4_parent\"",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiB5A0VerifierPinsClaimAbortWithoutReplacingIIB4Gate() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "[[ $1 == --iib5a0-claim-abort-contract-only ]]",
+            "[[ $1 == --iib5a0-staged-scope-contract-only ]]",
+            "ii-b5a0 canonical client source drifted",
+            "ii-b5a0 dependency surface drifted",
+            "ii-b5a0 regained physical authority",
+            "ii-b5a0 checkpoint paths drifted", "ii-b5a0 checkpoint budget drifted",
+            "ii-b5a0 staged checkpoint deleted a required path",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "alias-release", "alias-connect", "string-invalidation",
+            "for fixture in extra-path over-budget deleted-path",
+            "iib5a0_commit=953d14935e9f9a19a303b92d1b6eeeb1b8619f73",
+            "iib5a0_parent=ce048e16f5b97de694ccd5928bd940d93950aec1",
+            "--iib4-staged-scope-contract-only \"$iib4_parent\"",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        #expect(boundaries.contains(
+            "[[ $1 == --iib4-driver-support-contract-only ]]"
+        ))
+        #expect(boundaries.contains("(( changed <= 800 ))"))
+    }
+
+    @Test func iiB5AVerifierPinsTypedComposerWithoutProductionReachability() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {
+            try String(contentsOf: root.appending(path: $0), encoding: .utf8)
+        }
+        for marker in [
+            "[[ $1 == --iib5a-single-epoch-contract-only ]]",
+            "[[ $1 == --iib5a-staged-scope-contract-only ]]",
+            "label = \"composer\" if path == composer_path else \"focused test\"", "ii-b5a canonical {label} source drifted", "ii-b5a checkpoint paths drifted",
+            "ii-b5a checkpoint budget drifted",
+        ] { #expect(sources[0].contains(marker)) }
+        for marker in [
+            "iib5a0_commit=953d149", "iib5a_commit=43a2c83", "sender-resample", "post-await-cancel",
+        ] { #expect(sources[1].contains(marker)) }
+    }
+
+    @Test
+    func iiiASemanticEpochVerifierPinsContinuityAuthorityAndExactScope() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(path: "scripts/verify-investigation-boundaries"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(path: "scripts/verify-app-release-boundaries"),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-a-single-epoch-contract-only",
+            "--iib5biii-a-staged-scope-contract-only",
+            "InvestigationMachineHelperEpochContinuityTests.swift",
+            "function verify_iib5biii_a_single_epoch_contract()",
+            "function verify_iib5biii_a_staged_scope()",
+            "iii-a dependency surface drifted",
+            "iii-a public continuity or configuration surface drifted",
+            "iii-a authority or admission surface drifted",
+            "iii-a ownership suspension or completion ordering drifted",
+            "iii-a external containment outcome priority drifted",
+            "iii-a focused test source seal drifted",
+            "iii-a staged checkpoint paths drifted",
+            "iii-a checkpoint mode drifted",
+            "iii-a checkpoint baseline drifted",
+            "iii-a binary checkpoint path rejected",
+            "iii-a checkpoint budget drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-a-source-contract-only",
+            "function verify_iib5biii_a_source_contract()",
+            "iii-a source-only App boundary verification passed.",
+            "iii-a source-only App boundary gained physical authority",
+            "StornautInvestigationMachineDarwin",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iib5biii_a_gate=scripts/verify-investigation-boundaries",
+            "--iib5biii-a-single-epoch-contract-only",
+            "--iib5biii-a-staged-scope-contract-only",
+            "iii-a mutation accepted:",
+            "iii-a scope mutation accepted:",
+            "predecessor-nil-bypass",
+            "ordinal-genesis",
+            "same-helper",
+            "ownership-before-release",
+            "transfer-no-local-cleanup",
+            "local-completion-outer-proof",
+            "outer-join-successor",
+            "package-non-codable-private-init",
+            "foreign-replay-wrong-ordinal",
+            "cancellation-concurrency",
+            "cohort-binding",
+            "predecessor-digest",
+            "terminal-proof-zero",
+            "successor-terminal-proof-binding",
+            "physical-authority-fd0-spawn-pgid-entry-readiness", "comment-only-tests", "vacuous-marker-tests", "cancellation-assertions", "replay-assertion", "binding-assertion",
+            "InvestigationMachineSingleEpochInstalledL2JoinTests.swift",
+            "iii-a exact ten-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "1b2d1e792b3aaea094ff0c737adc23b700c0a62cfc3edc7a23cc9188ff8b3844",
+            "8c2b3e45a6a377d9ab13c418cdcd8b33501560cf3930b90bbe225d2b4f0bb2be",
+            "375a2265dcf42d9ea124f08945844203140542c7bf17362b964902d100524e58",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB1CohortVerifierPinsOneShotEightEpochAndExactScope() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b1-cohort-contract-only",
+            "--iib5biii-b1-staged-scope-contract-only",
+            "function verify_iib5biii_b1_cohort_contract()",
+            "function verify_iib5biii_b1_staged_scope()",
+            "iii-b1 dependency surface drifted",
+            "iii-b1 public surface drifted",
+            "iii-b1 authority or product reachability drifted",
+            "iii-b1 one-shot state ordering drifted",
+            "iii-b1 exact eight-loop or no-prefetch contract drifted",
+            "iii-b1 fixed overlay drifted",
+            "iii-b1 fresh wrapper retention drifted",
+            "iii-b1 selection or cohort binding drifted",
+            "iii-b1 cancellation checks drifted",
+            "iii-b1 final destroy/exhaustion ordering drifted",
+            "iii-b1 focused test source seal drifted",
+            "iii-b1 staged checkpoint paths drifted",
+            "iii-b1 checkpoint mode drifted",
+            "iii-b1 checkpoint baseline drifted",
+            "iii-b1 binary checkpoint path rejected",
+            "iii-b1 checkpoint budget drifted",
+            "iii-b1 completed tree drifted",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b1-source-contract-only",
+            "function verify_iib5biii_b1_source_contract()",
+            "iii-b1 source-only App boundary verification passed.",
+            "iii-b1 source-only App boundary gained physical authority",
+        ] {
+            #expect(release.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b1_gate=scripts/verify-investigation-boundaries",
+            "--iib5biii-b1-cohort-contract-only",
+            "--iib5biii-b1-staged-scope-contract-only",
+            "iii-b1 mutation accepted:",
+            "iii-b1 scope mutation accepted:",
+            "one-shot-bypass",
+            "prefetch-retry",
+            "overlay-drift",
+            "omit-final-destroy",
+            "ignore-exhaustion",
+            "reuse-wrapper",
+            "authority-injection",
+            "selection-binding",
+            "cohort-binding",
+            "cancellation-checks",
+            "comment-only-tests",
+            "vacuous-marker-tests",
+            "focused-test-source-seal",
+            "iib5biii_b1_commit=5e2365d0c5f3fbeef8e015f5e9ad4252c484217e",
+            "iib5biii_b1_tree=b46d39bfcb4a24cee80b4be9562e281519450cb8",
+            "iii-b1 historical parent drifted",
+            "iii-b1 historical tree drifted",
+            "iii-b1 historical paths drifted",
+            "iii-b1 historical line count drifted",
+            "substitute-cohort",
+            "substitute-continuity",
+            "substitute-focused",
+            "substitute-boundary-test",
+            "iii-b1 exact seven-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2A0PhysicalBridgeVerifierPinsTypedNonAuthorityBoundary() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let boundary = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a0-physical-bridge-contract-only",
+            "--iib5biii-b2a0-scope-contract-only",
+            "iii-b2a0 physical result authority boundary drifted",
+            "iii-b2a0 focused test vacuity or coverage drifted",
+            "iib5biii_b2a0_commit=65f85c5adbb01b41b1bf9a5f787951f9feb4660d",
+            "iib5biii_b2a0_tree=7df0d5597f498e3588823885d226bdd02befc058",
+            "iii-b2a0 completed tree drifted",
+            "substitute-bridge",
+            "substitute-preflight",
+        ] {
+            #expect(contract.contains(marker) || boundary.contains(marker))
+        }
+        #expect(app.contains(
+            "--iib5biii-b2a0-source-contract-only"
+        ))
+    }
+
+    @Test
+    func iiiB2AISupervisorVerifierPinsCanonicalAdmissionAndExactScope() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: repositoryRoot.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-i-supervisor-contract-only",
+            "--iib5biii-b2a-i-scope-contract-only",
+            "function verify_iib5biii_b2ai_supervisor_contract()",
+            "function verify_iib5biii_b2ai_scope()",
+            "iii-b2a-i package boundary drifted",
+            "iii-b2a-i canonical decode or EOF contract drifted",
+            "iii-b2a-i admitted token mint cardinality drifted",
+            "iii-b2a-i raw physical DTO admission drifted",
+            "iii-b2a-i outer one-shot ordering drifted",
+            "iii-b2a-i independent identity or deadline binding drifted",
+            "iii-b2a-i terminal evidence binding drifted",
+            "iii-b2a-i request-bound composer deadline drifted",
+            "iii-b2a-i focused test names or cardinality drifted",
+            "iii-b2a-i focused test became vacuous",
+            "iii-b2a-i admission terminal and driver digest binding drifted",
+            "iii-b2a-i admitted-only containment proof drifted",
+            "iii-b2a-i completion join proof binding drifted",
+            "--iib5biii-b2a-i-r1-scope-contract-only",
+            "function verify_iib5biii_b2ai_r1_scope()",
+            "iii-b2a-i-r1 staged checkpoint paths drifted",
+            "iii-b2a-i-r1 checkpoint budget drifted",
+            "iii-b2a-i staged checkpoint paths drifted",
+            "iii-b2a-i checkpoint budget drifted",
+            "iii-b2a-i required preflight document missing",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2a-i-source-contract-only",
+            "function verify_iib5biii_b2ai_source_contract()",
+            "iii-b2a-i source-only App boundary gained physical authority",
+            "iii-b2a-i source-only physical authority drifted",
+            "iii-b2a-i source-only raw DTO admission drifted",
+        ] {
+            #expect(app.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2ai_gate=scripts/verify-investigation-boundaries",
+            "--iib5biii-b2a-i-supervisor-contract-only",
+            "--iib5biii-b2a-i-scope-contract-only",
+            "iii-b2a-i mutation accepted:",
+            "iii-b2a-i scope mutation accepted:",
+            "canonical-request-domain",
+            "outer-replay-guard",
+            "raw-dto-admission",
+            "admitted-token-public-init",
+            "admitted-token-second-mint",
+            "terminal-app-binding",
+            "terminal-helper-binding",
+            "physical-deadline-forwarding",
+            "vacuous-focused-test",
+            "comment-only-focused-test",
+            "require_iib5biii_b2ai_app_mutation_rejected",
+            "iii-b2a-i App-boundary mutation accepted:",
+            "app-authority-single",
+            "app-authority-composition",
+            "app-authority-continuity",
+            "app-authority-bridge",
+            "app-authority-protocol",
+            "admission-maximum-capacity",
+            "admission-preconsume",
+            "normal-driver-observation-join",
+            "inner-post-await-state",
+            "generic-admitted-proof",
+            "admitted-owner-binding",
+            "completion-proof-binding",
+            "App-boundary interpolation mutation accepted",
+            "app-harmless-$source_name",
+            "iib5biii_b2ai_commit=2f3a116be4644829fc513bcc2287c6bd2a1ea0ec",
+            "iib5biii_b2ai_tree=dbe8e06f3e0c5bfb96e383348a0b870b8d7dad5f",
+            "iii-b2a-i completed tree drifted",
+            "substitute-protocol",
+            "substitute-continuity",
+            "substitute-single",
+            "substitute-composition",
+            "substitute-bridge",
+            "substitute-boundary-test",
+            "substitute-preflight",
+            "iii-b2a-i-r1 scope mutation accepted:",
+            "iib5biii_b2ai_r1_commit=6f6579834b3f5a707ab7b35152e5425e4260c6ad",
+            "iib5biii_b2ai_r1_tree=62994279cc5a262dee3a490d845dc2f32a8fa4b6",
+            "iii-b2a-i-r1 completed tree drifted",
+            "extra-path",
+            "over-budget",
+            "wrong-baseline",
+            "missing-preflight",
+            "iii-b2a-i exact ten-path staged scope",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA1VVerifierPinsOuterInnerAuthorityClosureAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a1v-contract-only",
+            "--iib5biii-b2a-ii-a1v-scope-contract-only",
+            "function verify_iib5biii_b2a_iia1v_contract()",
+            "function verify_iib5biii_b2a_iia1v_scope()",
+            "iii-b2a-ii-a1-v fixed spawn contract drifted",
+            "iii-b2a-ii-a1-v descriptor authority drifted",
+            "iii-b2a-ii-a1-v bounded framing drifted",
+            "iii-b2a-ii-a1-v child identity sandwich drifted",
+            "iii-b2a-ii-a1-v inner-role validator drifted",
+            "iii-b2a-ii-a1-v one-shot or shared retirement drifted",
+            "iii-b2a-ii-a1-v staged checkpoint paths drifted",
+            "iii-b2a-ii-a1-v checkpoint budget drifted",
+            "iii-b2a-ii-a1-v completed tree drifted",
+            "72d506de45deccb0cc0d6337b04a8f0e7ad751eb",
+            "a66564f527004ea7065b5f6ffeca05a9c12e5fac",
+            "(( ${#expected} == 7 ))",
+            "(( changed <= 2400 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2a-ii-a1v-source-contract-only",
+            "function verify_iib5biii_b2a_iia1v_source_contract()",
+            "iib5biii_b2a_iia1v_debug_symbols=(",
+            "iib5biii_b2a_iia1v_closed_images=(",
+            "verify_iib5biii_b2a_iia1v_macho()",
+            "iii-b2a-ii-a1-v Debug Machine driver positive control",
+            "iii-b2a-ii-a1-v dormant authority leaked into a closed image",
+        ] {
+            #expect(app.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2a_iia1v_commit=72d506de45deccb0cc0d6337b04a8f0e7ad751eb",
+            "iib5biii_b2a_iia1v_tree=f5b2ddaf731289866b956efbeaa2b817add3ecdd",
+            "iib5biii_b2a_iia1v_implementation_commit=9556367f4f29fc656d4dd45f90b8a61a2ea35f3c",
+            "iib5biii_b2a_iia1v_implementation_tree=a66564f527004ea7065b5f6ffeca05a9c12e5fac",
+            "iii-b2a-ii-a1-v historical parent drifted",
+            "iii-b2a-ii-a1-v historical tree drifted",
+            "iii-b2a-ii-a1-v historical line count drifted",
+            "iii-b2a-ii-a1-v implementation parent drifted",
+            "iii-b2a-ii-a1-v implementation tree drifted",
+            "iii-b2a-ii-a1-v implementation paths drifted",
+            "iii-b2a-ii-a1-v implementation line count drifted",
+            "iii-b2a-ii-a1-v mutation accepted:",
+            "iii-b2a-ii-a1-v scope mutation accepted:",
+            "substitute-session", "substitute-observer",
+            "substitute-focused", "substitute-boundary-test",
+            "substitute-contract", "substitute-boundary",
+            "substitute-app", "substitute-preflight",
+            "GIT_INDEX_FILE=\"$iib5biii_b2a_iia1v_index\" git read-tree",
+            "\"$iib5biii_b2a_iia1v_implementation_commit^{tree}\"",
+            "\"${iib5biii_b2a_iia1v_implementation_commit}:$checkpoint_path\"",
+            "controlled iii-b2a-ii-a1-v same-path tamper",
+            "iii-b2a-ii-a1-v completed tree drifted",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA20VerifierPinsSelfContainedUntrustedDecodeAndExactScope()
+        throws
+    {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iib5biii_b2a_iia20_scope", in: boundary
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a20-contract-only",
+            "--iib5biii-b2a-ii-a20-scope-contract-only",
+            "function verify_iib5biii_b2a_iia20_contract()",
+            "function verify_iib5biii_b2a_iia20_scope()",
+            "iii-b2a-ii-a2-0 invocation self-decode drifted",
+            "iii-b2a-ii-a2-0 request self-decode drifted",
+            "iii-b2a-ii-a2-0 authority surface drifted",
+            "iii-b2a-ii-a2-0 staged checkpoint paths drifted",
+            "iii-b2a-ii-a2-0 checkpoint budget drifted",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "b46120d3161b5992018f4b990382bd6ced49d599",
+            "(( ${#expected} == 8 ))",
+            "(( changed <= 1800 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2a_iia20_gate=scripts/verify-investigation-boundaries",
+            "iii-b2a-ii-a2-0 mutation accepted:",
+            "iii-b2a-ii-a2-0 scope mutation accepted:",
+            "invocation-candidate-count",
+            "invocation-selection-join",
+            "request-invocation-decode",
+            "request-selection-join",
+            "test-self-decode",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "574d07d1ceb6fbe04619f6abde040833c87b3ee0098a3458169aa0f6c484e36f",
+            "iib5biii_b2b1a0_xcode_debug_owned_sha256=cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e",
+            "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA2IVerifierPinsInheritedPGIDAndDirectChildRetirement()
+        throws
+    {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a2i-contract-only",
+            "--iib5biii-b2a-ii-a2i-scope-contract-only",
+            "function verify_iib5biii_b2a_iia2i_contract()",
+            "function verify_iib5biii_b2a_iia2i_scope()",
+            "iii-b2a-ii-a2-i topology policy drifted",
+            "fail(\"spawn contract drifted\")",
+            "fail(\"App identity topology drifted\")",
+            "fail(\"inherited PGID stability drifted\")",
+            "iii-b2a-ii-a2-i direct-child retirement drifted",
+            "iii-b2a-ii-a2-i successful direct-child retirement drifted",
+            "fail(\"session tests became vacuous\")",
+            "fail(\"identity tests became vacuous\")",
+            "iii-b2a-ii-a2-i retirement tests became vacuous",
+            "iii-b2a-ii-a2-i staged checkpoint paths drifted",
+            "iii-b2a-ii-a2-i checkpoint budget drifted",
+            "8362b47351a7d3b3a141fc78ec03f9575199901d",
+            "(( ${#expected} == 10 ))",
+            "(( changed <= 3200 ))",
+            "ActionPolicyGate",
+            "CleanupPolicyGate",
+            "CanonicalPathPolicy",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        #expect(!boundary.contains(
+            "iii-b2a-ii-a2-i broad Policy authority drifted"
+        ))
+        for marker in [
+            "inherited-flags-setpgroup",
+            "unconditional-setpgroup",
+            "widened-setpgroup-condition",
+            "normal-reaper-to-fallback",
+            "remove-exit-status-zero",
+            "exit-status-disjunction",
+            "successful-reaper-add-signal",
+            "for fixture in extra-path over-budget deleted binary mode wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b1a0_swiftpm_debug_owned_sha=af92aa80c452f4d3b4b539a334d149e8f41b9f98633b4b4aed1728c568052870",
+            "iib5biii_b2b1a0_swiftpm_release_owned_sha=459abfb64cf21475780a79ed8dd7c6088603b386f8a196dac14c282b49fcc08c",
+            "2232cd8aede221e91439b6e3634bc7fc3b007fa5aa145b8b0e65f52e5f98666e",
+            "iib5biii_b2b1a0_swiftpm_debug_owned_lines=7874",
+            "iib5biii_b2b1a0_swiftpm_release_owned_lines=5503",
+            "expected_owned_lines=3877",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b1a0_xcode_debug_owned_sha256=cdab4bac069437be33a167157569d915ca477594090344d2b1d0c3afe8f0e13e",
+            "iib5biii_b2b1a0_xcode_release_owned_sha256=574d84356b349a7c302d522697b9fe7c1ea60ce172c922f41c51a5ca8f0357f7",
+            "2209e254bfe1a2fb2709ae48640206658e2903a5aca28bd0fdf8e34171050962",
+            "iib5biii_b2b1a0_xcode_debug_owned_lines=7873",
+            "iib5biii_b2b1a0_xcode_release_owned_lines=5502",
+            "3876 release-owned-symbol",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2AIIA2IIVerifierPinsTerminalAdmissionComposition() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2a-ii-a2ii-contract-only",
+            "--iib5biii-b2a-ii-a2ii-scope-contract-only",
+            "function verify_iib5biii_b2a_iia2ii_contract()",
+            "function verify_iib5biii_b2a_iia2ii_scope()",
+            "fail(\"one-shot state machine drifted\")",
+            "fail(\"outer composition initializer drifted\")",
+            "fail(\"terminal absence proof drifted\")",
+            "iii-b2a-ii-a2-ii outer protocol order drifted",
+            "\"inner protocol order\"",
+            "\"inner ownership-before-decision order\"",
+            "fail(\"outer exit classification drifted\")",
+            "iii-b2a-ii-a2-ii wait-status classification drifted",
+            "fail(\"retirement order drifted\")",
+            "fail(\"shared admission factory drifted\")",
+            "fail(\"admitted token initializer drifted\")",
+            "fail(\"continuity mint drifted\")",
+            "fail(\"post-admission cancellation barrier drifted\")",
+            "fail(\"terminal cleanup join drifted\")",
+            "fail(\"retirement cancellation join drifted\")",
+            "iii-b2a-ii-a2-ii staged checkpoint paths drifted",
+            "iii-b2a-ii-a2-ii checkpoint budget drifted",
+            "iii-b2a-ii-a2-ii completed tree drifted",
+            "f363fbb67cbfb355ae701a85bba51b92e6db283d",
+            "9e3bdefd237bcd5bc9c616f54e456e7565f7b03a",
+            "(( ${#expected} == 12 ))",
+            "(( changed == 3673 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2a_iia2ii_gate=scripts/verify-investigation-boundaries",
+            "iib5biii_b2a_iia2ii_implementation_commit=8eac2c4f622055f6afc0bfe90b9fc7c982c4b6d0",
+            "iib5biii_b2a_iia2ii_implementation_tree=9e3bdefd237bcd5bc9c616f54e456e7565f7b03a",
+            "iii-b2a-ii-a2-ii implementation parent drifted",
+            "iii-b2a-ii-a2-ii implementation tree drifted",
+            "iii-b2a-ii-a2-ii implementation paths drifted",
+            "iii-b2a-ii-a2-ii implementation line count drifted",
+            "iii-b2a-ii-a2-ii mutation accepted:",
+            "iii-b2a-ii-a2-ii scope mutation accepted:",
+            "iii-b2a-ii-a2-ii same-path substitution accepted:",
+            "controlled iii-b2a-ii-a2-ii same-path tamper",
+            "outer-order-observation",
+            "outer-init-widening",
+            "terminal-proof-to-bool",
+            "outer-order-eof",
+            "inner-order-validation",
+            "inner-result-to-crash",
+            "wait-status-zero-bypass",
+            "natural-drain-removal",
+            "shared-admission-substitution",
+            "fileprivate-outcome-init",
+            "session-outcome-reuse-bypass",
+            "failure-retirement-downgrade",
+            "cleanup-cancellation-snapshot",
+            "real-session-test-vacuity",
+            "for fixture in extra-path over-budget deleted binary mode wrong-baseline",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2a-ii-a2ii-source-contract-only",
+            "function verify_iib5biii_b2a_iia2ii_source_contract()",
+            "iib5biii_b2a_iia2ii_debug_symbols=(",
+            "iib5biii_b2a_iia2ii_closed_images=(",
+            "verify_iib5biii_b2a_iia2ii_macho()",
+            "iii-b2a-ii-a2-ii Debug Machine driver positive control is missing",
+            "iii-b2a-ii-a2-ii DEBUG symbol leaked into a closed image",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2B0VerifierPinsReleaseGraphClosureAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        for marker in [
+            "--iib5biii-b2b0-release-graph-contract-only",
+            "--iib5biii-b2b0-staged-scope-contract-only",
+            "function verify_iib5biii_b2b0_release_graph_contract()",
+            "function verify_iib5biii_b2b0_scope()",
+            "iii-b2b-0 Release graph guard drifted",
+            "iii-b2b-0 Release graph linkage drifted",
+            "iii-b2b-0 Release graph public surface drifted",
+            "iii-b2b-0 Release graph Codable surface drifted",
+            "iii-b2b-0 staged checkpoint paths drifted",
+            "iii-b2b-0 checkpoint budget drifted",
+            "iii-b2b-0 completed tree drifted",
+            "iii-b2b-0 implementation line count drifted",
+            "d6ab789ada2d87d0422fb8175d3d82c70381b47c",
+            "d615795f2c9b2338fb7514607836cfb0b1780aa9",
+            "(( ${#expected} == 7 ))",
+            "(( changed <= 1200 ))",
+            "(( changed == 1096 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b0_baseline=d6ab789ada2d87d0422fb8175d3d82c70381b47c",
+            "iib5biii_b2b0_implementation_commit=c8cc5140b2943f7408ec760d9e9526dcd2ca53f0",
+            "iib5biii_b2b0_implementation_tree=d615795f2c9b2338fb7514607836cfb0b1780aa9",
+            "iii-b2b-0 implementation parent drifted",
+            "iii-b2b-0 implementation tree drifted",
+            "iii-b2b-0 implementation paths drifted",
+            "iii-b2b-0 implementation line count drifted",
+            "(( ${#iib5biii_b2b0_implementation_paths} == 8 ))",
+            "iii-b2b-0 mutation accepted:",
+            "iii-b2b-0 scope mutation accepted:",
+            "iii-b2b-0 same-path substitution accepted:",
+            "controlled iii-b2b-0 same-path tamper",
+            "reintroduce-observer-debug-guard",
+            "reintroduce-session-debug-guard",
+            "reintroduce-composition-debug-guard",
+            "boundary-test-vacuity",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b0-source-contract-only",
+            "function verify_iib5biii_b2b0_source_contract()",
+            "iib5biii_b2b0_symbols=(",
+            "iib5biii_b2b0_positive_drivers=(",
+            "iib5biii_b2b0_closed_images=(",
+            "verify_iib5biii_b2b0_macho()",
+            "iii-b2b-0 driver positive control is missing",
+            "iii-b2b-0 graph leaked into a closed image",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2B1A0VerifierPinsCanonicalHelperProvenanceAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+
+        for marker in [
+            "--iib5biii-b2b1a0-provenance-contract-only",
+            "--iib5biii-b2b1a0-staged-scope-contract-only",
+            "function verify_iib5biii_b2b1a0_provenance_contract()",
+            "function verify_iib5biii_b2b1a0_scope()",
+            "iii-b2b-1a-0 canonical provenance carriage drifted",
+            "iii-b2b-1a-0 staged checkpoint paths drifted",
+            "iii-b2b-1a-0 checkpoint budget drifted",
+            "iii-b2b-1a-0 completed tree drifted",
+            "iii-b2b-1a-0 implementation line count drifted",
+            "d643b8fd500be29736a962dcd0c270304b490828",
+            "f9322fa0c71910ca96a44cf6d3a7f70e3245f1fa",
+            "(( ${#expected} == 8 ))",
+            "(( changed <= 2200 ))",
+            "(( changed == 1336 ))",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b1a0_baseline=d643b8fd500be29736a962dcd0c270304b490828",
+            "iib5biii_b2b1a0_implementation_commit=53c5594da964ff3f6d5fdca4f2825a5e629b01c4",
+            "iib5biii_b2b1a0_implementation_tree=f9322fa0c71910ca96a44cf6d3a7f70e3245f1fa",
+            "iii-b2b-1a-0 implementation parent drifted",
+            "iii-b2b-1a-0 implementation tree drifted",
+            "iii-b2b-1a-0 implementation paths drifted",
+            "iii-b2b-1a-0 implementation line count drifted",
+            "(( ${#iib5biii_b2b1a0_implementation_paths} == 9 ))",
+            "iii-b2b-1a-0 mutation accepted:",
+            "iii-b2b-1a-0 scope mutation accepted:",
+            "iii-b2b-1a-0 same-path substitution accepted:",
+            "controlled iii-b2b-1a-0 same-path tamper",
+            "claim-evidence-digest-bypass",
+            "claim-evidence-nonce-bypass",
+            "coordinated-claim-evidence-tamper",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b1a0-source-contract-only",
+            "function verify_iib5biii_b2b1a0_source_contract()",
+            "iii-b2b-1a-0 source-only App boundary verification passed.",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2B1A1VerifierPinsConcreteOuterObservationAndExactScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let app = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iib5biii_b2b1a1_scope", in: boundary
+        )
+
+        for marker in [
+            "--iib5biii-b2b1a1-outer-observation-contract-only",
+            "--iib5biii-b2b1a1-staged-scope-contract-only",
+            "function verify_iib5biii_b2b1a1_outer_observation_contract()",
+            "function verify_iib5biii_b2b1a1_scope()",
+            "iii-b2b-1a-1 same-version identity drift acceptance",
+            "iii-b2b-1a-1 canonical claim evidence binding drifted",
+            "iii-b2b-1a-1 terminal state machine drifted",
+            "iii-b2b-1a-1 production observer factory drifted",
+            "iii-b2b-1a-1 staged checkpoint paths drifted",
+            "iii-b2b-1a-1 checkpoint budget drifted",
+            "iii-b2b-1a-1 completed tree drifted",
+            "iii-b2b-1a-1 implementation line count drifted",
+            "iib5biii_b2b1a1_swiftpm_debug_owned_sha=9eed7d1f1d064fa35bb75525a1dde998fd5f8ded763381381e99d698aea920db",
+            "iib5biii_b2b1a1_swiftpm_release_owned_sha=b85e9d441260f2fc2cf193ad1fdb76c0f5957e40ff84d4d1443882a2fccf555b",
+            "iib5biii_b2b1a1_swiftpm_debug_owned_lines=8200",
+            "iib5biii_b2b1a1_swiftpm_release_owned_lines=5758",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "31347396b922537e7f11540e47c394fb873c28db",
+            "6bd6d38471b4fdfb6e0392d65d8d281b2bf62d28",
+            "(( ${#expected} == 8 ))",
+            "(( changed <= 2800 ))",
+            "(( changed == 2800 ))",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "same-version-identity-drift",
+            "canonical-evidence-bypass",
+            "zero-request-binding-bypass",
+            "shared-driver-digest-bypass",
+            "terminalizing-reentrancy-bypass",
+            "epoch-deadline-bypass",
+            "admission-pre-mint-cancellation-bypass",
+            "same-observer-factory-bypass",
+            "empty-closed", "noop-body", "pre-call-exit",
+            "iii-b2b-1a-1 mutation accepted:",
+            "iii-b2b-1a-1 scope mutation accepted:",
+            "iib5biii_b2b1a1_implementation_commit=fe4f6add2d752e0241af9379fa67bbdf8d56b8a3",
+            "iib5biii_b2b1a1_implementation_tree=6bd6d38471b4fdfb6e0392d65d8d281b2bf62d28",
+            "iii-b2b-1a-1 implementation parent drifted",
+            "iii-b2b-1a-1 implementation tree drifted",
+            "iii-b2b-1a-1 implementation paths drifted",
+            "iii-b2b-1a-1 implementation line count drifted",
+            "iii-b2b-1a-1 staged/worktree source drifted:",
+            "iii-b2b-1a-1 same-path substitution accepted:",
+            "controlled iii-b2b-1a-1 same-path tamper",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b1a1-source-contract-only",
+            "function verify_iib5biii_b2b1a1_source_contract()",
+            "iib5biii_b2b1a1_symbols=(",
+            "iib5biii_b2b1a1_positive_drivers=(",
+            "iib5biii_b2b1a1_closed_images=(",
+            "verify_iib5biii_b2b1a1_macho()",
+            "iii-b2b-1a-1 driver positive control is missing",
+            "iii-b2b-1a-1 observer leaked into a closed image",
+            "iii-b2b-1a-1 Mach-O symbol allowlist drifted",
+            "iii-b2b-1a-1 Mach-O function body drifted",
+            "iib5biii_b2b1a1_xcode_debug_owned_sha256=d7dea7fb7f2878d4c80180b7347a0b2a6acc4c9302c44a8484f466a362f0102e",
+            "iib5biii_b2b1a1_xcode_release_owned_sha256=ad34b88c0d364aec5568d8221f1eb7b72e63d2f49058695defec0743585217f6",
+            "iib5biii_b2b1a1_xcode_debug_owned_lines=8199",
+            "iib5biii_b2b1a1_xcode_release_owned_lines=5757",
+            "iii-b2b-1a-1 source-only App boundary verification passed.",
+        ] {
+            #expect(app.contains(marker))
+        }
+    }
+
+    @Test
+    func iiiB2B1BIIVerifierPinsZeroArgumentEntryAndMutableScope() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundary = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ), encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ), encoding: .utf8
+        )
+        let scope = try l3c3biiFunction(
+            "verify_iib5biii_b2b1b_scope", in: boundary
+        )
+
+        for marker in [
+            "--iib5biii-b2b1b-zero-entry-contract-only",
+            "--iib5biii-b2b1b-staged-scope-contract-only",
+            "function verify_iib5biii_b2b1b_zero_entry_contract()",
+            "function verify_iib5biii_b2b1b_scope()",
+            "iii-b2b-1b dependency surface drifted",
+            "iii-b2b-1b public or JSON surface drifted",
+            "iii-b2b-1b authority or selector surface drifted",
+            "iii-b2b-1b fixed production composition drifted",
+            "iii-b2b-1b outer operation ordering drifted",
+            "iii-b2b-1b facade tests became vacuous",
+            "iii-b2b-1b focused tests became vacuous",
+            "iib5biii_b2b1b_swiftpm_debug_undefined_sha=f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c",
+            "iib5biii_b2b1b_swiftpm_release_undefined_sha=7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981",
+            "iib5biii_b2b1b_swiftpm_loads_sha=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9",
+            "iib5biii_b2b1b_swiftpm_debug_owned_sha=09cbd025b5367b04fb8a762dab6b20739e77630fed36b21036129977588dbd92",
+            "iib5biii_b2b1b_swiftpm_release_owned_sha=8570228a2bb16262520142d397ecee0cd415f42a01b41e142abc983bf1a89270",
+            "iib5biii_b2b1b_swiftpm_debug_undefined_lines=696",
+            "iib5biii_b2b1b_swiftpm_release_undefined_lines=499",
+            "iib5biii_b2b1b_swiftpm_loads_lines=18",
+            "iib5biii_b2b1b_swiftpm_debug_owned_lines=8662",
+            "iib5biii_b2b1b_swiftpm_release_owned_lines=5997",
+        ] {
+            #expect(boundary.contains(marker))
+        }
+        for marker in [
+            "6b2608258d59787bca592012086a2377d647473e",
+            "d7b6c05fdb90f0db693e8f506e45eae5b98a45f9",
+            "(( ${#expected} == 4 ))",
+            "(( changed <= 1200 ))",
+            "(( changed == 971 ))",
+            "iii-b2b-1b staged checkpoint paths drifted",
+            "iii-b2b-1b checkpoint budget drifted",
+            "iii-b2b-1b completed tree drifted",
+            "iii-b2b-1b implementation line count drifted",
+        ] {
+            #expect(scope.contains(marker))
+        }
+        for marker in [
+            "iib5biii_b2b1b_baseline=6b2608258d59787bca592012086a2377d647473e",
+            "iii-b2b-1b mutation accepted:",
+            "iii-b2b-1b scope mutation accepted:",
+            "completion-digest-bypass",
+            "outer-order-bypass",
+            "focused-test-vacuity",
+            "pipe-device-bypass", "wait-deadline-bypass",
+            "partial-write-deadline-bypass",
+            "final-write-reclassification",
+            "cancellation-precedence-bypass",
+            "extra-path over-budget deleted binary mode wrong-baseline",
+            "iib5biii_b2b1b_implementation_commit=1c8ab1d5c06f87f7d2af548228835adcd43a1ae9",
+            "iib5biii_b2b1b_implementation_tree=d7b6c05fdb90f0db693e8f506e45eae5b98a45f9",
+            "iii-b2b-1b implementation parent drifted",
+            "iii-b2b-1b implementation tree drifted",
+            "iii-b2b-1b implementation paths drifted",
+            "iii-b2b-1b implementation line count drifted",
+            "iii-b2b-1b implementation source seal drifted:",
+            "iii-b2b-1b same-path substitution accepted:",
+            "controlled iii-b2b-1b same-path tamper",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        for marker in [
+            "--iib5biii-b2b1b-source-contract-only",
+            "function verify_iib5biii_b2b1b_source_contract()",
+            "iib5biii_b2b1b_symbols=(",
+            "iib5biii_b2b1b_positive_drivers=(",
+            "iib5biii_b2b1b_closed_images=(",
+            "verify_iib5biii_b2b1b_macho()",
+            "iii-b2b-1b driver positive control is missing",
+            "iii-b2b-1b zero-entry leaked into a closed image",
+            "iib5biii_b2b1b_xcode_debug_undefined_sha256=f267aa32579fa4fc216b603638eecbc2065741569bdc81bc713a449bb61b8a8c",
+            "iib5biii_b2b1b_xcode_release_undefined_sha256=7c404634c3da87081f3cd2d716c61df7ad45c8583d22103b95d3e6e956e6f981",
+            "iib5biii_b2b1b_xcode_loads_sha256=dde8b8c4542bf1afbf276ecb5d5341bb35f3f95529573d149d1143cb18c080c9",
+            "iib5biii_b2b1b_xcode_debug_owned_sha256=1046c7407fe71790270fc29576d1ff2d1ac0e29f1f8d3aa4c6a9cf0527e6f559",
+            "iib5biii_b2b1b_xcode_release_owned_sha256=a82a4909089c97d1f8d262d46c8dabbdd179713855b7485598369a72dd049d7d",
+            "iib5biii_b2b1b_xcode_debug_undefined_lines=696",
+            "iib5biii_b2b1b_xcode_release_undefined_lines=499",
+            "iib5biii_b2b1b_xcode_loads_lines=18",
+            "iib5biii_b2b1b_xcode_debug_owned_lines=8661",
+            "iib5biii_b2b1b_xcode_release_owned_lines=5996",
+        ] {
+            #expect(release.contains(marker))
+        }
+    }
+
+    @Test func iiB5BIAProjectionVerifierPinsPureBinaryAndTemporalContract() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try ["scripts/verify-investigation-boundaries", "scripts/verify-contract"].map {
+            try String(contentsOf: root.appending(path: $0), encoding: .utf8)
+        }
+        for marker in [
+            "[[ $1 == --iib5bia-projection-contract-only ]]",
+            "[[ $1 == --iib5bia-staged-scope-contract-only ]]",
+            "ii-b5b-i-a canonical {label} source drifted", "ii-b5b-i-a checkpoint budget drifted",
+        ] { #expect(sources[0].contains(marker)) }
+        for marker in [
+            "iib5bia_commit=434faecaeae1b7e08472baa2e1462da942326b85",
+            "iib5bia_baseline=1d8cf284a61d2a728f8ec99bb1b1f29ba0610612",
+            "codable:'ii-b5b-i-a", "projection-epoch:'ii-b5b-i-a",
+            "claim-projection:'ii-b5b-i-a", "cross-clock:'ii-b5b-i-a",
+            "digest-bypass:'ii-b5b-i-a",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIB1VerifierPinsAuthorityFreeInstalledSemanticTarget() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "[[ $1 == --iib5bib1-semantic-contract-only ]]",
+            "[[ $1 == --iib5bib1-staged-scope-contract-only ]]",
+            "ii-b5b-i-b1 authority or schema surface drifted",
+            "ii-b5b-i-b1 checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "iib5bib1_commit=d47209e2fef268035504d884456b31c72af7737f",
+            "iib5bib1_baseline=89662d0d802760a85c6894b87127288a23bcbb2d",
+            "public-observation:'ii-b5b-i-b1",
+            "codable-observation:'ii-b5b-i-b1",
+            "artifact-closure:'ii-b5b-i-b1",
+            "signing-join:'ii-b5b-i-b1",
+            "driver-signing-join:'ii-b5b-i-b1",
+            "service-join:'ii-b5b-i-b1",
+            "cross-clock:'ii-b5b-i-b1",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIB2AVerifierPinsFixedArtifactAndStaticSigningReader() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib2a-artifact-contract-only",
+            "--iib5bib2a-staged-scope-contract-only",
+            "ii-b5b-i-b2a authority or contract surface drifted",
+            "ii-b5b-i-b2a descriptor revalidation drifted",
+            "ii-b5b-i-b2a checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "dependency:'ii-b5b-i-b2a",
+            "blocking-read:'ii-b5b-i-b2a",
+            "descriptor-revalidation:'ii-b5b-i-b2a",
+            "manifest-type:'ii-b5b-i-b2a",
+            "signing-requirement:'ii-b5b-i-b2a",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIB2BARejectsProcessControlFromIdentityReader() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib2ba-process-contract-only",
+            "--iib5bib2ba-staged-scope-contract-only",
+            "ii-b5b-i-b2b-a C authority drifted",
+            "ii-b5b-i-b2b-a object authority drifted",
+            "ii-b5b-i-b2b-a checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "c-signal:'ii-b5b-i-b2b-a",
+            "identity-reread:'ii-b5b-i-b2b-a",
+            "path-reread:'ii-b5b-i-b2b-a",
+            "audit-token:'ii-b5b-i-b2b-a",
+            "vacuous-test:'ii-b5b-i-b2b-a",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIB2BBPinsNonActivatingFixedServiceSampling() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib2bb-service-contract-only",
+            "--iib5bib2bb-staged-scope-contract-only",
+            "ii-b5b-i-b2b-b service mutation authority drifted",
+            "ii-b5b-i-b2b-b registry resample drifted",
+            "ii-b5b-i-b2b-b checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "service-register:'ii-b5b-i-b2b-b",
+            "registry-resample:'ii-b5b-i-b2b-b",
+            "identity-resample:'ii-b5b-i-b2b-b",
+            "broaden-absence:'ii-b5b-i-b2b-b",
+            "vacuous-test:'ii-b5b-i-b2b-b",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIB3PinsAuthorityClosedInstalledObserverComposition() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bib3-observer-contract-only",
+            "--iib5bib3-staged-scope-contract-only",
+            "ii-b5b-i-b3 observer authority drifted",
+            "ii-b5b-i-b3 composition order drifted",
+            "ii-b5b-i-b3 checkpoint budget drifted",
+        ] {
+            #expect(sources[0].contains(marker))
+        }
+        for marker in [
+            "claim-input:'ii-b5b-i-b3",
+            "reader-order:'ii-b5b-i-b3",
+            "clock-order:'ii-b5b-i-b3",
+            "vacuous-test:'ii-b5b-i-b3",
+            "binary-numstat",
+        ] {
+            #expect(sources[1].contains(marker))
+        }
+    }
+
+    @Test func iiB5BIC1PinsOpaqueJoinAfterRepeatedAppIdentity() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try [
+            "scripts/verify-investigation-boundaries", "scripts/verify-contract",
+        ].map { try String(contentsOf: root.appending(path: $0), encoding: .utf8) }
+        for marker in [
+            "--iib5bic1-installed-join-contract-only",
+            "--iib5bic1-staged-scope-contract-only",
+            "ii-b5b-i-c1 dependency direction drifted",
+            "ii-b5b-i-c1 proof construction drifted",
+            "ii-b5b-i-c1 proof order drifted",
+            "ii-b5b-i-c1 checkpoint budget drifted",
+        ] { #expect(sources[0].contains(marker)) }
+        for marker in [
+            "projection-binding:'ii-b5b-i-c1",
+            "proof-before-repeat:'ii-b5b-i-c1",
+            "codable-proof:'ii-b5b-i-c1",
+            "parallel-observer:'ii-b5b-i-c1",
+            "vacuous-test:'ii-b5b-i-c1",
+        ] { #expect(sources[1].contains(marker)) }
+    }
+
+    @Test func iiB5BIC2AClosesLegacyInstalledSemanticOwner() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let sourceRoot = root.appending(
+            path: "Sources/StornautInvestigationMachine"
+        )
+        let collector = try String(
+            contentsOf: sourceRoot.appending(
+                path: "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+        let serviceProbe = try String(
+            contentsOf: sourceRoot.appending(
+                path: "FixedLifecycleServiceProbe.swift"
+            ),
+            encoding: .utf8
+        )
+        let scenarioDriver = try String(
+            contentsOf: sourceRoot.appending(
+                path: "InvestigationMachineScenarioDriver.swift"
+            ),
+            encoding: .utf8
+        )
+        let lifecycle = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleRootTopologyObservation.swift"
+            ),
+            encoding: .utf8
+        )
+        let installedOwner = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationInstalledL2/"
+                    + "InstalledL2Observer.swift"
+            ),
+            encoding: .utf8
+        )
+        let installedJoin = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineDriverSupport/"
+                    + "InvestigationMachineSingleEpochInstalledL2Join.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(collector.contains(
+            "struct DarwinInvestigationLifecyclePostTeardownObserver"
+        ))
+        #expect(collector.contains(
+            "protocol InvestigationLifecyclePostTeardownObserving"
+        ))
+        #expect(serviceProbe.contains(
+            "struct DarwinPostTeardownLifecycleServiceProbe"
+        ))
+        for forbidden in [
+            "DarwinInvestigationLifecycleTopologyObserver",
+            "case installedTopologyUnproved",
+            "phase: .installed",
+            "provesInstalledTopology",
+            "installedTopology",
+            "DarwinFixedLifecycleServiceProbe",
+            "InstalledLifecycleTopologyBindingReader",
+        ] {
+            #expect(!collector.contains(forbidden))
+        }
+        for forbidden in [
+            "LifecycleFixedServiceIdentityReading",
+            "DarwinFixedServiceIdentityReader",
+            "InstalledLifecycleTopologyBindingReader",
+            "expectedIdentity",
+            ".loaded(identity:",
+        ] {
+            #expect(!serviceProbe.contains(forbidden))
+        }
+        #expect(!scenarioDriver.contains("cohort.installedTopology"))
+        for forbidden in [
+            "LifecycleRootTopologyPhase",
+            "provesInstalledTopology",
+            "installedContractSatisfied",
+            "case loaded(identity:",
+            "case loadedValid",
+        ] {
+            #expect(!lifecycle.contains(forbidden))
+        }
+
+        let sourceEnumerator = FileManager.default.enumerator(
+            at: root.appending(path: "Sources"),
+            includingPropertiesForKeys: nil
+        )
+        let sourceURLs = (sourceEnumerator?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "swift" }
+        let production = try sourceURLs.map {
+            try String(contentsOf: $0, encoding: .utf8)
+        }.joined(separator: "\n")
+        for retiredMarker in [
+            "LifecycleRootTopologyPhase",
+            "phase: .installed",
+            "provesInstalledTopology",
+            "installedContractSatisfied",
+            "installedTopologyUnproved",
+            "DarwinFixedLifecycleServiceProbe",
+            "DarwinFixedServiceIdentityReader",
+            "LifecycleFixedServiceIdentityReading",
+            "InvestigationLifecycleTopologyObserving",
+            "cohort.installedTopology",
+        ] {
+            #expect(!production.contains(retiredMarker))
+        }
+        #expect(installedOwner.components(
+            separatedBy: "InvestigationInstalledL2SemanticContract.evaluate("
+        ).count == 2)
+        for constructor in [
+            "InvestigationInstalledL2ArtifactReader()",
+            "InvestigationInstalledL2ProcessReader()",
+            "InvestigationInstalledL2FixedServiceReader()",
+        ] {
+            #expect(production.components(separatedBy: constructor).count == 2)
+            #expect(installedOwner.contains(constructor))
+        }
+        #expect(production.components(
+            separatedBy: "InvestigationInstalledL2Observer()"
+        ).count == 2)
+        #expect(installedJoin.contains("InvestigationInstalledL2Observer()"))
+    }
+
+    @Test func iiB5BIC2BLeavesOnePhysicalInstalledEvidenceOwner() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let lifecycle = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleRootTopologyObservation.swift"
+            ),
+            encoding: .utf8
+        )
+        let darwin = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "DarwinRootTopologySupport.swift"
+            ),
+            encoding: .utf8
+        )
+        let collector = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+        let evidenceValidator = try String(
+            contentsOf: root.appending(
+                path: "Sources/StornautInvestigationMachineDriverSupport/"
+                    + "InvestigationMachineDarwinOuterInnerProtocol.swift"
+            ),
+            encoding: .utf8
+        )
+
+        for required in [
+            "case present",
+            "protocol LifecycleRootTopologyArtifactAbsenceReading",
+            "protocol LifecycleRootTopologyProcessAbsenceReading",
+            "artifactReader.observeAbsence(",
+            "processReader.observeAbsence(",
+        ] {
+            #expect(lifecycle.contains(required))
+        }
+        for forbidden in [
+            "LifecycleRootTopologyBinding",
+            "LifecycleRootTopologyProcessSnapshot",
+            "LifecycleRootTopologyProcessReadResult",
+            "presentValid",
+            "case invalid(reasonKey:",
+            "rootTopologyIdentifier",
+            "binding:",
+        ] {
+            #expect(!lifecycle.contains(forbidden))
+        }
+
+        for required in [
+            "struct DarwinRootTopologyArtifactAbsenceReader:",
+            "struct DarwinRootTopologyProcessAbsenceReader:",
+            "case .failure(let error) where error.errno == ENOENT:",
+            "case .failure(.identityUnavailable(let code)) where code == ESRCH:",
+            "case .success(let identity) where identity == expectedIdentity:",
+        ] {
+            #expect(darwin.contains(required))
+        }
+        for forbidden in [
+            "import CryptoKit",
+            "DarwinRootTopologyArtifactReader",
+            "DarwinRootTopologyProcessReader",
+            "LifecycleRootTopologySigningEvidenceReading",
+            "LifecycleRootTopologyManifestReading",
+            "LifecycleRootTopologyProcessExecutableReading",
+            "proc_pidpath",
+            "SecurityLifecycleCodeSigningVerifier",
+        ] {
+            #expect(!darwin.contains(forbidden))
+        }
+
+        for required in [
+            "postTeardownObserver.observePostTeardown(",
+            "appProcessIdentity: request.appProcessIdentity",
+            "helperProcessIdentity:",
+            "retirementClaim.helperPeerIdentity",
+            "post.startedAt >= transitionedAt",
+        ] {
+            #expect(collector.contains(required))
+        }
+        for forbidden in [
+            "bindingMismatch",
+            "InvestigationLifecyclePostTeardownBindingReading",
+            "PostTeardownExpectedTopologyBindingReader",
+            "expectedBindingReader",
+            "topologyBinding",
+            "LifecycleBundleSigningIdentityReader",
+        ] {
+            #expect(!collector.contains(forbidden))
+        }
+
+        let production = try (FileManager.default.enumerator(
+            at: root.appending(path: "Sources"),
+            includingPropertiesForKeys: nil
+        )?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "swift" }
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined(separator: "\n")
+        for constructor in [
+            "InvestigationInstalledL2ArtifactReader()",
+            "InvestigationInstalledL2ProcessReader()",
+            "InvestigationInstalledL2FixedServiceReader()",
+            "InvestigationInstalledL2Observer()",
+        ] {
+            #expect(production.components(separatedBy: constructor).count == 2)
+        }
+        let semanticEvaluator =
+            "InvestigationInstalledL2SemanticContract.evaluate("
+        #expect(production.components(
+            separatedBy: semanticEvaluator
+        ).count == 3)
+        #expect(evidenceValidator.contains(semanticEvaluator))
+    }
+
+    @Test
+    func iiB5BIIAVerifierPinsFixedCapsuleAndNarrowFcntlContract() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        for marker in [
+            "[[ $1 == --iib5biia-fixed-capsule-contract-only ]]",
+            "[[ $1 == --iib5biia-staged-scope-contract-only ]]",
+            "ii-b5b-ii-a exact fcntl shape drifted",
+            "ii-b5b-ii-a FD_CLOEXEC shape drifted",
+            "ii-b5b-ii-a O_RDONLY shape drifted",
+            "stable metadata and canonical decode",
+            "ii-b5b-ii-a ACL or xattr semantics drifted",
+            "actor consumption order",
+            "ii-b5b-ii-a focused mutation drifted",
+            "darwinSystemRecognizesARealExtendedACL",
+            ".valid(deviceID: 0)",
+            ".valid(inode: 0)",
+            ".valid(flags: 1)",
+            "case .initialACL:",
+            "case .finalACL:",
+            "Machine fixed capsule exact fcntl contract drifted",
+            "Machine driver installed ACL semantics drifted",
+            "Machine fixed capsule ACL semantics drifted",
+            "ii-b5b-ii-a checkpoint paths drifted",
+            "ii-b5b-ii-a checkpoint baseline drifted",
+            "ii-b5b-ii-a checkpoint budget drifted",
+            "ii-b5b-ii-a checkpoint deleted an existing path",
+            "ii-b5b-ii-a binary checkpoint path rejected",
+            "scripts/verify-contract",
+            "verify_iib5biia_index_semantics",
+            "ii-b5b-ii-a staged content drifted",
+            "(( changed <= 2000 ))",
+            "_fcntl _ioctl",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+        for marker in [
+            "iib5biia_commit=ea9d2a237ab8e8d1b900f603f54233c94c86ecc0",
+            "iib5biia_parent=ddbc4a0be3ea059c7de239b85ef60c40c09affbb",
+            "iib5biia-historical",
+            "--iib5biia-staged-scope-contract-only \"$iib5biia_baseline\"",
+        ] {
+            #expect(contract.contains(marker))
+        }
+    }
+
+    @Test
+    func iiB5BIIBVerifierPinsIndependentCompleteAppIdentity() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "--iib5biib-app-identity-contract-only",
+            "--iib5biib-staged-scope-contract-only",
+            "ii-b5b-ii-b dependency surface drifted",
+            "ii-b5b-ii-b complete C snapshot drifted",
+            "ii-b5b-ii-b C object import drifted",
+            "ii-b5b-ii-b observer contract drifted",
+            "ii-b5b-ii-b focused coverage drifted",
+            "ii-b5b-ii-b checkpoint paths drifted",
+            "ii-b5b-ii-b checkpoint baseline drifted",
+            "ii-b5b-ii-b checkpoint budget drifted",
+            "ii-b5b-ii-b checkpoint path ceiling drifted",
+            "ii-b5b-ii-b checkpoint deleted an existing path",
+            "ii-b5b-ii-b binary checkpoint path rejected",
+            "ii-b5b-ii-b staged content drifted",
+            "verify_iib5biib_index_semantics",
+            "(( changed <= 2800 ))",
+            "_audit_get_pinfo_addr", "_proc_pidinfo", "_sysctl",
+        ] {
+            #expect(boundaries.contains(marker))
+        }
+    }
+
+    @Test
+    func nativeMachineDriverPackagingIsDiagnosticOnly() throws {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let projectSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Stornaut.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+        let diagnosticScheme = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Stornaut.xcodeproj/xcshareddata/xcschemes/"
+                    + "StornautInvestigationDiagnosticApp.xcscheme"
+            ),
+            encoding: .utf8
+        )
+        let ordinaryScheme = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Stornaut.xcodeproj/xcshareddata/xcschemes/"
+                    + "Stornaut.xcscheme"
+            ),
+            encoding: .utf8
+        )
+
+        func objectBlock(
+            id: String,
+            comment: String,
+            in source: String
+        ) throws -> String {
+            let marker = "\(id) /* \(comment) */ = {"
+            let start = try #require(source.range(of: marker))
+            let suffix = source[start.lowerBound...]
+            let end = try #require(suffix.range(of: "\n\t\t};"))
+            return String(suffix[..<end.upperBound])
+        }
+
+        func objectLine(
+            containing marker: String,
+            in source: String
+        ) throws -> String {
+            let range = try #require(source.range(of: marker))
+            return String(source[source.lineRange(for: range)])
+        }
+
+        #expect(
+            projectSource.components(
+                separatedBy: "isa = PBXNativeTarget;"
+            ).count == 11
+        )
+        #expect(
+            projectSource.components(
+                separatedBy:
+                    "name = StornautInvestigationMachineDriverNative;"
+            ).count == 2
+        )
+        #expect(
+            projectSource.components(
+                separatedBy:
+                    "name = StornautInvestigationDiagnosticReleaseShell;"
+            ).count == 2
+        )
+        let driverTarget = try objectBlock(
+            id: "A00000000000000000000007",
+            comment: "StornautInvestigationMachineDriverNative",
+            in: projectSource
+        )
+        for marker in [
+            "productName = StornautInvestigationMachineDriver;",
+            "productType = \"com.apple.product-type.tool\";",
+            "StornautInvestigationMachineDriverSupport",
+            "B00000000000000000000026 /* Sources */",
+            "B00000000000000000000027 /* Frameworks */",
+        ] {
+            #expect(driverTarget.contains(marker))
+        }
+        for forbidden in [
+            "StornautInvestigationMachine ",
+            "StornautCore",
+            "StornautCodex",
+            "StornautLifecycle",
+            "StornautInvestigationRuntime",
+            "StornautInvestigationDiagnostic",
+            "StornautExecution",
+            "fileSystemSynchronizedGroups",
+        ] {
+            #expect(!driverTarget.contains(forbidden))
+        }
+
+        let releaseShellTarget = try objectBlock(
+            id: "A00000000000000000000008",
+            comment: "StornautInvestigationDiagnosticReleaseShell",
+            in: projectSource
+        )
+        for marker in [
+            "B00000000000000000000029 /* Sources */",
+            "B00000000000000000000028 /* Frameworks */",
+            "B00000000000000000000035 /* Resources */",
+            "dependencies = (\n\t\t\t);",
+            "packageProductDependencies = (\n\t\t\t);",
+            "productName = StornautInvestigationDiagnosticReleaseShell;",
+        ] {
+            #expect(releaseShellTarget.contains(marker))
+        }
+        for forbidden in [
+            "PBXTargetDependency",
+            "Copy Investigation",
+            "StornautInvestigationDiagnostic in Frameworks",
+            "StornautInvestigationMachineDriver",
+            "StornautLifecycleHelper",
+        ] {
+            #expect(!releaseShellTarget.contains(forbidden))
+        }
+        let releaseShellSources = try objectBlock(
+            id: "B00000000000000000000029",
+            comment: "Sources",
+            in: projectSource
+        )
+        #expect(releaseShellSources.contains(
+            "B0000000000000000000001E "
+                + "/* InvestigationRuntimeDiagnosticHarness.swift in Sources */"
+        ))
+        #expect(
+            releaseShellSources.components(
+                separatedBy: " in Sources */"
+            ).count == 2
+        )
+        for (id, comment) in [
+            ("B00000000000000000000028", "Frameworks"),
+            ("B00000000000000000000035", "Resources"),
+        ] {
+            let phase = try objectBlock(
+                id: id,
+                comment: comment,
+                in: projectSource
+            )
+            #expect(phase.contains("files = (\n\t\t\t);"))
+        }
+        #expect(
+            projectSource.components(
+                separatedBy:
+                    "fileRef = D00000000000000000000009 "
+                        + "/* InvestigationRuntimeDiagnosticHarness.swift */;"
+            ).count == 3
+        )
+        let diagnosticConfigurationList = try objectBlock(
+            id: "A00000000000000000000025",
+            comment:
+                "Build configuration list for PBXNativeTarget "
+                    + "\"StornautInvestigationDiagnosticApp\"",
+            in: projectSource
+        )
+        #expect(diagnosticConfigurationList.contains(
+            "A00000000000000000000150 /* Debug */"
+        ))
+        #expect(!diagnosticConfigurationList.contains(
+            "A00000000000000000000151 /* Release */"
+        ))
+        let releaseShellConfigurationList = try objectBlock(
+            id: "A00000000000000000000028",
+            comment:
+                "Build configuration list for PBXNativeTarget "
+                    + "\"StornautInvestigationDiagnosticReleaseShell\"",
+            in: projectSource
+        )
+        #expect(releaseShellConfigurationList.contains(
+            "A00000000000000000000151 /* Release */"
+        ))
+        #expect(!releaseShellConfigurationList.contains(
+            "A00000000000000000000150 /* Debug */"
+        ))
+
+        let driverSources = try objectBlock(
+            id: "B00000000000000000000026",
+            comment: "Sources",
+            in: projectSource
+        )
+        #expect(driverSources.contains(
+            "B0000000000000000000001B /* main.swift in Sources */"
+        ))
+        #expect(driverSources.components(separatedBy: " in Sources */").count == 2)
+
+        let driverFrameworks = try objectBlock(
+            id: "B00000000000000000000027",
+            comment: "Frameworks",
+            in: projectSource
+        )
+        #expect(driverFrameworks.contains(
+            "B0000000000000000000001C "
+                + "/* StornautInvestigationMachineDriverSupport in Frameworks */"
+        ))
+        #expect(
+            driverFrameworks.components(separatedBy: " in Frameworks */").count
+                == 2
+        )
+
+        let driverCopy = try objectBlock(
+            id: "B00000000000000000000042",
+            comment: "Copy Investigation Machine Tools",
+            in: projectSource
+        )
+        for marker in [
+            "B0000000000000000000001D "
+                + "/* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */",
+            "B00000000000000000000052 "
+                + "/* StornautInvestigationMachineGate in Copy Investigation Machine Tools */",
+            "B00000000000000000000055 "
+                + "/* StornautInvestigationMachineGateCoordinator in Copy Investigation Machine Tools */",
+            "name = \"Copy Investigation Machine Tools\";",
+            "dstPath = Contents/MacOS;",
+        ] {
+            #expect(driverCopy.contains(marker))
+        }
+        #expect(
+            driverCopy.components(
+                separatedBy: " in Copy Investigation Machine Tools */"
+            ).count == 4
+        )
+        let driverCopyBuildFile = try objectLine(
+            containing:
+                "B0000000000000000000001D "
+                    + "/* StornautInvestigationMachineDriver in Copy Investigation Machine Tools */ =",
+            in: projectSource
+        )
+        #expect(driverCopyBuildFile.contains(
+            "settings = {ATTRIBUTES = (CodeSignOnCopy, ); };"
+        ))
+
+        let driverConfigurationList = try objectBlock(
+            id: "A00000000000000000000027",
+            comment:
+                "Build configuration list for PBXNativeTarget "
+                    + "\"StornautInvestigationMachineDriverNative\"",
+            in: projectSource
+        )
+        for (id, name) in [
+            ("A00000000000000000000170", "Debug"),
+            ("A00000000000000000000171", "Release"),
+        ] {
+            #expect(driverConfigurationList.contains("\(id) /* \(name) */"))
+            let configuration = try objectBlock(
+                id: id,
+                comment: name,
+                in: projectSource
+            )
+            for marker in [
+                "PRODUCT_BUNDLE_IDENTIFIER = "
+                    + "com.eriklee.stornaut.investigation.machine-driver;",
+                "CODE_SIGN_IDENTITY = \"-\";",
+                "CODE_SIGN_STYLE = Manual;",
+                "CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;",
+                "ENTITLEMENTS_ALLOWED = NO;",
+                "ENTITLEMENTS_REQUIRED = NO;",
+                "ARCHS = arm64;",
+                #"OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";"#,
+                "SKIP_INSTALL = YES;",
+            ] {
+                #expect(configuration.contains(marker))
+            }
+            #expect(!configuration.contains("CODE_SIGN_ENTITLEMENTS"))
+        }
+        #expect(
+            projectSource.components(
+                separatedBy: "name = \"Copy Investigation Machine Tools\";"
+            ).count == 2
+        )
+        #expect(
+            projectSource.components(
+                separatedBy: "isa = PBXCopyFilesBuildPhase;"
+            ).count == 4
+        )
+        #expect(
+            diagnosticScheme.components(
+                separatedBy:
+                    "BlueprintName = \""
+                        + "StornautInvestigationMachineDriverNative\""
+            ).count == 2
+        )
+        #expect(diagnosticScheme.contains(
+            "BuildableName = \"StornautInvestigationMachineDriver\""
+        ))
+        #expect(!ordinaryScheme.contains(
+            "StornautInvestigationMachineDriver"
+        ))
+    }
+
+    @Test
+    func iiCAMachinePackagingVerifierPinsClosedTopologyAndScope() throws {
+        let root = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let boundaries = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-investigation-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let release = try String(
+            contentsOf: root.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let contract = try String(
+            contentsOf: root.appending(path: "scripts/verify-contract"),
+            encoding: .utf8
+        )
+        let combined = boundaries + release + contract
+
+        for marker in [
+            "--iic-a-source-contract-only",
+            "--iic-a-staged-scope-contract-only",
+            "--iic-a-component-boundary-only",
+            "--iic-a-contract-only",
+            "function verify_iica_component_boundary()",
+            "function verify_iica_contract()",
+            "81f185c1278e0f80a3a5de856d0b8cb93c810272",
+            "7cf4db75a261895ba0c86b6876623daf900bb4db",
+            "ii-c-a historical replay failed",
+            "expected_diagnostic_mach_o_paths",
+            "helper_identifier == com.eriklee.stornaut.lifecycle.helper",
+            "helper_signature == adhoc",
+            "__info_plist",
+            "StornautInvestigationMachineGateCoordinator",
+            "@executable_path/../Frameworks",
+            "Coordinator framework dependency is unresolved",
+            "Copy Investigation Machine Tools",
+            "CodeSignOnCopy",
+        ] {
+            #expect(combined.contains(marker))
+        }
+        #expect(!combined.contains(
+            "ii-c-a requires one clean authoritative `scripts/verify --full`"
+        ))
+    }
+
+    @Test
+    func l3c3aAddsOnlyStrictDriverBindingWithoutAdvancingTopology()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+
+        func source(_ path: String) throws -> String {
+            try String(
+                contentsOf: repositoryRoot.appending(path: path),
+                encoding: .utf8
+            )
+        }
+
+        func block(
+            _ text: String,
+            from startMarker: String,
+            until endMarker: String
+        ) throws -> String {
+            let start = try #require(text.range(of: startMarker))
+            let suffix = text[start.lowerBound...]
+            let end = try #require(suffix.range(of: endMarker))
+            return String(suffix[..<end.lowerBound])
+        }
+
+        func requireSchema(
+            _ version: Int,
+            declaration: String,
+            in text: String,
+            until endMarker: String
+        ) throws {
+            let declarationSource = try block(
+                text,
+                from: "public struct \(declaration):",
+                until: endMarker
+            )
+            #expect(declarationSource.contains(
+                "public static let schemaVersion = \(version)"
+            ))
+        }
+
+        let signedContract = try source(
+            "Sources/StornautInvestigation/"
+                + "SignedInvestigationRuntimeContract.swift"
+        )
+        let machineContract = try source(
+            "Sources/StornautInvestigationMachine/"
+                + "SignedInvestigationRuntimeMachineContract.swift"
+        )
+        let appLeaf = try source(
+            "Sources/StornautInvestigationDiagnostic/"
+                + "InvestigationRuntimeDiagnosticAppLeaf.swift"
+        )
+        let composition = try source(
+            "Sources/StornautInvestigationDiagnostic/"
+                + "InvestigationRuntimeDiagnosticComposition.swift"
+        )
+        let lifecycleRegistration = try source(
+            "Sources/StornautLifecycle/"
+                + "LifecycleServiceRegistration.swift"
+        )
+        let xcodeProject = try source(
+            "Stornaut.xcodeproj/project.pbxproj"
+        )
+
+        let driverBinding = try block(
+            signedContract,
+            from:
+                "public struct "
+                + "SignedInvestigationRuntimeMachineDriverBinding:",
+            until: "public struct SignedInvestigationRuntimeBinding:"
+        )
+        for marker in [
+            "public static let schemaVersion = 1",
+            "strictSignedRuntimeContainer(",
+            #"keys: Set(CodingKeys.allCases.map(\.rawValue))"#,
+            "public let executableSHA256: String",
+            "public let signingIdentifier: String",
+            "public let designatedRequirementSHA256: String",
+            "public let codeDirectoryHash: String",
+            "public let machineClaimServiceIdentifier: String",
+            "lowercaseHex(codeDirectoryHash, count: 40)",
+            "lowercaseHex(codeDirectoryHash, count: 64)",
+            "case schemaVersion",
+            "case executableSHA256",
+            "case signingIdentifier",
+            "case designatedRequirementSHA256",
+            "case codeDirectoryHash",
+            "case machineClaimServiceIdentifier",
+            "lowercaseHex(codeDirectoryHash, count: 40)",
+            "lowercaseHex(codeDirectoryHash, count: 64)",
+        ] {
+            #expect(driverBinding.contains(marker))
+        }
+        #expect(
+            driverBinding.components(separatedBy: "        case " ).count
+                == 7
+        )
+
+        let runtimeBinding = try block(
+            signedContract,
+            from: "public struct SignedInvestigationRuntimeBinding:",
+            until:
+                "public struct "
+                + "SignedInvestigationRuntimeDiagnosticConfiguration:"
+        )
+        for marker in [
+            "public static let schemaVersion = 2",
+            "public let machineDriver:",
+            "SignedInvestigationRuntimeMachineDriverBinding",
+            "case machineDriver",
+            "machineDriver: try container.decode(",
+        ] {
+            #expect(runtimeBinding.contains(marker))
+        }
+        #expect(!runtimeBinding.contains(
+            "machineDriver:\n"
+                + "        SignedInvestigationRuntimeMachineDriverBinding?"
+        ))
+        #expect(!runtimeBinding.contains(
+            "machineDriver: container.decodeIfPresent"
+        ))
+
+        try requireSchema(
+            3,
+            declaration: "SignedInvestigationRuntimeDiagnosticConfiguration",
+            in: signedContract,
+            until: "public enum SignedInvestigationRuntimeDenialKind:"
+        )
+        try requireSchema(
+            4,
+            declaration: "SignedInvestigationCapabilityEvidenceReceipt",
+            in: signedContract,
+            until: "public struct SignedInvestigationRuntimeReport:"
+        )
+        try requireSchema(
+            4,
+            declaration: "SignedInvestigationRuntimeReport",
+            in: signedContract,
+            until: "public struct SignedInvestigationRuntimeAdmissionReceipt:"
+        )
+        for (declaration, version, nextDeclaration) in [
+            (
+                "SignedInvestigationRuntimeMachineCaseEvidence",
+                3,
+                "SignedInvestigationRuntimeFailureMatrix"
+            ),
+            (
+                "SignedInvestigationRuntimeFailureMatrix",
+                3,
+                "SignedInvestigationRuntimeMachineReport"
+            ),
+            (
+                "SignedInvestigationRuntimeMachineReport",
+                3,
+                "SignedInvestigationRuntimeLifecycleResidueRecord"
+            ),
+            (
+                "SignedInvestigationRuntimeLifecycleResidueRecord",
+                2,
+                "SignedInvestigationRuntimeMachineEvidenceBundle"
+            ),
+        ] {
+            try requireSchema(
+                version,
+                declaration: declaration,
+                in: machineContract,
+                until: "public struct \(nextDeclaration):"
+            )
+        }
+        let evidenceBundle = try block(
+            machineContract,
+            from:
+                "public struct "
+                + "SignedInvestigationRuntimeMachineEvidenceBundle:",
+            until:
+                "private struct "
+                + "CompletedMachineConfiguration: Decodable"
+        )
+        #expect(evidenceBundle.contains(
+            "public static let schemaVersion = 7"
+        ))
+
+        let leafConfiguration = try block(
+            appLeaf,
+            from: "private struct Configuration: Decodable",
+            until: "private enum Scenario:"
+        )
+        let leafBinding = try block(
+            appLeaf,
+            from: "private struct Binding: Decodable",
+            until: "private struct MachineDriverBinding: Decodable"
+        )
+        let leafDriverBinding = try block(
+            appLeaf,
+            from: "private struct MachineDriverBinding: Decodable",
+            until: "private struct DynamicCodingKey:"
+        )
+        #expect(leafConfiguration.contains("schemaVersion == 3"))
+        #expect(leafBinding.contains("schemaVersion == 2"))
+        #expect(leafBinding.contains("case machineDriver"))
+        #expect(leafDriverBinding.contains("schemaVersion == 1"))
+        for marker in [
+            "strictContainer(",
+            #"keys: Set(CodingKeys.allCases.map(\.rawValue))"#,
+            "case schemaVersion",
+            "case executableSHA256",
+            "case signingIdentifier",
+            "case designatedRequirementSHA256",
+            "case codeDirectoryHash",
+            "case machineClaimServiceIdentifier",
+        ] {
+            #expect(leafDriverBinding.contains(marker))
+        }
+        #expect(
+            leafDriverBinding.components(
+                separatedBy: "        case "
+            ).count == 7
+        )
+
+        let observation = try block(
+            composition,
+            from:
+                "package struct "
+                + "InvestigationRuntimeDiagnosticBindingObservation:",
+            until:
+                "private actor "
+                + "InvestigationRuntimeDiagnosticTransportOwner:"
+        )
+        for marker in [
+            "LifecycleBundleSigningIdentityReader()",
+            "contract.machineDriverExecutableURL",
+            "Contents/MacOS/",
+            "StornautInvestigationMachineDriver",
+            "machineDriverEvidence.executableSHA256",
+            "machineDriverEvidence.identity.signingIdentifier",
+            "machineDriverDesignatedRequirementSHA256",
+            "machineDriverCodeDirectoryHash",
+            "machineClaimServiceIdentifier",
+            "binding.machineDriver",
+        ] {
+            #expect(observation.contains(marker))
+        }
+
+        let signingIdentifier =
+            "com.eriklee.stornaut.investigation.machine-driver"
+        let claimServiceIdentifier =
+            "com.eriklee.stornaut.lifecycle.machine-claim"
+        for text in [driverBinding, leafDriverBinding, lifecycleRegistration] {
+            #expect(text.contains(signingIdentifier))
+            #expect(text.contains(claimServiceIdentifier))
+        }
+
+        let l3c3aSources = [driverBinding, leafDriverBinding, observation]
+        for text in l3c3aSources {
+            for forbidden in [
+                "StornautExecution",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "MoveToTrash",
+                "posix_spawn",
+                "Process(",
+                "CommandLine",
+                "ProcessInfo.processInfo.environment",
+                "NSXPCListener",
+                "NSXPCConnection",
+                "LifecycleMachineRetirementHandle",
+                "Launcher",
+                "launcher",
+                "signedInvestigationRuntimeReady",
+                "signedRuntimeReady",
+                "Readiness",
+                "readiness",
+                "arguments:",
+                "environment:",
+                "fileDescriptor:",
+            ] {
+                #expect(!text.contains(forbidden))
+            }
+        }
+
+        #expect(xcodeProject.contains(
+            "StornautInvestigationMachineDriverNative"
+        ))
+        #expect(xcodeProject.contains(
+            "com.eriklee.stornaut.investigation.machine-driver"
+        ))
+    }
+
+    @Test
+    func trustedMachineImplementationLivesOnlyInTheNonProductTarget()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let packageSource = try String(
+            contentsOf: repositoryRoot.appending(path: "Package.swift"),
+            encoding: .utf8
+        )
+        let releaseBoundary = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-app-release-boundaries"
+            ),
+            encoding: .utf8
+        )
+        let driverLoopStart = try #require(releaseBoundary.range(
+            of: "for app_without_machine_driver in \\\n"
+        ))
+        let driverLoopSuffix = releaseBoundary[driverLoopStart.lowerBound...]
+        let driverLoopEnd = try #require(
+            driverLoopSuffix.range(of: "\ndone")
+        )
+        let driverLoop = String(
+            driverLoopSuffix[..<driverLoopEnd.upperBound]
+        )
+        for appVariable in [
+            "\"$debug_app\"",
+            "\"$release_app\"",
+        ] {
+            #expect(
+                driverLoop.components(separatedBy: appVariable).count
+                    == 2
+            )
+        }
+        #expect(!driverLoop.contains("\"$diagnostic_debug_app\""))
+        let exactDriverPath =
+            "$app_without_machine_driver/Contents/MacOS/StornautInvestigationMachineDriver"
+        #expect(
+            driverLoop.components(separatedBy: exactDriverPath).count
+                == 3
+        )
+        #expect(driverLoop.contains("test ! -e"))
+        #expect(driverLoop.contains("test ! -L"))
+        for marker in [
+            "diagnostic_machine_driver=",
+            "machine_driver_product=",
+            "machine_driver_max_bytes=$((16 * 1024 * 1024))",
+            "/usr/bin/lipo -archs",
+            "/usr/bin/codesign --verify --strict",
+            "Identifier=com.eriklee.stornaut.investigation.machine-driver",
+            "designated => cdhash H",
+            "machine_driver_product_sha256",
+            "diagnostic_machine_driver_sha256",
+            "machine_driver_product_cdhash",
+            "diagnostic_machine_driver_cdhash",
+            "machine_driver_authority_forbidden_markers",
+            "signedInvestigationRuntimeReady",
+            "signedRuntimeReady",
+        ] {
+            #expect(releaseBoundary.contains(marker))
+        }
+
+        let verifierContract = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "scripts/verify-contract"
+            ),
+            encoding: .utf8
+        )
+        for marker in [
+            "validate_machine_driver_packaging_contract",
+            "validate_built_app",
+            "validate_installed_artifacts",
+            "validate_machine_driver_artifact",
+            "validate_machine_driver_identity",
+            "validate_machine_driver_fixtures",
+            "validate-machine-driver",
+        ] {
+            #expect(verifierContract.contains(marker))
+        }
+
+        let investigationSource = repositoryRoot.appending(
+            path: "Sources/StornautInvestigation/"
+                + "SignedInvestigationRuntimeMachineContract.swift"
+        )
+        let machineSource = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "SignedInvestigationRuntimeMachineContract.swift"
+        )
+
+        #expect(!FileManager.default.fileExists(
+            atPath: investigationSource.path
+        ))
+        #expect(FileManager.default.fileExists(atPath: machineSource.path))
+
+        let targetStart = try #require(packageSource.range(
+            of: ".target(\n            name: \"StornautInvestigationMachine\""
+        ))
+        let targetSuffix = packageSource[targetStart.lowerBound...]
+        let targetEnd = try #require(targetSuffix.range(of: "\n        ),"))
+        let targetSource = String(targetSuffix[..<targetEnd.upperBound])
+        for dependency in [
+            "\"StornautCodex\"",
+            "\"StornautCore\"",
+            "\"StornautInvestigation\"",
+            "\"StornautInvestigationRuntime\"",
+            "\"StornautLifecycle\"",
+        ] {
+            #expect(targetSource.contains(dependency))
+        }
+        for forbidden in [
+            "StornautExecution",
+            "StornautInvestigationDiagnostic",
+        ] {
+            #expect(!targetSource.contains(forbidden))
+        }
+
+        #expect(!packageSource.contains(
+            ".library(\n            name: \"StornautInvestigationMachine\""
+        ))
+        #expect(!packageSource.contains(
+            ".executable(\n            name: \"StornautInvestigationMachine\""
+        ))
+        let driverTargetStart = try #require(packageSource.range(
+            of: ".executableTarget(\n            name: \"StornautInvestigationMachineDriver\""
+        ))
+        let driverTargetSuffix = packageSource[
+            driverTargetStart.lowerBound...
+        ]
+        let driverTargetEnd = try #require(
+            driverTargetSuffix.range(of: "\n        ),")
+        )
+        let driverTargetSource = String(
+            driverTargetSuffix[..<driverTargetEnd.upperBound]
+        )
+        #expect(driverTargetSource.contains(
+            "dependencies: [\n                "
+                + "\"StornautInvestigationMachineDriverSupport\",\n"
+                + "            ]"
+        ))
+        #expect(driverTargetSource.contains(
+            "path: \"Tools/StornautInvestigationMachineDriver\""
+        ))
+        for forbidden in [
+            "StornautLifecycle",
+            "StornautInvestigationRuntime",
+            "StornautInvestigationDiagnostic",
+            "StornautExecution",
+            "StornautCore",
+            "StornautCodex",
+        ] {
+            #expect(!driverTargetSource.contains(forbidden))
+        }
+        #expect(!packageSource.contains(
+            ".executable(\n            name: \"StornautInvestigationMachineDriver\""
+        ))
+
+        let driverHostURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationMachineDriverHost.swift"
+        )
+        let driverMainURL = repositoryRoot.appending(
+            path: "Tools/StornautInvestigationMachineDriver/main.swift"
+        )
+        let scenarioRunnerURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationFixedScenarioRunner.swift"
+        )
+        let scenarioDriverURL = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationMachineScenarioDriver.swift"
+        )
+        #expect(FileManager.default.fileExists(atPath: driverHostURL.path))
+        #expect(FileManager.default.fileExists(atPath: driverMainURL.path))
+        #expect(FileManager.default.fileExists(atPath: scenarioRunnerURL.path))
+        #expect(FileManager.default.fileExists(atPath: scenarioDriverURL.path))
+        let driverHost = try String(
+            contentsOf: driverHostURL,
+            encoding: .utf8
+        )
+        let driverMain = try String(
+            contentsOf: driverMainURL,
+            encoding: .utf8
+        )
+        let scenarioRunner = try String(
+            contentsOf: scenarioRunnerURL,
+            encoding: .utf8
+        )
+        let scenarioDriver = try String(
+            contentsOf: scenarioDriverURL,
+            encoding: .utf8
+        )
+        for marker in [
+            "package enum InvestigationMachineDriverEntryPoint",
+            "package static func run() async -> Int32",
+            "actor InvestigationMachineDriverHost",
+            "struct StrictMachineRetirementClaimSource",
+            "InvestigationMachineRetirementClaimStore()",
+            "InvestigationLifecycleTopologyCollectionRequest(",
+        ] {
+            #expect(driverHost.contains(marker))
+        }
+        #expect(!driverHost.contains("LifecycleMachineClaimXPCClient()"))
+        #expect(!driverHost.contains("InstalledMachineRetirementHelperSigningVerifier"))
+        #expect(driverHost.contains("case implementationUnavailable"))
+        #expect(driverHost.contains("throw InvestigationMachineDriverHostError.implementationUnavailable"))
+        #expect(
+            driverHost.components(separatedBy: "package " ).count == 3
+        )
+        for internalDeclaration in [
+            "protocol InvestigationMachineRetirementHandleHandoff",
+            "protocol InvestigationMachineRetirementClaiming",
+            "struct InvestigationMachineTopologyAuthority",
+            "actor InvestigationMachineDriverHost",
+        ] {
+            #expect(driverHost.contains(internalDeclaration))
+            #expect(!driverHost.contains("public \(internalDeclaration)"))
+            #expect(!driverHost.contains("package \(internalDeclaration)"))
+        }
+        #expect(driverMain.contains(
+            "import StornautInvestigationMachineDriverSupport"
+        ))
+        #expect(driverMain.contains(
+            "await InvestigationMachineDriverSupport.run()"
+        ))
+        #expect(!driverMain.contains("CommandLine"))
+        #expect(!driverMain.contains("ProcessInfo"))
+        for source in [driverHost, driverMain] {
+            for forbidden in [
+                "StornautExecution",
+                "StornautInvestigationDiagnostic",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "SignedInvestigationRuntimeMachineAssembler",
+                "SignedInvestigationRuntimeMachineVerifier",
+                "signedInvestigationRuntimeReady",
+                "JSONEncoder",
+                "JSONDecoder",
+                "PropertyListEncoder",
+                "PropertyListDecoder",
+                "NSXPCConnection",
+                "URLSession",
+                "posix_spawn",
+                "removeItem",
+                "moveItem",
+                "copyItem",
+                "CommandLine.arguments",
+                "ProcessInfo.processInfo.environment",
+                "readLine(",
+                "kill(",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+        }
+        for marker in [
+            "actor InvestigationFixedScenarioRunner",
+            "typealias Operation = @Sendable () async throws",
+            "InvestigationFixedScenarioObservation",
+            "InvestigationFixedScenarioTrace",
+        ] {
+            #expect(scenarioRunner.contains(marker))
+        }
+        for marker in [
+            "actor InvestigationMachineScenarioDriver",
+            "struct InvestigationMachineScenarioAttempt",
+            "struct InvestigationMachineSyntheticSuccessEvidence",
+            "async throws -> SignedInvestigationRuntimeFailureMatrix",
+            "let authority = try await attempt.host.run()",
+            "try await attempt.runner.consumeObservation()",
+        ] {
+            #expect(scenarioDriver.contains(marker))
+        }
+        let scenarioSources = scenarioRunner + "\n" + scenarioDriver
+        let accessDeclaration = try NSRegularExpression(
+            pattern: #"(?m)^\s*(?:(?:@[A-Za-z_][A-Za-z0-9_.]*(?:\([^)]*\))?|final|indirect|nonisolated|override|required|static|class|mutating|nonmutating|convenience|distributed)\s+)*(?:public|package)(?:\(set\))?\s+"#
+        )
+        #expect(accessDeclaration.firstMatch(
+            in: scenarioSources,
+            range: NSRange(
+                scenarioSources.startIndex...,
+                in: scenarioSources
+            )
+        ) == nil)
+        for source in [scenarioRunner, scenarioDriver] {
+            for forbidden in [
+                "import StornautExecution",
+                "import StornautInvestigationDiagnostic",
+                "import StornautCodex",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "FileManagerTrashAdapter",
+                "CleanupExecutionRuntime",
+                "CleanupExecutionCoordinator",
+                "CleanupActionExecuting",
+                "CleanupAuthorizationController",
+                "ExecutionAuthorization",
+                "ActionPolicyGate",
+                "CleanupPolicyGate",
+                "MoveToTrash",
+                "ProposedCleanupAction",
+                "CleanupAction",
+                "SignedInvestigationCapabilityEvidenceReceipt",
+                "SignedInvestigationRuntimeMachineAssembler",
+                "SignedInvestigationRuntimeMachineVerifier",
+                "SignedInvestigationRuntimeMachineReport",
+                "signedInvestigationRuntimeReady",
+                "signedRuntimeReady",
+                "readiness",
+                "Readiness",
+                "Codable",
+                "JSONEncoder",
+                "JSONDecoder",
+                "PropertyListEncoder",
+                "PropertyListDecoder",
+                "FileManager.default",
+                "NSXPCConnection",
+                "URLSession",
+                "NWConnection",
+                "WebSocket",
+                "CFStream",
+                "socket",
+                "connect",
+                "send",
+                "recv",
+                "posix_spawn",
+                "removeItem",
+                "moveItem",
+                "copyItem",
+                "createDirectory",
+                "createFile",
+                "CommandLine.arguments",
+                "ProcessInfo.processInfo.environment",
+                "readLine(",
+                "kill(",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+        }
+
+        let machineText = try String(
+            contentsOf: machineSource,
+            encoding: .utf8
+        )
+        let collectorSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "InvestigationLifecycleTopologyCollector.swift"
+            ),
+            encoding: .utf8
+        )
+        let serviceSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautInvestigationMachine/"
+                    + "FixedLifecycleServiceProbe.swift"
+            ),
+            encoding: .utf8
+        )
+        let claimSource = repositoryRoot.appending(
+            path: "Sources/StornautInvestigationMachine/"
+                + "InvestigationMachineRetirementClaim.swift"
+        )
+        #expect(FileManager.default.fileExists(atPath: claimSource.path))
+        let claimText = try String(
+            contentsOf: claimSource,
+            encoding: .utf8
+        )
+        for marker in [
+            "protocol InvestigationMachineRetirementClaimSource",
+            "struct InvestigationMachineRetirementClaim",
+            "actor InvestigationMachineRetirementClaimStore",
+        ] {
+            #expect(claimText.contains(marker))
+            #expect(!claimText.contains("public \(marker)"))
+            #expect(!claimText.contains("package \(marker)"))
+        }
+        for forbidden in [
+            "Codable",
+            "JSONDecoder",
+            "JSONEncoder",
+            "PropertyListDecoder",
+            "PropertyListEncoder",
+            "NSXPCConnection",
+            "LifecycleSupervisorXPCWire",
+            "LifecycleInteractiveSessionXPCWire",
+        ] {
+            #expect(!claimText.contains(forbidden))
+        }
+        let xpcSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautLifecycle/LifecycleSupervisorXPC.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(!xpcSource.contains("LifecycleMachineRetirementClaimRequest"))
+        #expect(!xpcSource.contains("LifecycleMachineRetirementClaimResponse"))
+        #expect(!xpcSource.contains("LifecycleMachineClaimXPCWire"))
+        let helperSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "StornautLifecycleHelper/main.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(!helperSource.contains(
+            "@objc private protocol LifecycleMachineClaimXPCWire"
+        ))
+        #expect(helperSource.contains(
+            "import StornautInvestigationHandoffContract"
+        ))
+        #expect(helperSource.contains(
+            "with: InvestigationMachineClaimXPCWire.self"
+        ))
+        for method in [
+            "func attestHelper(",
+            "func handle(",
+            "func handleInteractive(",
+        ] {
+            #expect(
+                xpcSource.components(separatedBy: method).count == 2
+            )
+        }
+        #expect(
+            helperSource.components(
+                separatedBy: "func claimMachineRetirement("
+            ).count == 1
+        )
+        #expect(
+            helperSource.components(
+                separatedBy: "func releaseMachineRetirement("
+            ).count == 1
+        )
+        let exportedMethodCount = xpcSource
+            .components(separatedBy: "@objc public protocol")
+            .dropFirst()
+            .map { protocolSource in
+                protocolSource
+                    .prefix { $0 != "}" }
+                    .components(separatedBy: "func " )
+                    .count - 1
+            }
+            .reduce(0, +)
+        #expect(exportedMethodCount == 3)
+        let escrowSource = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/StornautLifecycle/"
+                    + "LifecycleMachineRetirementEscrow.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(
+            escrowSource.contains(
+                "machineDriverIdentity: LifecycleProcessIdentity"
+            )
+        )
+        #expect(
+            escrowSource.contains(
+                "admission: any LifecycleMachineDriverClaimAdmitting"
+            )
+        )
+        #expect(!escrowSource.contains("public func claim(\n        _ request: LifecycleMachineRetirementClaimRequest,\n        authorized: Bool"))
+        #expect(!escrowSource.contains("package func claim(\n        _ request: LifecycleMachineRetirementClaimRequest,\n        authorized: Bool"))
+        #expect(escrowSource.contains("let tokenSHA256: Data"))
+        let entryStart = try #require(
+            escrowSource.range(of: "fileprivate struct Entry {")
+        )
+        let entrySuffix = escrowSource[entryStart.lowerBound...]
+        let entryEnd = try #require(entrySuffix.range(of: "\n    }"))
+        let entrySource = String(entrySuffix[..<entryEnd.upperBound])
+        #expect(!entrySource.contains("LifecycleMachineRetirementHandle"))
+        for trustedDeclaration in [
+            "protocol SignedInvestigationRuntimeSealedCohortAuthority",
+            "struct SignedInvestigationRuntimeMachineAssembler",
+            "struct SignedInvestigationRuntimeMachineVerifier",
+        ] {
+            #expect(machineText.contains(trustedDeclaration))
+            #expect(!machineText.contains("public \(trustedDeclaration)"))
+            #expect(!machineText.contains("package \(trustedDeclaration)"))
+        }
+        for forbidden in [
+            "import StornautExecution",
+            "import StornautLifecycle",
+            "ActionExecutor",
+            "TrashMoving",
+            "FileManagerTrashAdapter",
+            "signedInvestigationRuntimeReady",
+        ] {
+            #expect(!machineText.contains(forbidden))
+        }
+        for source in [collectorSource, serviceSource] {
+            for forbidden in [
+                "StornautExecution",
+                "StornautInvestigationDiagnostic",
+                "ActionExecutor",
+                "TrashMoving",
+                "RegisteredAction",
+                "SignedInvestigationRuntimeMachineAssembler",
+                "SignedInvestigationRuntimeMachineVerifier",
+                "signedInvestigationRuntimeReady",
+                "Codable",
+                "JSONEncoder",
+                "JSONDecoder",
+                "bootout",
+                "bootstrap system",
+                "FileManager.default.remove",
+            ] {
+                #expect(!source.contains(forbidden))
+            }
+        }
+    }
+
+    @Test
+    func l3c3biiInstallerValidatesClosedToolIdentitiesAcrossAllPhases()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let installer = try l3c3biiSource(
+            "scripts/stornaut-r5-local-lifecycle",
+            repositoryRoot: repositoryRoot
+        )
+        let exactMetadata = l3c3biiFlattened(try l3c3biiFunction(
+            "exact_file_metadata",
+            in: installer
+        ))
+        let identity = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_closed_executable_identity",
+            in: installer
+        ))
+        let artifact = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_closed_executable_artifact",
+            in: installer
+        ))
+        let closedApp = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_closed_app_artifacts",
+            in: installer
+        ))
+        let built = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_built_app",
+            in: installer
+        ))
+        let installed = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_installed_artifacts",
+            in: installer
+        ))
+        let bundlePermissions = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_bundle_permissions",
+            in: installer
+        ))
+        let install = l3c3biiFlattened(try l3c3biiFunction(
+            "install",
+            in: installer
+        ))
+
+        for marker in [
+            "/usr/bin/codesign -d --verbose=4",
+            "Identifier=",
+            "CDHash=",
+            "/usr/bin/codesign -d -r-",
+            "designated => cdhash H",
+            "/usr/bin/shasum -a 256",
+            "com.eriklee.stornaut.investigation.machine-driver",
+            "$machine_claim_service",
+        ] {
+            #expect(identity.contains(marker))
+        }
+        for marker in [
+            "exact_file_metadata",
+            "/usr/bin/stat -f '%z'",
+            "/usr/bin/lipo -archs",
+            "/usr/bin/codesign --verify --strict",
+            "validate_closed_executable_identity",
+        ] {
+            #expect(artifact.contains(marker))
+        }
+        #expect(artifact.components(
+            separatedBy: "/usr/bin/stat -f '%d:%i'"
+        ).count >= 3)
+        for source in [exactMetadata, bundlePermissions] {
+            #expect(source.contains("/bin/ls -lde"))
+            #expect(source.contains("acl_listing"))
+            #expect(source.contains("!= *$'\\n'*"))
+        }
+        #expect(install.contains("/bin/chmod -RN \"$staging_app\""))
+
+        for product in [
+            "StornautInvestigationDiagnostic",
+            "StornautLifecycleHelper",
+            "StornautInvestigationMachineDriver",
+            "StornautInvestigationMachineGate",
+            "StornautInvestigationMachineGateCoordinator",
+        ] {
+            #expect(closedApp.contains("Contents/MacOS/\(product)"))
+        }
+        for identifier in [
+            "com.eriklee.stornaut",
+            "com.eriklee.stornaut.lifecycle.helper",
+            "com.eriklee.stornaut.investigation.machine-driver",
+            "com.eriklee.stornaut.investigation.machine-gate",
+            "com.eriklee.stornaut.investigation.machine-gate-coordinator",
+        ] {
+            #expect(closedApp.contains(identifier))
+        }
+        for identity in [
+            "appIdentity={", "helperIdentity={",
+            "machineDriverIdentity={", "machineGateIdentity={",
+            "machineCoordinatorIdentity={",
+        ] {
+            #expect(installer.contains(identity))
+        }
+
+        #expect(built.contains("validate_closed_app_artifacts"))
+        #expect(installed.contains("validate_closed_app_artifacts"))
+        #expect(install.contains("built_closed_artifact_identity="))
+        #expect(install.components(
+            separatedBy: "$built_closed_artifact_identity"
+        ).count >= 3)
+        #expect(install.contains(
+            "validate_closed_app_artifacts \"$staging_app\""
+        ))
+        #expect(install.contains(
+            "validate_installed_artifacts \"$built_closed_artifact_identity\""
+        ))
+        try l3c3biiRequireOrder(
+            [
+                "built_closed_artifact_identity=",
+                "validate_built_app",
+                "/usr/bin/ditto --noqtn",
+                "/bin/chmod -RN \"$staging_app\"",
+                "validate_bundle_permissions \"$staging_app\"",
+                "validate_closed_app_artifacts \"$staging_app\"",
+                "/bin/mv -n \"$staging_app\" \"$installed_app\"",
+                "validate_installed_artifacts \"$built_closed_artifact_identity\"",
+                "/bin/launchctl bootstrap system \"$installed_plist\"",
+                "validate_installed_state",
+                "lifecycle.local.install=complete",
+            ],
+            in: install
+        )
+    }
+
+    @Test
+    func l3c3biiValidationOnlyActionIsTokenBoundPathConfinedAndReadOnly()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let installer = try l3c3biiSource(
+            "scripts/stornaut-r5-local-lifecycle",
+            repositoryRoot: repositoryRoot
+        )
+        let token =
+            "I authorize one bounded disposable read-only Stornaut "
+            + "L3c3b-ii Machine driver validation."
+        let firstFunction = try #require(installer.range(
+            of: "\nexact_file_metadata() {"
+        ))
+        let preamble = String(installer[..<firstFunction.lowerBound])
+        #expect(preamble.contains(
+            "machine_driver_validation_token=\"\(token)\""
+        ))
+
+        let actionCaseStart = try #require(installer.range(
+            of: "case \"$action\" in"
+        ))
+        let actionCaseSuffix = installer[actionCaseStart.lowerBound...]
+        let actionCaseEnd = try #require(actionCaseSuffix.range(
+            of: "\nesac"
+        ))
+        let actionCase = String(
+            actionCaseSuffix[..<actionCaseEnd.upperBound]
+        )
+        for unchanged in [
+            "status) status ;;",
+            "install) install ;;",
+            "uninstall) uninstall ;;",
+        ] {
+            #expect(actionCase.contains(unchanged))
+        }
+
+        let arm = l3c3biiFlattened(try l3c3biiCaseArm(
+            "validate-machine-driver",
+            in: installer
+        ))
+        #expect(arm.contains("[[ $# == 6 ]]") || arm.contains("(( $# == 6 ))"))
+        #expect(arm.contains(
+            "validate_closed_artifact_fixtures \"$2\" \"$3\" "
+                + "\"$4\" \"$5\" \"$6\""
+        ))
+
+        let exactMetadata = try l3c3biiFunction(
+            "exact_file_metadata",
+            in: installer
+        )
+        let identity = try l3c3biiFunction(
+            "validate_closed_executable_identity",
+            in: installer
+        )
+        let artifact = try l3c3biiFunction(
+            "validate_closed_executable_artifact",
+            in: installer
+        )
+        let fixtures = l3c3biiFlattened(try l3c3biiFunction(
+            "validate_closed_artifact_fixtures",
+            in: installer
+        ))
+        #expect(fixtures.contains(
+            "[[ \"$token\" == \"$machine_driver_validation_token\" ]]"
+        ))
+        for path in [
+            "temporary_root",
+            "built_app",
+            "staging_app",
+            "installed_app",
+        ] {
+            #expect(fixtures.contains("[[ \"$\(path)\" == /* ]]"))
+            #expect(fixtures.contains(
+                "canonical_\(path)=$(/bin/realpath \"$\(path)\")"
+            ))
+        }
+        for app in ["built_app", "staging_app", "installed_app"] {
+            #expect(fixtures.contains(
+                "[[ \"$canonical_\(app)\" == "
+                    + "\"$canonical_temporary_root/\"* ]]"
+            ))
+        }
+        for pair in [
+            ("built_app", "staging_app"),
+            ("built_app", "installed_app"),
+            ("staging_app", "installed_app"),
+        ] {
+            #expect(fixtures.contains(
+                "[[ \"$canonical_\(pair.0)\" != "
+                    + "\"$canonical_\(pair.1)\" ]]"
+            ))
+        }
+        #expect(fixtures.components(
+            separatedBy: "validate_closed_app_artifacts"
+        ).count == 4)
+        #expect(fixtures.contains("built_closed_artifact_identity"))
+
+        let validationOnlySource =
+            exactMetadata + identity + artifact + fixtures + arm
+        for forbidden in [
+            "launchctl",
+            "mkdir",
+            "chown",
+            "chmod",
+            "ditto",
+            "/bin/mv",
+            "/bin/rm",
+            "/usr/bin/install",
+            "/Library/",
+            "/private/var/",
+            "posix_spawn",
+            "exec ",
+            "eval ",
+            "xargs",
+        ] {
+            #expect(!validationOnlySource.contains(forbidden))
+        }
+        let directDriverExecution = try NSRegularExpression(
+            pattern:
+                #"(?m)^[ \t]*"?\$(?:\{)?(?:driver|machine_driver)(?:\})?"?[ \t]*(?:$|[;&|])"#
+        )
+        #expect(directDriverExecution.firstMatch(
+            in: validationOnlySource,
+            range: NSRange(
+                validationOnlySource.startIndex...,
+                in: validationOnlySource
+            )
+        ) == nil)
+    }
+
+    @Test
+    func l3c3biiReleaseAndContractGatesFreezeDisposableValidation()
+        throws
+    {
+        let repositoryRoot = URL(filePath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let release = try l3c3biiSource(
+            "scripts/verify-app-release-boundaries",
+            repositoryRoot: repositoryRoot
+        )
+        let verifier = try l3c3biiSource(
+            "scripts/verify-contract",
+            repositoryRoot: repositoryRoot
+        )
+        let token =
+            "I authorize one bounded disposable read-only Stornaut "
+            + "L3c3b-ii Machine driver validation."
+        let matrix = try l3c3biiFunction(
+            "verify_closed_machine_tool_disposable_matrix",
+            in: release
+        )
+        let matrixLowercase = matrix.lowercased()
+        #expect(matrix.contains(token))
+        #expect(matrix.contains("mktemp -d"))
+        #expect(matrix.contains("trap"))
+        #expect(matrix.components(
+            separatedBy: "validate-machine-driver"
+        ).count >= 6)
+        for marker in [
+            "positive",
+            "wrong-token",
+            "outside-root",
+            "duplicate-app",
+            "identity-mismatch",
+            "acl-mismatch",
+            "missing-gate",
+            "swapped-gate-coordinator",
+            "hardlinked-coordinator",
+            "symlinked-gate",
+            "wrong-mode-gate",
+            "wrong-signature-gate",
+            "mutation-before-move",
+            "mutation-before-bootstrap",
+        ] {
+            #expect(matrixLowercase.contains(marker))
+        }
+        for marker in [
+            "temporary_root",
+            "built_app",
+            "staging_app",
+            "installed_app",
+        ] {
+            #expect(matrix.contains(marker))
+        }
+        for forbidden in [
+            " launchctl",
+            " install ;;",
+            " uninstall ;;",
+            " stornaut-r5-local-lifecycle install",
+            " stornaut-r5-local-lifecycle uninstall",
+        ] {
+            #expect(!matrix.contains(forbidden))
+        }
+
+        let contractStart = try #require(verifier.range(
+            of: "function verify_iica_contract() {"
+        ))
+        let contractEnd = try #require(verifier.range(
+            of: "\nfunction verify_iica_legacy_current_tree_contract() {",
+            range: contractStart.upperBound..<verifier.endIndex
+        ))
+        let contract = String(
+            verifier[contractStart.lowerBound..<contractEnd.lowerBound]
+        )
+        for marker in [
+            "81f185c1278e0f80a3a5de856d0b8cb93c810272",
+            "7cf4db75a261895ba0c86b6876623daf900bb4db",
+            "--iic-a-contract-only",
+            "--iic-a-staged-scope-contract-only",
+            "ii-c-a historical replay failed",
+        ] {
+            #expect(contract.contains(marker))
+        }
+        #expect(matrix.contains("acl-mismatch"))
+        #expect(matrix.contains(token))
+        #expect(!contract.contains("reject_before("))
+        #expect(!contract.contains(
+            "installer admitted the Machine driver before L3c3b-ii"
+        ))
+    }
+}

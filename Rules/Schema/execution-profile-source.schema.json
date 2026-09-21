@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stornaut.dev/schemas/execution-profile-source-v1.json",
+  "title": "Stornaut Execution Profile Source v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "ruleCatalogVersion",
+    "profiles"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogVersion": {
+      "const": "safe-execution-v1"
+    },
+    "ruleCatalogVersion": {
+      "const": "builtin-runtime-tool-residue-v2"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ruleID",
+        "relativePath",
+        "expectedKind",
+        "resolverBindings",
+        "processSubjects",
+        "defaultSuggestion",
+        "fixtureIDs"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/token"
+        },
+        "ruleID": {
+          "enum": [
+            "cache-go-build",
+            "cache-npm-content",
+            "cache-pip"
+          ]
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "expectedKind": {
+          "const": "directory"
+        },
+        "resolverBindings": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "resolver"
+            ],
+            "properties": {
+              "key": {
+                "$ref": "#/$defs/token"
+              },
+              "resolver": {
+                "enum": [
+                  "compilerAttested",
+                  "currentFilesystem",
+                  "currentActivity"
+                ]
+              }
+            }
+          }
+        },
+        "processSubjects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bundleIdentifiers",
+            "exactNames",
+            "versionedFamilies"
+          ],
+          "properties": {
+            "bundleIdentifiers": {
+              "const": []
+            },
+            "exactNames": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32,
+                "pattern": "^[a-z]+$"
+              }
+            },
+            "versionedFamilies": {
+              "type": "array",
+              "maxItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "python",
+                  "pip"
+                ]
+              }
+            }
+          }
+        },
+        "defaultSuggestion": {
+          "enum": [
+            "readyWhenEligible",
+            "never"
+          ]
+        },
+        "fixtureIDs": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/token"
+          }
+        }
+      }
+    }
+  }
+}

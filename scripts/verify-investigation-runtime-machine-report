@@ -1,0 +1,1985 @@
+#!/bin/zsh -f
+set -euo pipefail
+typeset -r iicc_self_sha=81bfad86da4aa4d1b4991cad129e1da07b6eedabdcf1708f6581585744674a14 # iicc-self-seal
+if [[ $0 != /dev/fd/9 ]]; then
+    self=${0:A}
+    [[ -f $self && ! -L $self ]] || exit 2
+    exec 9<"$self"
+    exec /bin/zsh -f /dev/fd/9 "$@"
+fi
+
+[[ $# == 2 ]] || {
+    print -u2 "manifest requires an exact external seal"
+    print -u2 "Usage: scripts/verify-investigation-runtime-machine-report <evidence-root> <seal.json>"
+    exit 2
+}
+
+exec /usr/bin/python3 -I - "$1" "$2" "$iicc_self_sha" 9 <<'PY'
+import ctypes
+import base64
+import errno
+import fcntl
+import hashlib
+import json
+import os
+import pwd
+import re
+import select
+import stat
+import struct
+import sys
+import uuid
+
+if sys.flags.optimize != 0:
+    raise SystemExit("optimized Python execution is not admitted")
+
+MAGIC = 0x53544E43
+VERSION = 1
+MAX_DOMAIN = 64
+MAX_MANIFEST = 512 << 10
+MAX_ARTIFACTS = 256
+MAX_ARTIFACT = 16 << 20
+MAX_TOTAL = 64 << 20
+MAX_EVENT = 4_608
+MAX_EVENT_PAYLOAD = 4_096
+MAX_RECEIPT = 4_096
+MAX_CAPSULE = 1_069_056
+MAX_EPOCH = 256 << 10
+MAX_BUNDLE = 3 << 20
+PRESERVED_GATE_ATTEMPT = "18a85048-5e1c-40c5-99e4-3785185070d3"
+PRESERVED_GATE_WHOLE = "a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104"
+PRESERVED_GATE_SIZE = 28_997
+PRESERVED_GATE_SHA256 = "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72"
+PRESERVED_V13_ATTEMPT = "a77c4d21-9bba-46f6-b694-3d1d1e55209d"
+PRESERVED_V13_WHOLE = "c484b8c14a5e70a4ee4364584013f864af30738c52494ebb727ac4fb326dfdc0"
+PRESERVED_V13_SIZE = 28_997
+PRESERVED_V13_SHA256 = "1567a7fc8f13da51b69c134bb79ac132d383ae30496bb5ae86674ac3fa9f8a17"
+PRESERVED_V16_ATTEMPT = "fa83c861-a7e2-4903-bf64-9eb08c757f74"
+PRESERVED_V16_WHOLE = "4aa74ea388fef92d833a4d3af5a191231d79ab4f8ede35348589662ce9b38e0a"
+PRESERVED_V16_SIZE = 29_029
+PRESERVED_V16_SHA256 = "0858c551d0741e066e46e79b5317fb19da11c32a4064b3ef49e7e0377e5f2f1a"
+ROOT_DRIVER_CLAIM_BYTES = 1_006
+DRIVER_COMPLETION_V3_BYTES = 180
+FIXED_DRIVER_PATH = ("/Library/Application Support/Stornaut/"
+    "Stornaut-R5-Diagnostic.app/Contents/MacOS/"
+    "StornautInvestigationMachineDriver")
+FIXED_DRIVER_SIGNING_ID = "com.eriklee.stornaut.investigation.machine-driver"
+SCENARIOS = ("success", "cancellation", "timeout", "invalidEnvelope",
+    "identityMismatch", "transportLoss", "lifecycleRecovery", "artifactCleanupFailure")
+ROLE_NAMES = {1: "sourceBuildIdentity", 2: "builtStagingInstalledIdentity",
+              3: "policyProbe", 4: "humanPromptAttestation",
+              5: "noAuthModelNetworkCounters", 8: "epochL2Projection",
+              9: "epochResidueProjection", 10: "uninstallEvidence",
+              11: "globalPostTeardown", 12: "verifierInput"}
+O_NOFOLLOW_ANY = 0x20000000
+O_RESOLVE_BENEATH = 0x00001000
+O_UNIQUE = 0x00002000
+READ_FLAGS = (
+    os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | O_NOFOLLOW_ANY
+    | O_RESOLVE_BENEATH | O_UNIQUE
+)
+DIRECTORY_FLAGS = READ_FLAGS | os.O_DIRECTORY
+ROOT_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NONBLOCK
+ROOT_FLAGS |= O_NOFOLLOW_ANY | O_UNIQUE
+VNODE_IDENTITY = (select.KQ_NOTE_DELETE | select.KQ_NOTE_ATTRIB
+                  | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE)
+VNODE_CONTENT = (VNODE_IDENTITY | select.KQ_NOTE_LINK
+                 | select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND)
+ACL_TYPE_EXTENDED = 0x00000100
+ACL_FIRST_ENTRY = 0
+PHASES = {
+    1: "01-preflight", 2: "02-install", 3: "03-authorization",
+    4: "04-driver-epochs", 5: "05-uninstall", 6: "06-verifier",
+}
+ROLES = {
+    1: (1, 2, "source-build.json"),
+    2: (2, 2, "installed.json"),
+    3: (3, 2, "policy-probe.json"),
+    4: (3, 2, "human-attestation.json"),
+    5: (3, 2, "capability-counts.json"),
+    6: (4, 4, "coordinator-receipt.bin"),
+    7: (4, 3, "diagnostic-output.bin"),
+    8: (4, 2, None),
+    9: (4, 2, None),
+    10: (5, 2, "uninstall.json"),
+    11: (6, 2, "global-post-teardown.json"),
+    12: (6, 2, "verification-input.json"),
+    13: (3, 1, None),
+}
+POST_ARM_ROLES = {6, 7, 8, 9}
+HEX = set("0123456789abcdef")
+libc = ctypes.CDLL(None, use_errno=True)
+libc.flistxattr.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+libc.flistxattr.restype = ctypes.c_ssize_t
+libc.acl_get_fd_np.argtypes = [ctypes.c_int, ctypes.c_int]
+libc.acl_get_fd_np.restype = ctypes.c_void_p
+libc.acl_get_entry.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_void_p)]
+libc.acl_get_entry.restype = ctypes.c_int
+libc.acl_free.argtypes = [ctypes.c_void_p]
+libc.acl_free.restype = ctypes.c_int
+objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+ctypes.CDLL(
+    "/System/Library/Frameworks/Foundation.framework/Foundation",
+    mode=ctypes.RTLD_GLOBAL)
+objc.objc_getClass.argtypes = [ctypes.c_char_p]
+objc.objc_getClass.restype = ctypes.c_void_p
+objc.sel_registerName.argtypes = [ctypes.c_char_p]
+objc.sel_registerName.restype = ctypes.c_void_p
+objc_send = ctypes.cast(objc.objc_msgSend, ctypes.c_void_p).value
+send_id = ctypes.CFUNCTYPE(
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)(objc_send)
+send_void = ctypes.CFUNCTYPE(
+    None, ctypes.c_void_p, ctypes.c_void_p)(objc_send)
+send_data = ctypes.CFUNCTYPE(
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+    ctypes.c_void_p, ctypes.c_ulong)(objc_send)
+send_json = ctypes.CFUNCTYPE(
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+    ctypes.c_ulong, ctypes.POINTER(ctypes.c_void_p))(objc_send)
+send_length = ctypes.CFUNCTYPE(
+    ctypes.c_ulong, ctypes.c_void_p, ctypes.c_void_p)(objc_send)
+
+def selector(name):
+    return objc.sel_registerName(name.encode("ascii"))
+
+class Rejected(Exception):
+    pass
+
+def require(value, message):
+    if not value:
+        raise Rejected(message)
+
+def u16(data):
+    require(len(data) == 2, "invalid u16")
+    return struct.unpack(">H", data)[0]
+
+def u32(data):
+    require(len(data) == 4, "invalid u32")
+    return struct.unpack(">I", data)[0]
+
+def u64(data):
+    require(len(data) == 8, "invalid u64")
+    return struct.unpack(">Q", data)[0]
+
+def i32(data):
+    require(len(data) == 4, "invalid i32")
+    return struct.unpack(">i", data)[0]
+
+def i64(data):
+    require(len(data) == 8, "invalid i64")
+    return struct.unpack(">q", data)[0]
+
+def boolean(data):
+    require(data in (b"\x00", b"\x01"), "invalid bool")
+    return data == b"\x01"
+
+def text(data):
+    try:
+        value = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise Rejected("invalid utf8") from error
+    require(value.encode() == data, "noncanonical utf8")
+    return value
+
+def valid_hex(value, count):
+    return (isinstance(value, str) and len(value) == count
+            and set(value) <= HEX and any(c != "0" for c in value))
+
+def uuid_text(data):
+    require(len(data) == 16 and any(data), "invalid uuid")
+    return str(uuid.UUID(bytes=data))
+
+def field(tag, payload):
+    require(payload, "empty field")
+    return struct.pack(">HI", tag, len(payload)) + payload
+
+def encode_transcript(domain, fields):
+    encoded = struct.pack(">I", MAGIC) + field(0, domain.encode())
+    encoded += field(1, struct.pack(">I", VERSION))
+    for index, payload in enumerate(fields, 2):
+        encoded += field(index, payload)
+    return encoded
+
+def parse_transcript(data, domain, ranges, maximum):
+    require(0 < len(data) <= maximum, "transcript size")
+    offset = 0
+    def take(count):
+        nonlocal offset
+        require(0 <= count <= len(data) - offset, "truncated transcript")
+        value = data[offset:offset + count]
+        offset += count
+        return value
+    require(u32(take(4)) == MAGIC, "transcript magic")
+    def tagged(expected, limits):
+        require(u16(take(2)) == expected, "transcript tag")
+        size = u32(take(4))
+        require(limits[0] <= size <= limits[1], "field size")
+        return take(size)
+    domain_bytes = tagged(0, (1, MAX_DOMAIN))
+    require(all(0 < byte < 0x80 for byte in domain_bytes), "domain ascii")
+    require(domain_bytes == domain.encode(), "domain mismatch")
+    require(u32(tagged(1, (4, 4))) == VERSION, "version mismatch")
+    fields = [tagged(index + 2, limits) for index, limits in enumerate(ranges)]
+    require(offset == len(data), "trailing transcript bytes")
+    require(encode_transcript(domain, fields) == data, "canonical re-encode")
+    return fields
+
+def foundation_json(data):
+    pool = send_id(send_id(
+        objc.objc_getClass(b"NSAutoreleasePool"), selector("alloc")),
+        selector("init"))
+    require(pool, "Foundation autorelease pool")
+    try:
+        buffer = ctypes.create_string_buffer(data)
+        nsdata = send_data(
+            objc.objc_getClass(b"NSData"), selector("dataWithBytes:length:"),
+            ctypes.cast(buffer, ctypes.c_void_p), len(data))
+        require(nsdata, "Foundation input data")
+        error = ctypes.c_void_p()
+        value = send_json(
+            objc.objc_getClass(b"NSJSONSerialization"),
+            selector("JSONObjectWithData:options:error:"), nsdata, 1 << 2,
+            ctypes.byref(error))
+        require(value and not error.value, "Foundation json decode")
+        error = ctypes.c_void_p()
+        encoded = send_json(
+            objc.objc_getClass(b"NSJSONSerialization"),
+            selector("dataWithJSONObject:options:error:"), value,
+            (1 << 1) | (1 << 3), ctypes.byref(error))
+        require(encoded and not error.value, "Foundation json encode")
+        length = send_length(encoded, selector("length"))
+        pointer = send_id(encoded, selector("bytes"))
+        require(length > 0 and pointer, "Foundation json bytes")
+        return ctypes.string_at(pointer, length)
+    finally:
+        send_void(pool, selector("drain"))
+
+def canonical_json(data):
+    def pairs(values):
+        result = {}
+        for key, value in values:
+            require(key not in result, "duplicate json key")
+            result[key] = value
+        return result
+    try:
+        value = json.loads(
+            data.decode("utf-8"), object_pairs_hook=pairs,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                Rejected(f"invalid json constant {value}")))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise Rejected("invalid json") from error
+    require(isinstance(value, dict), "json must be object")
+    require(foundation_json(data) == data, "noncanonical json")
+    return value
+
+def parse_decimal(value, name):
+    require(isinstance(value, str) and value and value.isascii()
+            and value.isdecimal(), f"invalid {name}")
+    require(value == "0" or not value.startswith("0"), f"noncanonical {name}")
+    parsed = int(value)
+    require(0 <= parsed <= (1 << 64) - 1, f"overflow {name}")
+    return parsed
+
+def exact_object(value, keys, name): require(set(value) == set(keys), f"{name} schema")
+def exact_int(value, name, minimum=None):
+    require(type(value) is int, f"{name} integer")
+    if minimum is not None: require(value >= minimum, f"{name} range")
+    return value
+def exact_uuid(value, name):
+    require(isinstance(value, str), f"{name} uuid type")
+    try: parsed = uuid.UUID(value)
+    except ValueError as error: raise Rejected(f"{name} uuid") from error
+    require(parsed.int and str(parsed) == value, f"{name} uuid canonical")
+    return value
+def digest_text(value, name):
+    require(valid_hex(value, 64), f"{name} digest")
+    return value
+def decoded_base64(value, name, maximum=MAX_ARTIFACT):
+    require(isinstance(value, str) and value, f"{name} base64 type")
+    try: decoded = base64.b64decode(value, validate=True)
+    except ValueError as error: raise Rejected(f"{name} base64") from error
+    require(0 < len(decoded) <= maximum
+            and base64.b64encode(decoded).decode() == value, f"{name} base64")
+    return decoded
+def common_json(value, role, manifest):
+    version = exact_int(value["schemaVersion"], "evidence schema")
+    require((version == 1 or role == 11 and version in (2, 3, 4, 5))
+            and value["role"] == ROLE_NAMES[role]
+            and exact_uuid(value["campaignUUID"], "evidence campaign") == manifest["campaign"]
+            and exact_uuid(value["attemptUUID"], "evidence attempt") == manifest["attempt"], "evidence common binding")
+def parse_projection(data):
+    fields = parse_transcript(data,
+        "stornaut.task39.installed-l2.identity-projection",
+        [(16,16),(16,16),(8,8),(32,32),(32,32),(32,32),(1,256),
+         (32,32),(1,256),(32,32),(1,256),(32,32),(20,32),(1,256),(32,32)],
+        2_048)
+    zeroed = list(fields); zeroed[14] = bytes(32)
+    require(hashlib.sha256(encode_transcript("stornaut.task39.installed-l2.identity-projection", zeroed)).digest() == fields[14], "projection self hash")
+    require(i64(fields[2]) > 0 and uuid_text(fields[0]) != uuid_text(fields[1])
+            and len(fields[12]) in (20,32)
+            and text(fields[6]) == "com.eriklee.stornaut"
+            and text(fields[8]) == "com.eriklee.stornaut.lifecycle"
+            and text(fields[10]) == "com.eriklee.stornaut.investigation.machine-driver"
+            and text(fields[13]) == "com.eriklee.stornaut.lifecycle.machine-claim",
+            "projection semantics")
+    return {"epoch":uuid_text(fields[0]),"nonce":uuid_text(fields[1]),"validBefore":i64(fields[2]),
+        "configuration":fields[3].hex(),"signed":fields[4].hex(),"app":fields[5].hex(),"helper":fields[7].hex(),
+        "driver":fields[9].hex(),"appID":text(fields[6]),"helperID":text(fields[8]),"driverID":text(fields[10]),
+        "driverRequirement":fields[11],"driverCodeHash":fields[12],"sha":fields[14].hex(),"raw":data}
+def parse_epoch_descriptor(data):
+    fields = parse_transcript(data, "stornaut.task39.l3c3cii.cohort.epoch", [(4,4),(16,16),(4,4),(16,16),(4,4),(32,32),(32,32),(1,65536)], 66_048)
+    ordinal, scenario = u32(fields[0]), u32(fields[2])
+    epoch, nonce = uuid_text(fields[1]), uuid_text(fields[3])
+    require(ordinal < 8 and scenario == ordinal + 1 and epoch != nonce
+            and u32(fields[4]) == len(fields[7])
+            and hashlib.sha256(fields[7]).digest() == fields[5], "cohort epoch")
+    return {"ordinal":ordinal,"scenario":scenario,"epoch":epoch,"nonce":nonce,
+        "configuration":fields[5],"signed":fields[6],"raw":data}
+def parse_capsule(data):
+    fields = parse_transcript(data, "stornaut.task39.l3c3cii.cohort", [(16,16),(4,4),(32,32)]+[(1,66_048)]*8, 1_048_576)
+    require(u32(fields[1]) == 8, "capsule count")
+    zeroed = list(fields); zeroed[2] = bytes(32)
+    require(hashlib.sha256(encode_transcript("stornaut.task39.l3c3cii.cohort", zeroed)).digest() == fields[2], "capsule self hash")
+    epochs = [parse_epoch_descriptor(value) for value in fields[3:]]
+    require([value["ordinal"] for value in epochs] == list(range(8))
+            and [value["scenario"] for value in epochs] == list(range(1,9))
+            and len({uuid_text(fields[0])} | {value["epoch"] for value in epochs}
+                    | {value["nonce"] for value in epochs}) == 17, "capsule identities")
+    return {"attempt":uuid_text(fields[0]),"sha":fields[2],"epochs":epochs,"raw":data}
+
+def parse_projected_input(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.l3c3cii.projected-cohort-input",
+        [(1,MAX_CAPSULE),(4,4),(32,32)] + [(1,2_048)]*8, MAX_CAPSULE)
+    require(u32(fields[1]) == 8, "projected input count")
+    zeroed = list(fields); zeroed[2] = bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.l3c3cii.projected-cohort-input", zeroed)).digest()
+        == fields[2], "projected input self hash")
+    capsule = parse_capsule(fields[0])
+    projections = [parse_projection(value) for value in fields[3:]]
+    selections = []
+    for epoch, projection in zip(capsule["epochs"], projections):
+        require(epoch["epoch"] == projection["epoch"]
+                and epoch["nonce"] == projection["nonce"]
+                and epoch["configuration"].hex() == projection["configuration"]
+                and epoch["signed"].hex() == projection["signed"],
+                "projected selection")
+        selections.append({"attempt":capsule["attempt"],
+            "capsule":capsule["sha"],"whole":fields[2],
+            "epoch":epoch,"projection":projection})
+    return {"capsule":capsule,"whole":fields[2],
+        "projections":projections,"selections":selections,"raw":data}
+def parse_process_identity(data, expected_role=None):
+    fields = parse_transcript(data, "stornaut.task39.machine-claim.process-identity", [(1,1),(4,4),(4,4),(4,4),(4,4),(32,32)], 1_024)
+    role = fields[0][0]; require(role in (1,2), "process role")
+    pid, version, session, user = map(u32, fields[1:5])
+    words = struct.unpack(">8I", fields[5])
+    require(pid > 1 and version > 0 and session > 0
+            and user == (501 if role == 1 else 0)
+            and words[1] == user and words[5] == pid
+            and words[6] == session and words[7] == version
+            and (expected_role is None or role == expected_role), "process identity")
+    helper = None
+    if role == 2:
+        helper = hashlib.sha256(encode_transcript("stornaut.task39.machine-claim.helper-identity",
+            [struct.pack(">I",value) for value in (pid,version,session,user,*words)])).digest()
+    return {"role":role,"pid":pid,"version":version,"session":session,"user":user,"raw":data,"sha":helper}
+def parse_claim(data):
+    fields = parse_transcript(data, "stornaut.task39.machine-claim.evidence", [(32,32),(16,16),(16,16),(1,1024),(1,1024),(4,4),(8,8),(8,8),(1,512),(1,1024),(8,8)], 4_096)
+    app, helper = parse_process_identity(fields[3], 1), parse_process_identity(fields[4], 2)
+    retirement = parse_transcript(fields[8], "stornaut.task39.machine-claim.owner-retirement", [(1,1)]*4, 512)
+    require(retirement == [b"\x02",b"\x01",b"\x01",b"\x01"], "owner retirement")
+    residue = parse_transcript(fields[9], "stornaut.task39.machine-claim.l1-residue",
+        [(16,16),(4,4),(4,4),(8,8),(4,4),(4,4),(4,4),(4,4)], 1_024)
+    observed, recorded, claimed = i64(residue[3]), i64(fields[6]), i64(fields[7])
+    require(any(fields[0]) and u32(fields[5]) == 501
+            and app["user"] == 501 and helper["user"] == 0
+            and app["pid"] != helper["pid"]
+            and u32(residue[1]) == helper["session"] and u32(residue[2]) == 501
+            and all(u32(value) == 0 for value in residue[4:])
+            and observed > 0 and observed <= recorded <= claimed and u64(fields[10]) > 0,
+            "claim evidence")
+    return {"request":fields[0],"challenge":uuid_text(fields[1]),"connection":uuid_text(fields[2]),
+        "app":app,"helper":helper,"nonce":uuid_text(residue[0]),"observed":observed,"recorded":recorded,
+        "claimed":claimed,"release":u64(fields[10]),"raw":data}
+def parse_resolved_root_driver_claim(data):
+    path_size=len(FIXED_DRIVER_PATH.encode()); signing_size=len(FIXED_DRIVER_SIGNING_ID.encode())
+    ranges=[(16,16),(32,32),(4,4),(4,4),(8,8),(4,4),(4,4),(4,4),(4,4),(4,4),
+        (32,32),(4,4),(4,4),(4,4),(4,4),(4,4),(4,4),(4,4),(64,64),
+        (path_size,path_size),(8,8),(8,8),(4,4),(1,1),(4,4),(4,4),(4,4),
+        (8,8),(8,8),(4,4),(32,32),(signing_size,signing_size),(32,32),
+        (4,4),(32,32),(1,1),(signing_size,signing_size),(32,32),(4,4),
+        (32,32),(1,1),(8,8),(32,32)]
+    require(len(data)==ROOT_DRIVER_CLAIM_BYTES, "resolved root-driver claim size")
+    f=parse_transcript(data,"stornaut.task39.resolved-root-driver-claim-v1",
+        ranges,ROOT_DRIVER_CLAIM_BYTES)
+    pid,version=u32(f[2]),u32(f[3]); ruid,euid,suid=map(u32,f[11:14])
+    rgid,egid,sgid=map(u32,f[14:17]); asid=u32(f[9]); token=struct.unpack(">8I",f[10])
+    group_count=u32(f[17]); groups=struct.unpack(">16I",f[18])
+    require(pid>1 and version>0 and i64(f[4])>0 and 0<=i32(f[5])<=999_999
+        and u32(f[6])>0 and u32(f[7])>1 and u32(f[8])>0 and asid>0,
+        "resolved root-driver process")
+    require((ruid,euid,suid,rgid,egid,sgid)==(0,0,0,0,0,0)
+        and token[1:]==(euid,egid,ruid,rgid,pid,asid,version),
+        "resolved root-driver credentials")
+    admitted_groups=groups[:group_count]
+    require(1<=group_count<=16 and groups[group_count:]==(0,)*(16-group_count)
+        and tuple(sorted(set(admitted_groups)))==admitted_groups and 0 in admitted_groups,
+        "resolved root-driver groups")
+    require(text(f[19])==FIXED_DRIVER_PATH and u64(f[20])>0 and u64(f[21])>0
+        and boolean(f[23]) and u32(f[24])==u32(f[25])==0 and u32(f[26])==0o755
+        and u64(f[27])==1 and 1<=i64(f[28])<=16<<20 and u32(f[29])==0
+        and any(f[30]), "resolved root-driver executable")
+    def signing(start):
+        count=u32(f[start+2]); padded=f[start+3]
+        require(text(f[start])==FIXED_DRIVER_SIGNING_ID and any(f[start+1])
+            and count in (20,32) and any(padded[:count])
+            and padded[count:]==bytes(32-count) and boolean(f[start+4]),
+            "resolved root-driver signing")
+        return {"identifier":text(f[start]),"requirement":f[start+1],
+            "codeHash":padded[:count],"isAdHoc":boolean(f[start+4])}
+    static,live=signing(31),signing(36)
+    require(static==live and u64(f[41])>0 and any(f[42]),
+        "resolved root-driver stable identity")
+    zeroed=list(f);zeroed[42]=bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.resolved-root-driver-claim-v1",zeroed)).digest()==f[42],
+        "resolved root-driver claim self hash")
+    return {"attempt":uuid_text(f[0]),"whole":f[1],"pid":pid,
+        "selfSHA":f[42],"raw":data,"executable":{"sha":f[30],
+        "signingIdentifier":static["identifier"],
+        "designatedRequirement":static["requirement"],
+        "codeDirectoryHash":static["codeHash"],
+        "isAdHoc":static["isAdHoc"]}}
+def validate_json_artifacts(manifest, contents):
+    values, epochs = {}, {}
+    common = {"schemaVersion","role","campaignUUID","attemptUUID"}
+    for entry in manifest["entries"]:
+        role = entry["role"]
+        if role not in ROLE_NAMES: continue
+        value = canonical_json(contents[entry["path"]]); common_json(value, role, manifest)
+        values.setdefault(role, []).append((entry, value))
+        if role == 1:
+            exact_object(value, common | {"repositoryHEAD","repositoryTree","canonicalSourceManifestSHA256","buildProvenanceSHA256","signedRuntimeBindingSHA256","preArmFrameSHA256"}, "source")
+            require(value["repositoryHEAD"] == manifest["head"]
+                    and value["repositoryTree"] == manifest["tree"]
+                    and digest_text(value["canonicalSourceManifestSHA256"], "source manifest") == manifest["source"].hex()
+                    and digest_text(value["buildProvenanceSHA256"], "build") == manifest["build"].hex()
+                    and digest_text(value["signedRuntimeBindingSHA256"], "signed") == manifest["signed"].hex(), "source binding")
+            digest_text(value["preArmFrameSHA256"], "pre-arm")
+        elif role == 2:
+            executables = {"appExecutableSHA256","helperExecutableSHA256","machineDriverExecutableSHA256","gateExecutableSHA256","coordinatorExecutableSHA256"}
+            exact_object(value, common | {"buildProvenanceSHA256","signedRuntimeBindingSHA256","transactionReceiptSHA256","builtIdentitySHA256","stagingIdentitySHA256","installedIdentitySHA256","plistSHA256","serviceLoaded"} | executables, "install")
+            identities = [digest_text(value[n], n) for n in ("builtIdentitySHA256","stagingIdentitySHA256","installedIdentitySHA256")]
+            require(len(set(identities)) == 1 and value["serviceLoaded"] is True and value["buildProvenanceSHA256"] == manifest["build"].hex() and value["signedRuntimeBindingSHA256"] == manifest["signed"].hex(), "install binding")
+            digest_text(value["transactionReceiptSHA256"], "install receipt"); digest_text(value["plistSHA256"], "plist")
+            for name in executables: digest_text(value[name], name)
+        elif role == 3:
+            exact_object(value, common | {"command","exitStatus","stdoutByteCount","stdoutSHA256","stderrByteCount","stderrSHA256"}, "policy probe")
+            require(value["command"] == "/usr/bin/sudo -knv" and exact_int(value["exitStatus"], "probe status") != 0, "policy probe result")
+            for n in ("stdoutByteCount","stderrByteCount"): exact_int(value[n], n, 0)
+            for n in ("stdoutSHA256","stderrSHA256"): digest_text(value[n], n)
+        elif role == 4:
+            exact_object(value, common | {"prompt","machinePromptObserved","attestationKind","humanActionObserved","credentialRetainedByteCount"}, "attestation")
+            require(value["prompt"] == "Stornaut Task 39 ii-c administrator authorization: " and type(value["machinePromptObserved"]) is bool and exact_int(value["credentialRetainedByteCount"], "credential bytes") == 0, "attestation fields")
+            expected = {"trustedOperatorInteractiveAction": (True, True),
+                        "operatorCancellationBeforeCredential": (None, False)}
+            require(value["attestationKind"] in expected and type(value["humanActionObserved"]) is bool, "attestation kind")
+            prompt, human = expected[value["attestationKind"]]
+            require(value["humanActionObserved"] is human and (prompt is None or value["machinePromptObserved"] is prompt), "attestation semantics")
+        elif role == 5:
+            exact_object(value, common | {"authInvocationCount","modelInvocationCount","networkInvocationCount","credentialTranscriptByteCount"}, "counters")
+            require(all(exact_int(value[n], n) == 0 for n in set(value)-common), "nonzero capability counter")
+        elif role in (8, 9):
+            ordinal = exact_int(value["ordinal"], "epoch ordinal")
+            require(1 <= ordinal <= 8 and value["scenario"] == SCENARIOS[ordinal-1] and entry["leaf"] == f"epoch-{ordinal:02d}-" + ("l2.json" if role == 8 else "residue.json"), "epoch path")
+            exact_uuid(value["epochUUID"], "epoch uuid"); epochs.setdefault(ordinal, {})[role] = (entry, value)
+        elif role == 10:
+            executables = {"appExecutableSHA256","helperExecutableSHA256","machineDriverExecutableSHA256","gateExecutableSHA256","coordinatorExecutableSHA256"}
+            exact_object(value, common | executables | {"transactionReceiptSHA256","installedIdentitySHA256","plistSHA256","bootoutCompleted","installedRootRemoved","installedAppRemoved","plistRemoved","runtimeRootRemoved","leaseRootRemoved"}, "uninstall")
+            digest_text(value["transactionReceiptSHA256"], "uninstall receipt")
+            for name in executables | {"installedIdentitySHA256","plistSHA256"}: digest_text(value[name], name)
+            require(all(value[n] is True for n in {"bootoutCompleted","installedRootRemoved","installedAppRemoved","plistRemoved","runtimeRootRemoved","leaseRootRemoved"}), "uninstall absence")
+        elif role == 11:
+            zeros = {"appProcessCount","helperProcessCount","driverProcessCount","gateProcessCount","coordinatorProcessCount","childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount","gateAttemptEntryCount","gateCapsuleEntryCount"}
+            schema = value["schemaVersion"]
+            preserved = {"preservedGateAttemptEntryCount","preservedGateCapsuleEntryCount","preservedGateAttemptUUID","preservedGateWholeInputSHA256","preservedGateCapsuleByteCount","preservedGateCapsuleSHA256"} if schema in (2, 4) else set()
+            persistent = {"persistentGateRelativePath","persistentGateEntryCount","persistentGateBaseDevice","persistentGateBaseInode","persistentGateBaseGeneration","persistentGateLockDevice","persistentGateLockInode","persistentGateLockGeneration","persistentGateLockByteCount","persistentGateLockExclusive"} if schema in (3, 4, 5) else set()
+            preserved_nodes = {"preservedGateAttemptDevice","preservedGateAttemptInode","preservedGateAttemptGeneration","preservedGateCapsuleDevice","preservedGateCapsuleInode","preservedGateCapsuleGeneration"} if schema == 4 else set()
+            dual_preserved = {"preservedGateAttemptEntryCount","preservedGateCapsuleEntryCount","preservedGateCapsules"} if schema == 5 else set()
+            exact_object(value, common | zeros | preserved | persistent | preserved_nodes | dual_preserved | {"observationReceiptSHA256","serviceAbsent","gateOwnerLockRevalidated"}, "global teardown")
+            require(all(exact_int(value[n], n) == 0 for n in zeros) and value["serviceAbsent"] is True and value["gateOwnerLockRevalidated"] is True, "global teardown values")
+            if value["schemaVersion"] == 2:
+                require(exact_int(value["preservedGateAttemptEntryCount"], "preserved attempt count") == 1
+                    and exact_int(value["preservedGateCapsuleEntryCount"], "preserved capsule count") == 1
+                    and exact_uuid(value["preservedGateAttemptUUID"], "preserved attempt") == PRESERVED_GATE_ATTEMPT
+                    and digest_text(value["preservedGateWholeInputSHA256"], "preserved whole input") == PRESERVED_GATE_WHOLE
+                    and exact_int(value["preservedGateCapsuleByteCount"], "preserved capsule bytes") == PRESERVED_GATE_SIZE
+                    and digest_text(value["preservedGateCapsuleSHA256"], "preserved capsule sha") == PRESERVED_GATE_SHA256, "preserved Gate evidence")
+            elif schema == 3:
+                base_device = parse_decimal(value["persistentGateBaseDevice"], "persistent Gate base device")
+                lock_device = parse_decimal(value["persistentGateLockDevice"], "persistent Gate lock device")
+                require(value["persistentGateRelativePath"] ==
+                    "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
+                    and exact_int(value["persistentGateEntryCount"], "persistent Gate entry count") == 1
+                    and base_device > 0
+                    and parse_decimal(value["persistentGateBaseInode"], "persistent Gate base inode") > 0
+                    and parse_decimal(value["persistentGateBaseGeneration"], "persistent Gate base generation") >= 0
+                    and lock_device == base_device
+                    and parse_decimal(value["persistentGateLockInode"], "persistent Gate lock inode") > 0
+                    and parse_decimal(value["persistentGateLockGeneration"], "persistent Gate lock generation") >= 0
+                    and exact_int(value["persistentGateLockByteCount"], "persistent Gate lock bytes") == 0
+                    and value["persistentGateLockExclusive"] is True,
+                    "persistent Gate evidence")
+            elif schema == 4:
+                base_device = parse_decimal(value["persistentGateBaseDevice"], "persistent Gate base device")
+                require(value["persistentGateRelativePath"] ==
+                    "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
+                    and exact_int(value["persistentGateEntryCount"], "persistent Gate entry count") == 2
+                    and base_device > 0
+                    and parse_decimal(value["persistentGateBaseInode"], "persistent Gate base inode") > 0
+                    and parse_decimal(value["persistentGateBaseGeneration"], "persistent Gate base generation") >= 0
+                    and parse_decimal(value["persistentGateLockDevice"], "persistent Gate lock device") == base_device
+                    and parse_decimal(value["persistentGateLockInode"], "persistent Gate lock inode") > 0
+                    and parse_decimal(value["persistentGateLockGeneration"], "persistent Gate lock generation") >= 0
+                    and exact_int(value["persistentGateLockByteCount"], "persistent Gate lock bytes") == 0
+                    and value["persistentGateLockExclusive"] is True
+                    and exact_int(value["preservedGateAttemptEntryCount"], "preserved attempt count") == 1
+                    and exact_int(value["preservedGateCapsuleEntryCount"], "preserved capsule count") == 1
+                    and exact_uuid(value["preservedGateAttemptUUID"], "preserved attempt") == PRESERVED_V13_ATTEMPT
+                    and digest_text(value["preservedGateWholeInputSHA256"], "preserved whole input") == PRESERVED_V13_WHOLE
+                    and exact_int(value["preservedGateCapsuleByteCount"], "preserved capsule bytes") == PRESERVED_V13_SIZE
+                    and digest_text(value["preservedGateCapsuleSHA256"], "preserved capsule sha") == PRESERVED_V13_SHA256
+                    and parse_decimal(value["preservedGateAttemptDevice"], "preserved attempt device") == base_device
+                    and parse_decimal(value["preservedGateAttemptInode"], "preserved attempt inode") > 0
+                    and parse_decimal(value["preservedGateAttemptGeneration"], "preserved attempt generation") >= 0
+                    and parse_decimal(value["preservedGateCapsuleDevice"], "preserved capsule device") == base_device
+                    and parse_decimal(value["preservedGateCapsuleInode"], "preserved capsule inode") > 0
+                    and parse_decimal(value["preservedGateCapsuleGeneration"], "preserved capsule generation") >= 0,
+                    "preserved persistent Gate evidence")
+            elif schema == 5:
+                base_device = parse_decimal(value["persistentGateBaseDevice"], "persistent Gate base device")
+                expected = (
+                    (PRESERVED_V13_ATTEMPT, PRESERVED_V13_WHOLE,
+                     PRESERVED_V13_SIZE, PRESERVED_V13_SHA256),
+                    (PRESERVED_V16_ATTEMPT, PRESERVED_V16_WHOLE,
+                     PRESERVED_V16_SIZE, PRESERVED_V16_SHA256),
+                )
+                capsules = value["preservedGateCapsules"]
+                require(value["persistentGateRelativePath"] ==
+                    "Library/Application Support/com.eriklee.stornaut.task39-machine-gate"
+                    and exact_int(value["persistentGateEntryCount"], "persistent Gate entry count") == 3
+                    and exact_int(value["preservedGateAttemptEntryCount"], "preserved attempt count") == 2
+                    and exact_int(value["preservedGateCapsuleEntryCount"], "preserved capsule count") == 2
+                    and base_device > 0
+                    and parse_decimal(value["persistentGateBaseInode"], "persistent Gate base inode") > 0
+                    and parse_decimal(value["persistentGateBaseGeneration"], "persistent Gate base generation") >= 0
+                    and parse_decimal(value["persistentGateLockDevice"], "persistent Gate lock device") == base_device
+                    and parse_decimal(value["persistentGateLockInode"], "persistent Gate lock inode") > 0
+                    and parse_decimal(value["persistentGateLockGeneration"], "persistent Gate lock generation") >= 0
+                    and exact_int(value["persistentGateLockByteCount"], "persistent Gate lock bytes") == 0
+                    and value["persistentGateLockExclusive"] is True
+                    and isinstance(capsules, list) and len(capsules) == 2,
+                    "dual preserved persistent Gate evidence")
+                exact_capsule_keys = {"attemptUUID","wholeInputSHA256",
+                    "capsuleByteCount","capsuleSHA256","attemptDevice",
+                    "attemptInode","attemptGeneration","capsuleDevice",
+                    "capsuleInode","capsuleGeneration"}
+                for entry, item in zip(capsules, expected):
+                    exact_object(entry, exact_capsule_keys, "preserved Gate capsule")
+                    require(exact_uuid(entry["attemptUUID"], "preserved attempt") == item[0]
+                        and digest_text(entry["wholeInputSHA256"], "preserved whole input") == item[1]
+                        and exact_int(entry["capsuleByteCount"], "preserved capsule bytes") == item[2]
+                        and digest_text(entry["capsuleSHA256"], "preserved capsule sha") == item[3]
+                        and parse_decimal(entry["attemptDevice"], "preserved attempt device") == base_device
+                        and parse_decimal(entry["attemptInode"], "preserved attempt inode") > 0
+                        and parse_decimal(entry["attemptGeneration"], "preserved attempt generation") >= 0
+                        and parse_decimal(entry["capsuleDevice"], "preserved capsule device") == base_device
+                        and parse_decimal(entry["capsuleInode"], "preserved capsule inode") > 0
+                        and parse_decimal(entry["capsuleGeneration"], "preserved capsule generation") >= 0,
+                        "dual preserved Gate capsule")
+            digest_text(value["observationReceiptSHA256"], "teardown receipt")
+        elif role == 12:
+            exact_object(value, common | {"expectedConsumed","expectedEpochCount","evidenceSetSHA256","verifierExecutableSHA256"}, "verifier input")
+            require(type(value["expectedConsumed"]) is bool
+                    and 0 <= exact_int(value["expectedEpochCount"], "expected epochs") <= 8, "verifier expectation")
+            digest_text(value["evidenceSetSHA256"], "evidence set"); digest_text(value["verifierExecutableSHA256"], "verifier executable")
+    if manifest["summary"]["consumed"]:
+        observed = values[12][0][1]["expectedEpochCount"]
+        require(values[12][0][1]["expectedConsumed"] is True and set(epochs) == set(range(1, observed + 1)), "epoch set")
+        whole = set()
+        for ordinal, pair in epochs.items():
+            require(set(pair) == {8,9}, "epoch role pair")
+            l2entry, l2 = pair[8]; _, residue = pair[9]
+            l2keys = common | {"ordinal","scenario","epochUUID","configurationNonce","configurationSHA256","signedRuntimeBindingSHA256","wholeProjectedInputSHA256","projectionBase64","projectionSHA256","installedL2ProofBase64","installedL2ProofSHA256","claimEvidenceSHA256","physicalOwnershipSHA256"}
+            residuekeys = common | {"ordinal","scenario","epochUUID","l2ArtifactSHA256","helperIdentitySHA256","completionBindingSHA256","terminalEvidenceBase64","terminalEvidenceSHA256","childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount","helperExitObserved","artifactsRetired"}
+            exact_object(l2, l2keys, "epoch l2"); exact_object(residue, residuekeys, "epoch residue")
+            projection = decoded_base64(l2["projectionBase64"], "projection", 2_048); parsed = parse_projection(projection)
+            require(parsed["epoch"] == l2["epochUUID"] and parsed["nonce"] == exact_uuid(l2["configurationNonce"], "configuration nonce") and parsed["configuration"] == digest_text(l2["configurationSHA256"], "configuration") and parsed["signed"] == manifest["signed"].hex() and parsed["sha"] == digest_text(l2["projectionSHA256"], "projection"), "projection binding")
+            require(l2["signedRuntimeBindingSHA256"] == manifest["signed"].hex(),
+                    "projection signed binding")
+            proof = decoded_base64(l2["installedL2ProofBase64"], "installed l2", 16_384)
+            require(hashlib.sha256(proof).hexdigest() == digest_text(l2["installedL2ProofSHA256"], "installed l2"), "installed l2 digest")
+            require(residue["epochUUID"] == l2["epochUUID"] and residue["l2ArtifactSHA256"] == l2entry["sha"].hex(), "l2 residue join")
+            terminal = decoded_base64(residue["terminalEvidenceBase64"], "terminal evidence", 2_048)
+            require(hashlib.sha256(terminal).hexdigest() == digest_text(residue["terminalEvidenceSHA256"], "terminal evidence") and all(exact_int(residue[n], n) == 0 for n in ("childCount","descendantCount","openChannelCount","ownedProcessGroupMemberCount")) and residue["helperExitObserved"] is True and residue["artifactsRetired"] is True, "residue terminal")
+            whole.add(digest_text(l2["wholeProjectedInputSHA256"], "whole input"))
+        require(len(whole) == (1 if observed else 0), "whole input drift")
+    require(values[10][0][1]["transactionReceiptSHA256"] != values[2][0][1]["transactionReceiptSHA256"], "install/uninstall receipt alias")
+    install, uninstall = values[2][0][1], values[10][0][1]
+    identity_names = executables | {"installedIdentitySHA256","plistSHA256"}
+    require(all(install[name] == uninstall[name] for name in identity_names), "install/uninstall identity drift")
+    return values, epochs, values[1][0][1]
+
+def parse_summary(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.iic.attempt-summary.v1",
+        [(16, 16), (4, 4), (4, 4), (1, 1), (4, 4), (32, 32)], 256)
+    attempt = uuid_text(fields[0])
+    mode, outcome = u32(fields[1]), u32(fields[2])
+    consumed, count, final_hash = boolean(fields[3]), u32(fields[4]), fields[5]
+    require(any(final_hash), "zero final event digest")
+    valid = ((mode, outcome, consumed, count) in {
+        (1, 1, False, 2), (2, 1, False, 2),
+        (2, 2, True, 4), (2, 3, True, 4), (2, 4, True, 3),
+    })
+    require(valid, "attempt summary shape")
+    return {"attempt": attempt, "mode": mode, "outcome": outcome,
+            "consumed": consumed, "count": count, "final": final_hash}
+
+def valid_leaf(role, leaf):
+    phase, encoding, fixed = ROLES[role]
+    if fixed is not None:
+        return leaf == fixed
+    if role in (8, 9):
+        suffix = "-l2.json" if role == 8 else "-residue.json"
+        return (leaf.startswith("epoch-") and leaf.endswith(suffix)
+                and len(leaf[6:-len(suffix)]) == 2
+                and leaf[6:-len(suffix)].isdigit()
+                and 1 <= int(leaf[6:-len(suffix)]) <= 8)
+    if role == 13:
+        return (leaf.startswith("attempt-event-") and leaf.endswith(".bin")
+                and len(leaf[14:-4]) == 4 and leaf[14:-4].isdigit()
+                and 1 <= int(leaf[14:-4]) <= 4)
+    return False
+
+def parse_entry(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.iic.raw-evidence-entry.v1",
+        [(1, 128), (4, 4), (4, 4), (4, 4), (8, 8), (32, 32)], 512)
+    path = text(fields[0])
+    require(path.count("/") == 1, "artifact path shape")
+    directory, leaf = path.split("/")
+    phase, role, encoding = u32(fields[1]), u32(fields[2]), u32(fields[3])
+    require(phase in PHASES and directory == PHASES[phase], "artifact phase")
+    require(role in ROLES and ROLES[role][0] == phase, "artifact role phase")
+    require(ROLES[role][1] == encoding and valid_leaf(role, leaf), "artifact role")
+    require(1 <= len(leaf.encode()) <= 96
+            and leaf[0].isalnum() and leaf[-1].isalnum()
+            and all(c.isascii() and (c.isalnum() or c in "._-") for c in leaf)
+            and "pending" not in leaf and leaf != "manifest.bin", "artifact leaf")
+    size, digest = u64(fields[4]), fields[5]
+    require(size <= MAX_ARTIFACT and (size > 0 or role == 7), "artifact size")
+    require(any(digest), "zero artifact digest")
+    return {"path": path, "phase": phase, "leaf": leaf, "role": role,
+            "encoding": encoding, "size": size, "sha": digest}
+
+def parse_manifest(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.iic.raw-evidence-manifest.v1",
+        [(16, 16), (16, 16), (1, 256), (40, 40), (40, 40),
+         (32, 32), (32, 32), (32, 32), (4, 4), (8, 8), (1, MAX_MANIFEST)],
+        MAX_MANIFEST)
+    campaign, attempt = uuid_text(fields[0]), uuid_text(fields[1])
+    require(campaign != attempt, "campaign equals attempt")
+    summary = parse_summary(fields[2])
+    require(summary["attempt"] == attempt, "summary attempt binding")
+    head, tree = text(fields[3]), text(fields[4])
+    require(valid_hex(head, 40) and valid_hex(tree, 40), "source git identity")
+    for digest in fields[5:8]:
+        require(any(digest), "zero source digest")
+    count, total, encoded_entries = u32(fields[8]), u64(fields[9]), fields[10]
+    require(1 <= count <= MAX_ARTIFACTS, "artifact count")
+    entries, offset = [], 0
+    for _ in range(count):
+        require(offset + 4 <= len(encoded_entries), "entry length truncation")
+        size = u32(encoded_entries[offset:offset + 4]); offset += 4
+        require(0 < size <= len(encoded_entries) - offset, "entry size")
+        entries.append(parse_entry(encoded_entries[offset:offset + size])); offset += size
+    require(offset == len(encoded_entries), "entry trailing bytes")
+    paths = [entry["path"] for entry in entries]
+    require(paths == sorted(paths, key=lambda value: value.encode()), "entry ordering")
+    require(len(set(paths)) == len(paths), "duplicate artifact path")
+    require(sum(entry["size"] for entry in entries) == total <= MAX_TOTAL,
+            "artifact total")
+    by_role = {role: [entry for entry in entries if entry["role"] == role]
+               for role in ROLES}
+    for role, values in by_role.items():
+        if summary["consumed"]:
+            expected = summary["count"] if role == 13 else None if role in (6,7,8,9) else 1
+        elif role == 13:
+            expected = 2
+        elif role in POST_ARM_ROLES:
+            expected = 0
+        else:
+            expected = 1
+        if expected is not None: require(len(values) == expected, "role cardinality")
+        elif role in (6,7): require(len(values) <= 1, "role cardinality")
+        else: require(len(values) <= 8, "role cardinality")
+    if summary["consumed"]:
+        l2, residue = by_role[8], by_role[9]
+        require(len(l2) == len(residue), "epoch pair cardinality")
+        require([entry["leaf"] for entry in l2] ==
+                [f"epoch-{i:02d}-l2.json" for i in range(1, len(l2)+1)]
+                and [entry["leaf"] for entry in residue] ==
+                [f"epoch-{i:02d}-residue.json" for i in range(1, len(residue)+1)],
+                "epoch prefix ordering")
+    event_names = [entry["leaf"] for entry in by_role[13]]
+    require(event_names == [f"attempt-event-{i:04d}.bin"
+                            for i in range(1, summary["count"] + 1)],
+            "event names")
+    require(by_role[13][-1]["sha"] == summary["final"], "final event binding")
+    return {"campaign": campaign, "attempt": attempt, "summary": summary,
+            "head": head, "tree": tree, "source": fields[5],
+            "build": fields[6], "signed": fields[7], "entries": entries,
+            "count": count, "total": total, "sha": hashlib.sha256(data).digest()}
+
+def parse_event(data):
+    fields = parse_transcript(
+        data, "stornaut.task39.iic.attempt-event.v1",
+        [(4, 4), (16, 16), (4, 4), (32, 32), (8, 8),
+         (1, MAX_EVENT_PAYLOAD), (32, 32)], MAX_EVENT)
+    sequence, attempt, kind = u32(fields[0]), uuid_text(fields[1]), u32(fields[2])
+    observed, payload = i64(fields[4]), fields[5]
+    require(sequence > 0 and kind in range(1, 7) and observed > 0, "event values")
+    value = canonical_json(payload)
+    names = {1: "prepared", 2: "cancelledBeforeArm", 3: "armedConsumed",
+             4: "spawnObserved", 5: "spawnUncertain", 6: "terminal"}
+    base = {"schemaVersion", "kind", "attemptUUID", "evidenceSetSHA256"}
+    keys = (base | {"processID", "processGroupID", "sessionID"}
+            if kind == 4 else base | {"reason"} if kind in (2, 5) else base)
+    exact_object(value, keys, "event payload")
+    schema = exact_int(value["schemaVersion"], "event schema")
+    require((schema == 1 or kind == 5 and schema in (2, 3))
+            and value["kind"] == names[kind]
+            and exact_uuid(value["attemptUUID"], "event attempt") == attempt
+            and digest_text(value["evidenceSetSHA256"], "event evidence"),
+            "event payload binding")
+    if kind == 4:
+        pid = exact_int(value["processID"], "spawn pid", 2)
+        require(exact_int(value["processGroupID"], "spawn pgid") == pid
+                and exact_int(value["sessionID"], "spawn sid", 2) > 1,
+                "spawn topology")
+    if kind in (2, 5):
+        require(isinstance(value["reason"], str) and value["reason"]
+                and len(value["reason"].encode()) <= (128 if schema == 3 else 96),
+                "event reason")
+    if kind == 5 and schema in (2, 3):
+        primary = ("alreadyConsumed", "bindingInvalid",
+            "deadlineExceeded", "spawnUncertain", "identityMismatch",
+            "receiptInvalid", "diagnosticOverflow", "childTerminated",
+            "exactReapUncertain", "residueUncertain",
+            "transportUncertain", "cancelled", "unexpectedResponse")
+        parts = value["reason"].split("/")
+        expected_parts = 6 if schema == 2 else 7
+        wait = (parts[2] if len(parts) == expected_parts else "")
+        wait_match = re.fullmatch(r"(exited|signaled|stopped)-([0-9]+)", wait)
+        wait_valid = (wait == "wait-unavailable" or wait_match is not None
+            and wait_match.group(2) == str(int(wait_match.group(2)))
+            and (0 <= int(wait_match.group(2)) <= 255
+                if wait_match.group(1) == "exited"
+                else 1 <= int(wait_match.group(2)) <= 31))
+        cleanup_match = (re.fullmatch(r"cleanup-([0-9a-f]{2})", parts[5])
+            if len(parts) == expected_parts else None)
+        cleanup_mask = (int(cleanup_match.group(1), 16)
+                        if cleanup_match is not None else 0x100)
+        wait_failed = cleanup_mask & 0x04 != 0
+        both_eof = (len(parts) == expected_parts
+                    and parts[3] == "receipt-eof"
+                    and parts[4] == "terminal-eof")
+        termination_match = (re.fullmatch(
+            r"termination-(covered|unresolved)-(deadline|posix-([1-9][0-9]{0,2}))",
+            parts[6]) if len(parts) == 7 else None)
+        termination_valid = (schema == 2 or termination_match is not None
+            and (termination_match.group(3) is None
+                 or 1 <= int(termination_match.group(3)) <= 255))
+        covered = (schema == 3 and termination_match is not None
+                   and termination_match.group(1) == "covered")
+        producible = (len(parts) == expected_parts
+            and parts[1] not in ("alreadyConsumed", "bindingInvalid",
+                                 "spawnUncertain")
+            and cleanup_mask & 0x01 == 0
+            and (wait not in ("wait-unavailable",)
+                 and not wait.startswith("stopped-") or wait_failed)
+            and (parts[1] != "exactReapUncertain"
+                 or wait_failed and not wait.startswith("stopped-")
+                 and parts[3] == "receipt-eof"
+                 and parts[4] == "terminal-eof")
+            and (parts[1] not in ("identityMismatch", "childTerminated",
+                                  "exactReapUncertain", "residueUncertain")
+                 or both_eof)
+            and (parts[1] not in ("deadlineExceeded", "cancelled",
+                                  "diagnosticOverflow") or not both_eof)
+            and (parts[1] != "diagnosticOverflow"
+                 or parts[4] == "terminal-open")
+            and (parts[1] != "receiptInvalid"
+                 or parts[3] == "receipt-open" or both_eof)
+            and (parts[1] != "residueUncertain"
+                 or wait == "exited-0" and cleanup_mask in (0x00, 0x10))
+            and (parts[1] != "transportUncertain" or not both_eof
+                 or wait == "exited-0" and cleanup_mask in (0x08, 0x18))
+            and (parts[1] != "unexpectedResponse" or not both_eof
+                 or wait == "exited-0" and cleanup_mask == 0)
+            and (parts[1] != "childTerminated"
+                 or wait != "wait-unavailable"
+                 and (not wait_failed or wait.startswith("stopped-"))))
+        require(len(parts) == expected_parts and parts[0] == "postArmFailure"
+                and parts[1] in primary and wait_valid
+                and parts[3] in ("receipt-open", "receipt-eof")
+                and parts[4] in ("terminal-open", "terminal-eof")
+                and cleanup_match is not None
+                and cleanup_mask <= 0x1f and producible and termination_valid
+                and (schema == 2
+                     or covered and termination_match.group(2) != "deadline"
+                        and cleanup_mask == 0 and both_eof
+                        and (wait.startswith("exited-")
+                             or wait.startswith("signaled-"))
+                     or not covered and cleanup_mask & 0x02 != 0),
+                "closed failure projection reason")
+    require(hashlib.sha256(payload).digest() == fields[6], "event payload digest")
+    return {"sequence": sequence, "attempt": attempt, "kind": kind,
+            "previous": fields[3], "observed": observed, "payload": value,
+            "bytes": data}
+
+def validate_events(entries, contents, summary, attempt):
+    events = [parse_event(contents[entry["path"]])
+              for entry in entries if entry["role"] == 13]
+    require(len(events) == summary["count"], "event count")
+    for index, event in enumerate(events):
+        require(event["sequence"] == index + 1 and event["attempt"] == attempt,
+                "event sequence or attempt")
+        expected_previous = bytes(32) if index == 0 else hashlib.sha256(
+            events[index - 1]["bytes"]).digest()
+        require(event["previous"] == expected_previous, "event chain")
+        if index:
+            require(event["observed"] > events[index - 1]["observed"],
+                    "event time order")
+    kinds = [event["kind"] for event in events]
+    shapes = {(1, 1): [1, 2], (2, 1): [1, 2],
+              (2, 2): [1, 3, 4, 6], (2, 3): [1, 3, 5, 6]}
+    shapes[(2, 4)] = [1, 3, 5]
+    require(kinds == shapes.get((summary["mode"], summary["outcome"])),
+            "event terminal shape")
+    if (len(events) > 2
+            and events[2]["payload"]["schemaVersion"] in (2, 3)):
+        primary = events[2]["payload"]["reason"].split("/")[1]
+        terminal_published = events[-1]["kind"] == 6
+        require((primary == "transportUncertain") != terminal_published,
+                "closed failure terminal-shape binding")
+    require(hashlib.sha256(events[-1]["bytes"]).digest() == summary["final"],
+            "event summary digest")
+    require(len({event["payload"]["evidenceSetSHA256"] for event in events}) == 1,
+            "event evidence set drift")
+    return events
+
+def frames(data):
+    result, offset = [], 0
+    while offset < len(data):
+        require(offset + 4 <= len(data), "frame prefix")
+        size = u32(data[offset:offset+4]); offset += 4
+        require(0 < size <= MAX_ARTIFACT and offset + size <= len(data), "frame size")
+        result.append(data[offset:offset+size]); offset += size
+    require(offset == len(data), "frame trailing bytes")
+    return result
+
+def parse_prearm(data, manifest):
+    fields = parse_transcript(data, "stornaut.task39.iic.coordinator-prearm.v1",
+        [(40,40),(40,40)] + [(32,32)]*3 + [(16,16)]
+        + [(32,32)]*2 + [(1,MAX_CAPSULE),(32,32)], MAX_CAPSULE + 1_024)
+    zeroed = list(fields); zeroed[9] = bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.iic.coordinator-prearm.v1", zeroed)).digest() == fields[9],
+        "pre-arm self hash")
+    require(text(fields[0]) == manifest["head"] and text(fields[1]) == manifest["tree"]
+            and fields[2] == manifest["source"] and fields[3] == manifest["build"]
+            and fields[4] == manifest["signed"] and uuid_text(fields[5]) == manifest["attempt"],
+            "pre-arm source binding")
+    projected = parse_projected_input(fields[8])
+    capsule = projected["capsule"]
+    require(projected["whole"] == fields[7]
+            and capsule["attempt"] == uuid_text(fields[5])
+            and capsule["sha"] == fields[6], "pre-arm capsule binding")
+    return {"capsule":fields[6],"whole":fields[7],"projected":fields[8],
+        "projections":projected["projections"],
+        "selections":projected["selections"],"sha":fields[9]}
+def parse_gate_receipt(data, manifest, prearm):
+    require(len(data) == 422 and data[:4] == b"STNG" and u16(data[4:6]) == 1
+            and data[6:8] == b"\x02\x02" and u32(data[8:12]) == 410,
+            "raw Gate receipt frame")
+    payload, offset = data[12:], 0
+    def take(count):
+        nonlocal offset
+        require(count <= len(payload)-offset, "raw Gate truncation")
+        value=payload[offset:offset+count]; offset+=count; return value
+    def pid(): return i32(take(4))
+    launcher, attempt, whole, prepared = take(32), uuid_text(take(16)), take(32), take(32)
+    capsule = (u64(take(8)),u64(take(8)),u64(take(8)),i64(take(8)))
+    gate, coordinator, session, recovery, saved = (pid(),pid(),pid(),pid(),pid())
+    child = (pid(),pid(),pid(),pid(),u64(take(8)),u64(take(8)))
+    input_node = (u64(take(8)),u64(take(8)),u64(take(8)),i64(take(8)))
+    initial_offset, final_offset, input_eof, input_sha = i64(take(8)),i64(take(8)),boolean(take(1)),take(32)
+    initial_tty=(u64(take(8)),u64(take(8)),pid()); child_tty=(u64(take(8)),u64(take(8)),pid()); final_tty=(u64(take(8)),u64(take(8)),pid())
+    count, digest = u32(take(4)), take(32)
+    overflow, output_eof, expired = boolean(take(1)),boolean(take(1)),boolean(take(1))
+    wait, forwarded = take(5), u32(take(4))
+    started, completed, progression = u64(take(8)),u64(take(8)),take(1)[0]
+    group_empty, child_reaped, restored, borrowed = boolean(take(1)),boolean(take(1)),boolean(take(1)),take(5)
+    prepared_deadline = started + 1_400_000_000_000
+    require(prepared_deadline <= (1 << 64) - 1, "raw Gate prepared deadline")
+    prepared_payload = b"".join(struct.pack(">I",value) for value in
+        (gate,coordinator,session,child[0],recovery,saved,child[1],child[3])) \
+        + struct.pack(">QQI",child[4],child[5],0x7f) + uuid.UUID(attempt).bytes + whole \
+        + struct.pack(">QQQq",*capsule) + struct.pack(">QQI",*initial_tty) + struct.pack(">Q",prepared_deadline)
+    require(len(prepared_payload) == 160, "raw Gate prepared payload")
+    prepared_frame = struct.pack(">IHBBI", 0x53544e47, 1, 1, 1, 160) + prepared_payload
+    require(offset == 410 and any(launcher) and attempt == manifest["attempt"]
+            and whole == prearm["whole"]
+            and prepared == hashlib.sha256(prepared_frame).digest(),
+            "raw Gate identity")
+    require(capsule[0] > 0 and capsule[1] > 0 and 1 <= capsule[3] <= MAX_CAPSULE, "raw Gate capsule")
+    require(gate > 1 and coordinator > 1 and coordinator == session == saved
+            and recovery == gate and saved != recovery, "raw Gate topology")
+    require(all(value > 1 for value in child[:4]) and child[0] != child[2]
+            and child[1] == gate and child[2] == recovery and child[3] == session
+            and child[4] > 0 and child[5] < 1_000_000, "raw Gate child")
+    require(input_node == capsule and initial_offset == 0 and final_offset == capsule[3]
+            and final_offset >= initial_offset and input_eof and input_sha == whole
+            and any(input_sha), "raw Gate input")
+    require(initial_tty[0] > 0 and initial_tty[1] > 0 and initial_tty[2] == saved
+            and child_tty[:2] == initial_tty[:2] and child_tty[2] == recovery
+            and final_tty[:2] == initial_tty[:2] and final_tty[2] == saved,
+            "raw Gate terminal")
+    require(count == 1_190 and any(digest) and not overflow and output_eof
+            and not expired and wait == b"\x01\x00\x00\x00\x00"
+            and forwarded == 0, "raw Gate output")
+    require(started > 0 and started <= completed
+            and completed-started <= 1_400_000_000_000 and progression == 1
+            and group_empty and child_reaped and restored
+            and borrowed == b"\x01\x00\x00\x00\x00", "raw Gate terminal state")
+    return {"gate":launcher,"attempt":attempt,"whole":whole,"prepared":prepared,"capsule":capsule,
+        "pid":gate,"coordinator":coordinator,"saved":saved,"childPID":child[0],"pgid":recovery,
+        "sid":session,"started":started,"completed":completed,"outputCount":count,"outputSHA":digest,
+        "sha":hashlib.sha256(data).digest()}
+def parse_driver_child(data):
+    fields=parse_transcript(data,"stornaut.task39.machine.outer-inner.driver-child",
+        [(4,4)]*6+[(32,32)],1_024)
+    pid,version,parent,group,session,user=map(u32,fields[:6]); words=struct.unpack(">8I",fields[6])
+    require(pid>1 and version>0 and parent>1 and group==pid and session>0 and user==0
+            and words[1]==user and words[2:5]==(0,0,0)
+            and words[5]==pid and words[6]==session and words[7]==version,"driver child")
+    return {"pid":pid,"parent":parent,"group":group,"raw":data}
+def parse_app_child(data):
+    fields=parse_transcript(data,"stornaut.task39.machine.outer-inner.app-child",[(1,1024),(4,4),(4,4)],2_048)
+    identity=parse_process_identity(fields[0],1); parent,group=u32(fields[1]),u32(fields[2])
+    require(parent>1 and group>1,"app child")
+    return {"identity":identity,"parent":parent,"group":group,"raw":data}
+def parse_signing(data):
+    fields=parse_transcript(data,"stornaut.task39.machine.single-epoch.installed-l2-signing",[(1,256),(32,32),(20,32),(1,1)],1_024)
+    identifier=text(fields[0]); require(identifier and all(ord(c)<128 and (c.isalnum() or c in "-._") for c in identifier),"signing")
+    boolean(fields[3])
+    return (identifier,fields[1],fields[2],fields[3])
+def parse_l2_proof(data, selection, claim, app, helper, deadline):
+    f=parse_transcript(data,"stornaut.task39.machine.single-epoch.installed-l2-proof",
+        [(32,32),(32,32),(16,16),(16,16),(8,8),(1,1024),(32,32),(1,1024),(1,1024),(1,1024),(32,32),(1,1024),(1,1024),(32,32),(1,1024),(1,1024),(1,2048),(8,8),(8,8),(8,8),(8,8),(1,1024),(8,8)],16_384)
+    repeated=parse_process_identity(f[21],1); signings=[parse_signing(f[i]) for i in (7,8,11,12,14,15)]
+    start_wall,start_clock,observed_wall,observed_clock=i64(f[17]),u64(f[18]),i64(f[19]),u64(f[20])
+    require(f[0].hex()==selection["projection"]["sha"] and f[1]==hashlib.sha256(claim["raw"]).digest()
+            and uuid_text(f[2])==selection["epoch"]["epoch"] and uuid_text(f[3])==selection["epoch"]["nonce"]
+            and f[4][:6]==b"\x02"*6 and all(value in (1,2) for value in f[4][6:])
+            and f[5]==app["raw"] and f[9]==helper["raw"]
+            and f[6].hex()==selection["projection"]["app"] and f[10].hex()==selection["projection"]["helper"]
+            and f[13].hex()==selection["projection"]["driver"] and f[7]==f[8] and f[11]==f[12] and f[14]==f[15]
+            and f[16]==b"\x02"+helper["raw"] and repeated["raw"]==app["raw"]
+            and start_wall>0 and start_clock>0 and observed_wall>0 and observed_clock>0
+            and start_wall<=observed_wall<selection["projection"]["validBefore"] and start_clock<=observed_clock
+            and claim["claimed"]<=start_wall and observed_clock<claim["release"]<=deadline and u64(f[22])==deadline
+            and signings[0]==signings[1] and signings[2]==signings[3] and signings[4]==signings[5]
+            and signings[0][0]==selection["projection"]["appID"]
+            and signings[2][0]==selection["projection"]["helperID"]+".helper"
+            and signings[4]==(selection["projection"]["driverID"],selection["projection"]["driverRequirement"],selection["projection"]["driverCodeHash"],b"\x01"),"installed L2 proof")
+    return observed_clock
+
+def parse_request(data, selection, previous):
+    fields=parse_transcript(data,"stornaut.task39.machine.outer-inner.epoch-request",[(1,96<<10),(32,32),(8,8),(1,1)],128<<10)
+    mode=2 if selection["epoch"]["scenario"]==7 else 1; successor=selection["epoch"]["ordinal"]>0
+    inv=parse_transcript(fields[0],"stornaut.task39.machine.epoch-invocation.successor" if successor else "stornaut.task39.machine.epoch-invocation.genesis",
+        [(16,16),(32,32),(32,32),(1,66_048),(1,2_048),(1,8_192),(32,32)]+([(1,1024)] if successor else []),96<<10)
+    epoch,projection=parse_epoch_descriptor(inv[3]),parse_projection(inv[4])
+    require(hashlib.sha256(fields[0]).digest()==fields[1] and u64(fields[2])>0 and fields[3]==bytes([mode])
+            and uuid_text(inv[0])==selection["attempt"] and inv[1]==selection["capsule"] and inv[2]==selection["whole"]
+            and epoch["raw"]==selection["epoch"]["raw"] and projection["raw"]==selection["projection"]["raw"]
+            and hashlib.sha256(inv[5]).digest()==inv[6] and any(inv[6]),"epoch request")
+    previous_helper=parse_process_identity(inv[7],2) if successor else None
+    if successor: require(previous is not None and previous_helper["raw"]==previous["helper"]["raw"],"previous helper")
+    return {"raw":data,"sha":hashlib.sha256(data).digest(),"deadline":u64(fields[2]),"mode":mode,"predecessor":inv[5],"predecessorSHA":inv[6],"previousHelper":previous_helper}
+
+def parse_diagnostic(diagnostic):
+    claim_prefix=b"STORNAUT_TASK39_IIC_ROOT_DRIVER_CLAIM_V1 "
+    bundle_prefix=b"STORNAUT_TASK39_IIC_EPOCH_BUNDLE_V1 "
+    require(b"\r" not in diagnostic and diagnostic.count(b"\n")==2
+            and diagnostic.endswith(b"\n"), "driver diagnostic envelope shape")
+    claim_line,bundle_line,empty=diagnostic.split(b"\n")
+    require(not empty and claim_line.startswith(claim_prefix)
+            and bundle_line.startswith(bundle_prefix), "driver diagnostic lines")
+    claim=decoded_base64(claim_line[len(claim_prefix):].decode(),
+        "root driver claim",ROOT_DRIVER_CLAIM_BYTES)
+    bundle=decoded_base64(bundle_line[len(bundle_prefix):].decode(),
+        "driver bundle",MAX_BUNDLE)
+    require(diagnostic==claim_prefix+base64.b64encode(claim)+b"\n"
+        +bundle_prefix+base64.b64encode(bundle)+b"\n",
+        "driver diagnostic canonical envelope")
+    return claim,bundle
+def parse_bundle(bundle, manifest, epochs, prearm):
+    fields = parse_transcript(bundle, "stornaut.task39.machine.driver-evidence-bundle.v1",
+        [(16,16),(32,32),(32,32),(4,4)] + [(1,MAX_EPOCH)]*8, MAX_BUNDLE)
+    require(uuid_text(fields[0]) == manifest["attempt"] and fields[1]==prearm["capsule"]
+            and fields[2]==prearm["whole"] and u32(fields[3]) == 8,
+            "driver bundle identity")
+    verified=[]
+    for ordinal, encoded in enumerate(fields[4:], 1):
+        row = parse_transcript(encoded, "stornaut.task39.machine.epoch-evidence.v1",
+            [(4,4),(4,4),(16,16),(16,16),(1,128<<10),(1,64<<10),(1,2_048),(1,50<<10),(32,32)], MAX_EPOCH)
+        selection=prearm["selections"][ordinal-1]; previous=verified[-1] if verified else None
+        l2, residue = epochs[ordinal][8][1], epochs[ordinal][9][1]
+        require(u32(row[0]) == ordinal-1 and u32(row[1]) == ordinal
+                and uuid_text(row[2]) == l2["epochUUID"]
+                and uuid_text(row[3]) == l2["configurationNonce"]
+                and decoded_base64(l2["projectionBase64"],"projection",2_048)==selection["projection"]["raw"]
+                and l2["configurationSHA256"]==selection["epoch"]["configuration"].hex()
+                and l2["signedRuntimeBindingSHA256"]==selection["epoch"]["signed"].hex()
+                and row[6] == decoded_base64(residue["terminalEvidenceBase64"], "terminal evidence", 2_048),
+                "driver epoch join")
+        request=parse_request(row[4],selection,previous); normal=request["mode"]==1
+        physical=parse_transcript(row[5],"stornaut.task39.machine.epoch-physical-evidence.v1",
+            [(1,32<<10),(1,48<<10)] if normal else [(1,32<<10)],64<<10)
+        ownership = physical[0]
+        own = parse_transcript(ownership, "stornaut.task39.machine.physical-ownership.evidence-v1",
+            [(16,16),(32,32),(32,32),(16,16),(4,4),(4,4),(32,32),(1,4096),(1,4096),(1,4096),(32,32),(32,32),(1,16384),(8,8),(8,8),(32,32)], 32<<10)
+        app,helper,claim=parse_process_identity(own[7],1),parse_process_identity(own[8],2),parse_claim(own[9])
+        require(own[0:3]==[uuid.UUID(selection["attempt"]).bytes,selection["capsule"],selection["whole"]]
+                and uuid_text(own[3])==selection["epoch"]["epoch"] and u32(own[4])==ordinal-1 and u32(own[5])==ordinal
+                and own[6].hex()==selection["projection"]["sha"] and claim["app"]["raw"]==app["raw"]
+                and claim["helper"]["raw"]==helper["raw"] and claim["nonce"]==selection["epoch"]["nonce"]
+                and claim["observed"]<=claim["recorded"]<=claim["claimed"]
+                and hashlib.sha256(own[9]).digest()==own[10] and hashlib.sha256(own[12]).digest()==own[11]
+                and claim["release"]==u64(own[13])<=u64(own[14])==request["deadline"],"physical ownership")
+        binding=hashlib.sha256(encode_transcript("stornaut.task39.machine.single-epoch.ownership",
+            own[:6]+[uuid.UUID(selection["epoch"]["nonce"]).bytes,selection["epoch"]["configuration"],selection["epoch"]["signed"],own[6]]+own[7:12]+own[13:15])).digest()
+        require(binding==own[15],"ownership binding")
+        l2_observed=parse_l2_proof(
+            own[12],selection,claim,app,helper,request["deadline"])
+        material=parse_transcript(row[7],"stornaut.task39.machine.outer-inner.admission-material",[(1,48<<10),(1,512),(1,512),(16,16)],50<<10)
+        record=parse_transcript(material[0],"stornaut.task39.machine.outer-inner.ownership-record",[(32,32),(1,1024),(1,2048),(1,32<<10),(32,32)],48<<10)
+        driver,app_child=parse_driver_child(record[1]),parse_app_child(record[2])
+        require(any(material[3]) and record[0]==request["sha"] and record[3]==ownership
+                and record[4]==hashlib.sha256(ownership).digest() and app_child["parent"]==driver["pid"]
+                and app_child["group"]==driver["group"] and app_child["identity"]["raw"]==app["raw"],"ownership record")
+        record_sha=hashlib.sha256(material[0]).digest(); ack=parse_transcript(material[1],"stornaut.task39.machine.outer-inner.acknowledgement",[(32,32)]*3,512)
+        decision=parse_transcript(material[2],"stornaut.task39.machine.outer-inner.decision",[(32,32)]*3+[(1,1)],512)
+        require(ack==[request["sha"],record_sha,hashlib.sha256(ownership).digest()]
+                and decision==[request["sha"],record_sha,hashlib.sha256(material[1]).digest(),bytes([1 if normal else 2])],"admission chain")
+        completion=None; observation=None
+        if normal:
+            result=parse_transcript(physical[1],"stornaut.task39.machine.outer-inner.normal-result",[(32,32)]*4+[(1,48<<10),(32,32)],48<<10)
+            complete=parse_transcript(result[4],"stornaut.task39.machine.physical-completion.evidence-v1",[(1,32<<10),(32,32),(32,32),(32,32)],48<<10)
+            completion=hashlib.sha256(encode_transcript("stornaut.task39.machine.single-epoch.local-completion",[own[15],complete[1],complete[2],b"\x01"])).digest(); observation=complete[2]
+            require(result[:4]==[request["sha"],record_sha,hashlib.sha256(material[1]).digest(),hashlib.sha256(material[2]).digest()]
+                    and hashlib.sha256(result[4]).digest()==result[5] and complete[0]==ownership and complete[3]==completion
+                    and any(complete[1]) and any(observation),"normal result")
+        terminal=parse_transcript(row[6],"stornaut.task39.machine.outer-inner.terminal-evidence",[(1,1),(1,1),(1,1024),(1,2048),(1,1024)]+[(1,1)]*6+[(32,32),(32,32),(8,8)],2_048)
+        terminal_helper=parse_process_identity(terminal[4],2)
+        require(all(boolean(terminal[i]) for i in (0,1,6,7,8,9,10)) and terminal[2]==record[1] and terminal[3]==record[2]
+                and terminal_helper["raw"]==helper["raw"] and boolean(terminal[5])==normal
+                and any(terminal[11]) and terminal[11]==terminal[12]
+                and l2_observed<=u64(terminal[13])<request["deadline"]
+                and ((normal and terminal[11]==observation) or (not normal and not boolean(terminal[5]))),"terminal evidence")
+        admission=encode_transcript("stornaut.task39.machine.outer-inner.admission",[row[4],material[0],material[1],material[2],hashlib.sha256(physical[1] if normal else b"").digest(),hashlib.sha256(row[6]).digest(),material[3]])
+        require(hashlib.sha256(admission).digest()==row[8]
+                and hashlib.sha256(ownership).hexdigest()==l2["physicalOwnershipSHA256"]
+                and own[12]==decoded_base64(l2["installedL2ProofBase64"],"installed l2",16_384)
+                and hashlib.sha256(own[9]).hexdigest()==l2["claimEvidenceSHA256"]
+                and helper["sha"].hex()==residue["helperIdentitySHA256"]
+                and (completion or own[15]).hex()==residue["completionBindingSHA256"],"binary/JSON join")
+        if previous:
+            pred=parse_transcript(request["predecessor"],"stornaut.task39.machine.helper-continuity.successor",[(16,16),(32,32),(32,32),(4,4),(16,16),(1,1024),(32,32),(32,32),(32,32),(1,1)],4_096)
+            pred_helper=parse_process_identity(pred[5],2)
+            require(pred_helper["raw"]==previous["helper"]["raw"] and helper["raw"]!=previous["helper"]["raw"]
+                    and pred[:3]==[uuid.UUID(selection["attempt"]).bytes,selection["capsule"],selection["whole"]]
+                    and u32(pred[3])==ordinal-2 and uuid_text(pred[4])==previous["epoch"]
+                    and pred[6]==previous["predecessorSHA"] and pred[7]==previous["completion"]
+                    and pred[8]==previous["admission"] and pred[9]==bytes([previous["mode"]]),"epoch continuity")
+        else:
+            pred=parse_transcript(request["predecessor"],"stornaut.task39.machine.helper-continuity.genesis",[(16,16),(32,32),(32,32),(4,4),(16,16)],512)
+            require(pred[:3]==[uuid.UUID(selection["attempt"]).bytes,selection["capsule"],selection["whole"]]
+                    and u32(pred[3])==0 and uuid_text(pred[4])==selection["epoch"]["epoch"],"genesis continuity")
+        verified.append({"helper":helper,"epoch":selection["epoch"]["epoch"],"predecessorSHA":request["predecessorSHA"],"completion":completion or own[15],"admission":row[8],"mode":request["mode"]})
+        verified[-1]["driverParent"] = driver["parent"]
+    require(len({value["driverParent"] for value in verified}) == 1,
+            "outer driver identity drift")
+    return {"sha": hashlib.sha256(bundle).digest(), "whole": fields[2],
+        "outerDriverPID":verified[0]["driverParent"]}
+
+def parse_receipt(frame, manifest):
+    require(len(frame) >= 4 and 1 <= u32(frame[:4]) <= MAX_RECEIPT
+            and len(frame) == u32(frame[:4]) + 4, "receipt frame")
+    body = frame[4:]
+    ranges = [(64, 64), (32, 32), (16, 16), (32, 32),
+              (8, 8), (8, 8), (8, 8), (8, 8), (32, 32), (32, 32),
+              (4, 4), (4, 4), (4, 4), (5, 5)]
+    ranges += [(1, 1)] * 6 + [(8, 8), (8, 8), (32, 32)]
+    fields = parse_transcript(
+        body, "stornaut.task39.machine.gate-coordinator-receipt.v1",
+        ranges, MAX_RECEIPT)
+    build = text(fields[0]); attempt = uuid_text(fields[2])
+    require(valid_hex(build, 64) and build == manifest["build"].hex(),
+            "receipt build binding")
+    require(fields[1] == manifest["signed"] and attempt == manifest["attempt"],
+            "receipt attempt or signed binding")
+    for digest in (fields[1], fields[3], fields[8], fields[9]):
+        require(any(digest), "zero receipt digest")
+    device, inode, generation, size = map(u64, fields[4:8])
+    require(device > 0 and inode > 0 and 1 <= size <= MAX_CAPSULE, "receipt capsule")
+    pid, pgid, sid = i32(fields[10]), i32(fields[11]), i32(fields[12])
+    require(pid > 1 and pgid == pid and sid > 1 and sid != pgid, "receipt process")
+    require(fields[13] == b"\x01\x00\x00\x00\x00", "receipt wait")
+    booleans = [boolean(value) for value in fields[14:20]]
+    require(booleans == [True, False, False, True, True, True], "receipt terminal flags")
+    started, completed = u64(fields[20]), u64(fields[21])
+    require(started > 0 and completed > started, "receipt times")
+    require(any(fields[22]), "zero receipt self hash")
+    zeroed = list(fields); zeroed[22] = bytes(32)
+    require(hashlib.sha256(encode_transcript(
+        "stornaut.task39.machine.gate-coordinator-receipt.v1", zeroed
+    )).digest() == fields[22], "receipt self hash")
+    return {"attempt": attempt, "whole": fields[3],
+            "capsule": (device,inode,generation,size), "gate": fields[8],
+            "gateSHA": fields[9], "pid": pid, "pgid": pgid, "sid": sid,
+            "started": started, "completed": completed, "sha": fields[22]}
+
+def validate_receipt_chain(
+        stream, diagnostic, manifest, epochs, source, install, events):
+    framed = frames(stream)
+    require(len(framed) == 3, "FD 3 frame cardinality")
+    prearm = parse_prearm(framed[0], manifest)
+    final = parse_receipt(struct.pack(">I", len(framed[2])) + framed[2], manifest)
+    raw = parse_gate_receipt(framed[1], manifest, prearm)
+    spawn = [event["payload"] for event in events if event["kind"] == 4]
+    require(len(spawn) == 1, "spawn identity cardinality")
+    require(raw["sha"] == final["gateSHA"] and final["whole"] == prearm["whole"]
+            and raw["gate"] == final["gate"]
+            and raw["attempt"] == final["attempt"]
+            and raw["whole"] == final["whole"] and raw["capsule"] == final["capsule"]
+            and (raw["pid"],raw["pgid"],raw["sid"]) == (final["pid"],final["pgid"],final["sid"])
+            and raw["coordinator"] == spawn[0]["processID"]
+            and raw["sid"] == spawn[0]["sessionID"]
+            and raw["saved"] == spawn[0]["processGroupID"]
+            and final["started"] < raw["started"]
+            and raw["completed"] < final["completed"]
+            and raw["gate"].hex() == install["gateExecutableSHA256"],
+            "three-frame receipt chain")
+    for projection in prearm["projections"]:
+        require(projection["app"] == install["appExecutableSHA256"]
+                and projection["helper"] == install["helperExecutableSHA256"]
+                and projection["driver"] == install["machineDriverExecutableSHA256"],
+                "installed executable projection drift")
+    claim_bytes,bundle_bytes=parse_diagnostic(diagnostic)
+    claim=parse_resolved_root_driver_claim(claim_bytes)
+    bundle = parse_bundle(bundle_bytes, manifest, epochs, prearm)
+    require(source["preArmFrameSHA256"] == prearm["sha"].hex()
+            and {pair[8][1]["wholeProjectedInputSHA256"] for pair in epochs.values()}
+                == {prearm["whole"].hex()}
+            and bundle["whole"] == prearm["whole"], "source/epoch whole join")
+    require(claim["attempt"]==manifest["attempt"]
+            and claim["whole"]==prearm["whole"]
+            and claim["pid"]==bundle["outerDriverPID"],
+            "resolved root-driver claim binding")
+    executable=claim["executable"]
+    require(executable["sha"].hex()==install["machineDriverExecutableSHA256"]
+            and executable["isAdHoc"] is True
+            and all(executable["sha"].hex()==projection["driver"]
+                and executable["signingIdentifier"]==projection["driverID"]
+                and executable["designatedRequirement"]
+                    ==projection["driverRequirement"]
+                and executable["codeDirectoryHash"]
+                    ==projection["driverCodeHash"]
+                for projection in prearm["projections"]),
+            "resolved root-driver executable projection binding")
+    business=(uuid.UUID(manifest["attempt"]).bytes+prearm["capsule"]
+        +prearm["whole"]+struct.pack(">I",8)
+        +hashlib.sha256(claim_bytes).digest()+bundle["sha"])
+    require(len(business)==148, "driver completion-v3 business size")
+    completion=business+hashlib.sha256(business+bytes(32)).digest()
+    require(len(completion)==DRIVER_COMPLETION_V3_BYTES,
+        "driver completion-v3 self hash")
+    output=struct.pack(">I",len(claim_bytes))+claim_bytes+completion
+    require(len(output)==4+ROOT_DRIVER_CLAIM_BYTES+DRIVER_COMPLETION_V3_BYTES,
+            "Gate output canonical size")
+    require(raw["outputCount"] == len(output)
+            and raw["outputSHA"] == hashlib.sha256(output).digest(),
+            "Gate output completion binding")
+
+def empty_extended_acl(fd):
+    ctypes.set_errno(0)
+    acl = libc.acl_get_fd_np(fd, ACL_TYPE_EXTENDED)
+    if not acl:
+        require(ctypes.get_errno() == errno.ENOENT, "acl read")
+        return True
+    entry = ctypes.c_void_p()
+    result = libc.acl_get_entry(acl, ACL_FIRST_ENTRY, ctypes.byref(entry))
+    saved = ctypes.get_errno() if result < 0 else 0
+    free_result = libc.acl_free(acl)
+    require(free_result == 0 and result >= 0, f"acl iteration {saved}")
+    return result != 0
+
+def inventory(fd, maximum):
+    names = []
+    with os.scandir(fd) as entries:
+        for entry in entries:
+            names.append(entry.name)
+            require(len(names) <= maximum, "inventory overflow")
+    return sorted(names)
+
+def validate_metadata(value, owner, device, mode, regular):
+    require(value.st_uid == owner[0] and value.st_gid == owner[1], "owner")
+    require(value.st_dev == device and stat.S_IMODE(value.st_mode) == mode, "mode/device")
+    require(getattr(value, "st_flags", 0) == 0 and value.st_nlink > 0, "flags/link")
+    require(stat.S_ISREG(value.st_mode) if regular else stat.S_ISDIR(value.st_mode),
+            "node type")
+    if regular:
+        require(value.st_nlink == 1, "file link count")
+
+def validate_open_fd(fd, named, owner, device, mode, regular):
+    held = os.fstat(fd)
+    validate_metadata(held, owner, device, mode, regular)
+    require((held.st_dev, held.st_ino, held.st_gen, held.st_size) ==
+            (named.st_dev, named.st_ino, named.st_gen, named.st_size),
+            "held/named identity")
+    require(fcntl.fcntl(fd, fcntl.F_GETFD) & fcntl.FD_CLOEXEC, "fd cloexec")
+    require(fcntl.fcntl(fd, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY,
+            "fd access mode")
+    require(libc.flistxattr(fd, None, 0, 0) == 0, "extended attributes")
+    require(empty_extended_acl(fd), "extended acl")
+    return held
+
+def read_child(parent_fd, name, maximum, owner, device, held_files):
+    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    fd = os.open(name, READ_FLAGS, dir_fd=parent_fd)
+    try:
+        watch(fd, True)
+        before = validate_open_fd(fd, named, owner, device, 0o600, True)
+        require(0 <= before.st_size <= maximum, "file size bound")
+        data = os.pread(fd, before.st_size, 0)
+        require(len(data) == before.st_size and os.pread(fd, 1, before.st_size) == b"",
+                "short read or trailing byte")
+        after = validate_open_fd(
+            fd, os.stat(name, dir_fd=parent_fd, follow_symlinks=False),
+            owner, device, 0o600, True)
+        require((before.st_dev, before.st_ino, before.st_gen, before.st_size) ==
+                (after.st_dev, after.st_ino, after.st_gen, after.st_size),
+                "post-read identity")
+        held_files.append((parent_fd, name, fd, before, hashlib.sha256(data).digest()))
+        fd = -1
+        return data
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+def revalidate_held_file(record, owner, device):
+    parent_fd, name, fd, before, digest = record
+    after = validate_open_fd(
+        fd, os.stat(name, dir_fd=parent_fd, follow_symlinks=False),
+        owner, device, 0o600, True)
+    require((before.st_dev, before.st_ino, before.st_gen, before.st_size) ==
+            (after.st_dev, after.st_ino, after.st_gen, after.st_size),
+            "final file identity")
+    data = os.pread(fd, before.st_size, 0)
+    require(len(data) == before.st_size and os.pread(fd, 1, before.st_size) == b""
+            and hashlib.sha256(data).digest() == digest, "final file bytes")
+
+def canonical_absolute_path(path):
+    require(isinstance(path, str) and path.startswith("/") and path != "/",
+            "absolute path required")
+    components = path.split("/")[1:]
+    require(all(component not in ("", ".", "..")
+                for component in components), "noncanonical path component")
+    require(path == "/" + "/".join(components), "noncanonical absolute path")
+    return path
+
+def path_identity(value):
+    return (value.st_dev, value.st_ino, value.st_gen)
+
+change_queue = select.kqueue()
+
+def watch(fd, content):
+    event = select.kevent(
+        fd, filter=select.KQ_FILTER_VNODE, flags=select.KQ_EV_ADD,
+        fflags=VNODE_CONTENT if content else VNODE_IDENTITY)
+    require(change_queue.control([event], 0, 0) == [], "vnode watch registration")
+
+def require_exact_component(parent_fd, component):
+    require(component in os.listdir(parent_fd), "noncanonical path spelling")
+
+def open_absolute(path, final_flags, final_regular):
+    components = canonical_absolute_path(path).split("/")[1:]
+    root_fd = os.open("/", ROOT_FLAGS)
+    walk = {"root_fd": root_fd, "root_identity": path_identity(
+        os.fstat(root_fd)), "nodes": [], "fds": [root_fd]}
+    try:
+        watch(root_fd, False)
+        for index, component in enumerate(components):
+            final = index == len(components) - 1
+            parent_fd = walk["fds"][-1]
+            require_exact_component(parent_fd, component)
+            named = os.stat(component, dir_fd=parent_fd,
+                            follow_symlinks=False)
+            expected_regular = final and final_regular
+            require(stat.S_ISREG(named.st_mode) if expected_regular
+                    else stat.S_ISDIR(named.st_mode), "path component type")
+            flags = final_flags if final else DIRECTORY_FLAGS
+            descriptor = os.open(component, flags, dir_fd=parent_fd)
+            walk["fds"].append(descriptor)
+            watch(descriptor, final)
+            held = os.fstat(descriptor)
+            require(path_identity(held) == path_identity(named),
+                    "path held/named identity")
+            walk["nodes"].append((
+                parent_fd, component, descriptor, path_identity(held),
+                expected_regular))
+        return walk["fds"][-1], walk, walk["nodes"][-1]
+    except BaseException:
+        for descriptor in reversed(walk["fds"]):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise
+
+def revalidate_absolute_walk(walk):
+    require(path_identity(os.fstat(walk["root_fd"])) ==
+            walk["root_identity"], "absolute root identity")
+    for parent_fd, component, descriptor, identity, expected_regular in walk["nodes"]:
+        require_exact_component(parent_fd, component)
+        named = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+        held = os.fstat(descriptor)
+        require(path_identity(named) == identity == path_identity(held),
+                "path post-read identity")
+        require(stat.S_ISREG(held.st_mode) if expected_regular
+                else stat.S_ISDIR(held.st_mode), "path post-read type")
+
+def close_descriptors(descriptors):
+    first = None
+    for descriptor in descriptors:
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            if first is None:
+                first = error
+    if first is not None:
+        raise first
+
+def close_absolute_walk(walk):
+    close_descriptors(reversed(walk["fds"]))
+
+def read_seal(path, evidence_root, evidence_identity):
+    require(os.path.commonpath([path, evidence_root]) != evidence_root,
+            "seal must be external")
+    fd, walk, final_node = open_absolute(
+        path, os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+        | O_NOFOLLOW_ANY | O_RESOLVE_BENEATH | O_UNIQUE, True)
+    try:
+        require(all(identity != evidence_identity
+                    for _, _, _, identity, _ in walk["nodes"]),
+                "seal aliases evidence root")
+        parent_fd, leaf, _, _, _ = final_node
+        named = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        value = validate_open_fd(
+            fd, named, (os.geteuid(), os.getegid()), named.st_dev, 0o600, True)
+        require(0 < value.st_size <= 8_192, "seal metadata")
+        data = os.pread(fd, value.st_size, 0)
+        require(len(data) == value.st_size and os.pread(fd, 1, value.st_size) == b"",
+                "seal read")
+        after = validate_open_fd(
+            fd, os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False),
+            (os.geteuid(), os.getegid()), named.st_dev, 0o600, True)
+        require((value.st_dev, value.st_ino, value.st_gen, value.st_size) ==
+                (after.st_dev, after.st_ino, after.st_gen, after.st_size),
+                "seal post-read identity")
+        revalidate_absolute_walk(walk)
+        value = canonical_json(data)
+        require(set(value) == {"schemaVersion", "campaignUUID", "attemptUUID",
+                "rootIdentity", "manifestSHA256", "contentRootSHA256",
+                "artifactCount", "totalByteCount", "attemptSummary"},
+                "seal schema")
+        require(type(value["schemaVersion"]) is int and value["schemaVersion"] == 1,
+                "seal version")
+        root = value["rootIdentity"]; summary = value["attemptSummary"]
+        require(isinstance(root, dict) and set(root) ==
+                {"device", "inode", "generation", "size"}, "root identity schema")
+        require(isinstance(summary, dict) and set(summary) ==
+                {"attemptUUID", "mode", "outcome", "consumed",
+                 "eventCount", "finalEventSHA256"}, "seal summary schema")
+        for name in ("campaignUUID", "attemptUUID"):
+            require(str(uuid.UUID(value[name])) == value[name]
+                    and uuid.UUID(value[name]).int, f"seal {name}")
+        for name in ("manifestSHA256", "contentRootSHA256"):
+            require(valid_hex(value[name], 64), f"seal {name}")
+        require(type(value["artifactCount"]) is int
+                and 1 <= value["artifactCount"] <= MAX_ARTIFACTS, "seal count")
+        value["totalByteCount"] = parse_decimal(
+            value["totalByteCount"], "total bytes")
+        for name in root:
+            root[name] = parse_decimal(root[name], f"root {name}")
+        require(root["device"] > 0 and root["inode"] > 0, "root identity value")
+        require(str(uuid.UUID(summary["attemptUUID"])) == summary["attemptUUID"],
+                "seal summary uuid")
+        require(type(summary["mode"]) is int and type(summary["outcome"]) is int
+                and type(summary["consumed"]) is bool
+                and type(summary["eventCount"]) is int
+                and valid_hex(summary["finalEventSHA256"], 64),
+                "seal summary values")
+        return value, walk, (final_node[0], final_node[1], fd, after,
+                             hashlib.sha256(data).digest())
+    except BaseException:
+        close_absolute_walk(walk)
+        raise
+
+def open_preserved_gate(owner):
+    require(owner == (501, 20), "preserved Gate verifier identity")
+    account = pwd.getpwuid(owner[0])
+    home = account.pw_dir
+    require(isinstance(home, str) and home.startswith("/") and home != "/",
+            "preserved Gate account home")
+    base_path = canonical_absolute_path(
+        home + "/Library/Caches/com.eriklee.stornaut.task39-machine-gate")
+    base_fd, base_walk, base_node = open_absolute(
+        base_path, DIRECTORY_FLAGS, False)
+    attempt_fd = -1
+    held_files = []
+    try:
+        parent_fd, leaf, _, _, _ = base_node
+        named_base = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        device = named_base.st_dev
+        base_before = validate_open_fd(
+            base_fd, named_base, owner, device, 0o700, False)
+        attempt_name = "attempt-" + PRESERVED_GATE_ATTEMPT
+        capsule_name = "projected-cohort-" + PRESERVED_GATE_WHOLE + ".bin"
+        require(inventory(base_fd, 2) == [".owner-lock-v1", attempt_name],
+                "preserved Gate base inventory")
+        lock_bytes = read_child(
+            base_fd, ".owner-lock-v1", 0, owner, device, held_files)
+        require(lock_bytes == b"", "preserved Gate lock bytes")
+        named_attempt = os.stat(
+            attempt_name, dir_fd=base_fd, follow_symlinks=False)
+        attempt_fd = os.open(attempt_name, DIRECTORY_FLAGS, dir_fd=base_fd)
+        watch(attempt_fd, True)
+        attempt_before = validate_open_fd(
+            attempt_fd, named_attempt, owner, device, 0o700, False)
+        require(inventory(attempt_fd, 1) == [capsule_name],
+                "preserved Gate attempt inventory")
+        capsule = read_child(
+            attempt_fd, capsule_name, PRESERVED_GATE_SIZE, owner, device,
+            held_files)
+        require(len(capsule) == PRESERVED_GATE_SIZE
+                and hashlib.sha256(capsule).hexdigest() == PRESERVED_GATE_SHA256,
+                "preserved Gate capsule bytes")
+        projected = parse_projected_input(capsule)
+        require(projected["capsule"]["attempt"] == PRESERVED_GATE_ATTEMPT
+                and projected["whole"].hex() == PRESERVED_GATE_WHOLE,
+                "preserved Gate capsule contract")
+        return {
+            "base_fd": base_fd, "base_walk": base_walk,
+            "base_node": base_node, "base_before": base_before,
+            "attempt_fd": attempt_fd, "attempt_name": attempt_name,
+            "attempt_before": attempt_before, "capsule_name": capsule_name,
+            "held_files": held_files, "device": device,
+        }
+    except BaseException:
+        close_descriptors([record[2] for record in reversed(held_files)])
+        if attempt_fd >= 0:
+            os.close(attempt_fd)
+        close_absolute_walk(base_walk)
+        raise
+
+def revalidate_preserved_gate(gate, owner):
+    for record in gate["held_files"]:
+        revalidate_held_file(record, owner, gate["device"])
+    attempt_after = validate_open_fd(
+        gate["attempt_fd"], os.stat(
+            gate["attempt_name"], dir_fd=gate["base_fd"],
+            follow_symlinks=False), owner, gate["device"], 0o700, False)
+    require(path_identity(attempt_after)
+            == path_identity(gate["attempt_before"]),
+            "preserved Gate attempt identity")
+    require(inventory(gate["attempt_fd"], 1) == [gate["capsule_name"]],
+            "preserved Gate final attempt inventory")
+    parent_fd, leaf, _, _, _ = gate["base_node"]
+    base_after = validate_open_fd(
+        gate["base_fd"], os.stat(
+            leaf, dir_fd=parent_fd, follow_symlinks=False), owner,
+        gate["device"], 0o700, False)
+    require(path_identity(base_after) == path_identity(gate["base_before"]),
+            "preserved Gate base identity")
+    require(inventory(gate["base_fd"], 2)
+            == [".owner-lock-v1", gate["attempt_name"]],
+            "preserved Gate final base inventory")
+    revalidate_absolute_walk(gate["base_walk"])
+
+def open_persistent_gate(owner, evidence):
+    require(owner == (501, 20), "persistent Gate verifier identity")
+    account = pwd.getpwuid(owner[0])
+    home = account.pw_dir
+    require(isinstance(home, str) and home.startswith("/") and home != "/",
+            "persistent Gate account home")
+    require(evidence["persistentGateRelativePath"] ==
+        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+        "persistent Gate relative path")
+    base_path = canonical_absolute_path(
+        home + "/" + evidence["persistentGateRelativePath"])
+    base_fd, base_walk, base_node = open_absolute(
+        base_path, DIRECTORY_FLAGS, False)
+    held_files = []
+    try:
+        parent_fd, leaf, _, _, _ = base_node
+        named_base = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        device = named_base.st_dev
+        base_before = validate_open_fd(
+            base_fd, named_base, owner, device, 0o700, False)
+        require(inventory(base_fd, 1) == [".owner-lock-v1"],
+                "persistent Gate base inventory")
+        lock_bytes = read_child(
+            base_fd, ".owner-lock-v1", 0, owner, device, held_files)
+        require(lock_bytes == b"", "persistent Gate lock bytes")
+        lock_record = held_files[0]
+        lock_before = lock_record[3]
+        require(fcntl.flock(lock_record[2], fcntl.LOCK_EX | fcntl.LOCK_NB) is None,
+                "persistent Gate owner lock")
+        expected_base = (
+            parse_decimal(evidence["persistentGateBaseDevice"], "persistent base device"),
+            parse_decimal(evidence["persistentGateBaseInode"], "persistent base inode"),
+            parse_decimal(evidence["persistentGateBaseGeneration"], "persistent base generation"),
+        )
+        expected_lock = (
+            parse_decimal(evidence["persistentGateLockDevice"], "persistent lock device"),
+            parse_decimal(evidence["persistentGateLockInode"], "persistent lock inode"),
+            parse_decimal(evidence["persistentGateLockGeneration"], "persistent lock generation"),
+        )
+        require(path_identity(base_before) == expected_base
+                and path_identity(lock_before) == expected_lock,
+                "persistent Gate evidence identity")
+        return {
+            "base_fd": base_fd, "base_walk": base_walk,
+            "base_node": base_node, "base_before": base_before,
+            "held_files": held_files, "device": device,
+        }
+    except BaseException:
+        close_descriptors([record[2] for record in reversed(held_files)])
+        close_absolute_walk(base_walk)
+        raise
+
+def revalidate_persistent_gate(gate, owner):
+    for record in gate["held_files"]:
+        revalidate_held_file(record, owner, gate["device"])
+    parent_fd, leaf, _, _, _ = gate["base_node"]
+    base_after = validate_open_fd(
+        gate["base_fd"], os.stat(
+            leaf, dir_fd=parent_fd, follow_symlinks=False), owner,
+        gate["device"], 0o700, False)
+    require(path_identity(base_after) == path_identity(gate["base_before"]),
+            "persistent Gate base identity")
+    require(inventory(gate["base_fd"], 1) == [".owner-lock-v1"],
+            "persistent Gate final base inventory")
+    revalidate_absolute_walk(gate["base_walk"])
+
+def open_persistent_preserved_gate(owner, evidence):
+    require(owner == (501, 20), "preserved persistent Gate verifier identity")
+    account = pwd.getpwuid(owner[0])
+    home = account.pw_dir
+    require(isinstance(home, str) and home.startswith("/") and home != "/",
+            "preserved persistent Gate account home")
+    require(evidence["persistentGateRelativePath"] ==
+        "Library/Application Support/com.eriklee.stornaut.task39-machine-gate",
+        "preserved persistent Gate relative path")
+    base_path = canonical_absolute_path(
+        home + "/" + evidence["persistentGateRelativePath"])
+    base_fd, base_walk, base_node = open_absolute(
+        base_path, DIRECTORY_FLAGS, False)
+    attempt_fds = []
+    held_files = []
+    try:
+        parent_fd, leaf, _, _, _ = base_node
+        named_base = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        device = named_base.st_dev
+        base_before = validate_open_fd(
+            base_fd, named_base, owner, device, 0o700, False)
+        preserved = ((PRESERVED_V13_ATTEMPT, PRESERVED_V13_WHOLE,
+                      PRESERVED_V13_SIZE, PRESERVED_V13_SHA256),)
+        if evidence["schemaVersion"] == 5:
+            preserved += ((PRESERVED_V16_ATTEMPT, PRESERVED_V16_WHOLE,
+                           PRESERVED_V16_SIZE, PRESERVED_V16_SHA256),)
+        attempt_names = ["attempt-" + item[0] for item in preserved]
+        require(inventory(base_fd, len(preserved) + 1)
+                == sorted([".owner-lock-v1"] + attempt_names),
+                "preserved persistent Gate base inventory")
+        lock_bytes = read_child(
+            base_fd, ".owner-lock-v1", 0, owner, device, held_files)
+        require(lock_bytes == b"", "preserved persistent Gate lock bytes")
+        lock_before = held_files[0][3]
+        require(fcntl.flock(held_files[0][2], fcntl.LOCK_EX | fcntl.LOCK_NB)
+                is None, "preserved persistent Gate owner lock")
+        observed = []
+        for attempt_uuid, whole, size, digest in preserved:
+            attempt_name = "attempt-" + attempt_uuid
+            capsule_name = "projected-cohort-" + whole + ".bin"
+            named_attempt = os.stat(
+                attempt_name, dir_fd=base_fd, follow_symlinks=False)
+            attempt_fd = os.open(attempt_name, DIRECTORY_FLAGS, dir_fd=base_fd)
+            attempt_fds.append(attempt_fd); watch(attempt_fd, True)
+            attempt_before = validate_open_fd(
+                attempt_fd, named_attempt, owner, device, 0o700, False)
+            require(inventory(attempt_fd, 1) == [capsule_name],
+                    "preserved persistent Gate attempt inventory")
+            capsule = read_child(
+                attempt_fd, capsule_name, size, owner, device, held_files)
+            require(len(capsule) == size
+                    and hashlib.sha256(capsule).hexdigest() == digest,
+                    "preserved persistent Gate capsule bytes")
+            projected = parse_projected_input(capsule)
+            require(projected["capsule"]["attempt"] == attempt_uuid
+                    and projected["whole"].hex() == whole,
+                    "preserved persistent Gate capsule contract")
+            observed.append((attempt_name, capsule_name, attempt_fd,
+                             attempt_before, held_files[-1]))
+        evidence_entries = (
+            [evidence] if evidence["schemaVersion"] == 4
+            else evidence["preservedGateCapsules"])
+        require(path_identity(base_before) == (
+                    parse_decimal(evidence["persistentGateBaseDevice"], "base device"),
+                    parse_decimal(evidence["persistentGateBaseInode"], "base inode"),
+                    parse_decimal(evidence["persistentGateBaseGeneration"], "base generation"))
+                and path_identity(lock_before) == (
+                    parse_decimal(evidence["persistentGateLockDevice"], "lock device"),
+                    parse_decimal(evidence["persistentGateLockInode"], "lock inode"),
+                    parse_decimal(evidence["persistentGateLockGeneration"], "lock generation"))
+                and all(path_identity(item[3]) == (
+                    parse_decimal(entry["preservedGateAttemptDevice" if evidence["schemaVersion"] == 4 else "attemptDevice"], "attempt device"),
+                    parse_decimal(entry["preservedGateAttemptInode" if evidence["schemaVersion"] == 4 else "attemptInode"], "attempt inode"),
+                    parse_decimal(entry["preservedGateAttemptGeneration" if evidence["schemaVersion"] == 4 else "attemptGeneration"], "attempt generation"))
+                    and path_identity(item[4][3]) == (
+                    parse_decimal(entry["preservedGateCapsuleDevice" if evidence["schemaVersion"] == 4 else "capsuleDevice"], "capsule device"),
+                    parse_decimal(entry["preservedGateCapsuleInode" if evidence["schemaVersion"] == 4 else "capsuleInode"], "capsule inode"),
+                    parse_decimal(entry["preservedGateCapsuleGeneration" if evidence["schemaVersion"] == 4 else "capsuleGeneration"], "capsule generation"))
+                    for item, entry in zip(observed, evidence_entries)),
+                "preserved persistent Gate evidence identity")
+        return {
+            "base_fd": base_fd, "base_walk": base_walk,
+            "base_node": base_node, "base_before": base_before,
+            "attempts": observed,
+            "held_files": held_files, "device": device,
+        }
+    except BaseException:
+        close_descriptors([record[2] for record in reversed(held_files)])
+        close_descriptors(reversed(attempt_fds))
+        close_absolute_walk(base_walk)
+        raise
+
+def revalidate_persistent_preserved_gate(gate, owner):
+    for record in gate["held_files"]:
+        revalidate_held_file(record, owner, gate["device"])
+    for attempt_name, capsule_name, attempt_fd, attempt_before, _ in gate["attempts"]:
+        attempt_after = validate_open_fd(
+            attempt_fd, os.stat(attempt_name, dir_fd=gate["base_fd"],
+            follow_symlinks=False), owner, gate["device"], 0o700, False)
+        require(path_identity(attempt_after) == path_identity(attempt_before)
+                and inventory(attempt_fd, 1) == [capsule_name],
+                "preserved Gate final attempt identity")
+    parent_fd, leaf, _, _, _ = gate["base_node"]
+    base_after = validate_open_fd(gate["base_fd"], os.stat(
+        leaf, dir_fd=parent_fd, follow_symlinks=False), owner,
+        gate["device"], 0o700, False)
+    require(path_identity(base_after) == path_identity(gate["base_before"])
+            and inventory(gate["base_fd"], len(gate["attempts"]) + 1)
+                == sorted([".owner-lock-v1"]
+                    + [item[0] for item in gate["attempts"]]),
+            "preserved Gate final base inventory")
+    revalidate_absolute_walk(gate["base_walk"])
+
+def verify(root_path, seal_path, expected_self_sha, verifier_fd):
+    root_path = canonical_absolute_path(root_path)
+    seal_path = canonical_absolute_path(seal_path)
+    root_fd, root_walk, root_node = open_absolute(
+        root_path, DIRECTORY_FLAGS, False)
+    seal_walk = None
+    held_files = []
+    held_phases = []
+    non_admitting = False
+    preserved_gate = None
+    persistent_gate = None
+    persistent_preserved_gate = None
+    try:
+        verifier_before = os.fstat(verifier_fd)
+        validate_metadata(verifier_before, (os.geteuid(), os.getegid()),
+                          verifier_before.st_dev, 0o755, True)
+        require(fcntl.fcntl(verifier_fd, fcntl.F_GETFL) & os.O_ACCMODE
+                == os.O_RDONLY, "verifier fd access")
+        watch(verifier_fd, True)
+        require(0 < verifier_before.st_size <= 1 << 20, "verifier size")
+        verifier_bytes = os.pread(verifier_fd, verifier_before.st_size, 0)
+        require(len(verifier_bytes) == verifier_before.st_size
+                and os.pread(verifier_fd, 1, verifier_before.st_size) == b"",
+                "verifier read")
+        verifier_digest = hashlib.sha256(verifier_bytes).hexdigest()
+        normalized, count = re.subn(
+            rb"(?m)^typeset -r iicc_self_sha=(?:[0-9a-f]{64}|SELF) # iicc-self-seal$",
+            b"typeset -r iicc_self_sha=SELF # iicc-self-seal",
+            verifier_bytes)
+        require(count == 1 and valid_hex(expected_self_sha, 64)
+                and hashlib.sha256(normalized).hexdigest() == expected_self_sha,
+                "verifier self seal")
+        root_parent_fd, root_leaf, _, root_identity, _ = root_node
+        named_root = os.stat(
+            root_leaf, dir_fd=root_parent_fd, follow_symlinks=False)
+        owner, device = (os.geteuid(), os.getegid()), named_root.st_dev
+        root_metadata = validate_open_fd(root_fd, named_root, owner, device, 0o700, False)
+        seal, seal_walk, seal_file = read_seal(
+            seal_path, root_path, root_identity)
+        require(root_leaf == "stornaut-task39-iic-" + seal["campaignUUID"],
+                "evidence root name")
+        expected_identity = seal["rootIdentity"]
+        require((root_metadata.st_dev, root_metadata.st_ino, root_metadata.st_gen,
+                 root_metadata.st_size) ==
+                (expected_identity["device"], expected_identity["inode"],
+                 expected_identity["generation"], expected_identity["size"]),
+                "seal root identity")
+        root_names = inventory(root_fd, len(PHASES) + 1)
+        require(root_names == sorted(list(PHASES.values()) + ["manifest.bin"]),
+                "root inventory")
+        manifest_bytes = read_child(
+            root_fd, "manifest.bin", MAX_MANIFEST, owner, device, held_files)
+        manifest = parse_manifest(manifest_bytes)
+        require(manifest["campaign"] == seal["campaignUUID"]
+                and manifest["attempt"] == seal["attemptUUID"], "seal ids")
+        require(manifest["sha"].hex() == seal["manifestSHA256"], "manifest seal")
+        content_root = hashlib.sha256(encode_transcript(
+            "stornaut.task39.iic.raw-evidence-root.v1", [manifest["sha"]])).hexdigest()
+        require(content_root == seal["contentRootSHA256"], "content root seal")
+        require(manifest["count"] == seal["artifactCount"]
+                and manifest["total"] == seal["totalByteCount"], "seal accounting")
+        summary = manifest["summary"]; sealed_summary = seal["attemptSummary"]
+        require(sealed_summary == {
+            "attemptUUID": summary["attempt"], "mode": summary["mode"],
+            "outcome": summary["outcome"], "consumed": summary["consumed"],
+            "eventCount": summary["count"],
+            "finalEventSHA256": summary["final"].hex(),
+        }, "attempt summary seal")
+        contents = {}
+        by_phase = {phase: [] for phase in PHASES}
+        for entry in manifest["entries"]:
+            by_phase[entry["phase"]].append(entry)
+        for phase, directory in PHASES.items():
+            named = os.stat(directory, dir_fd=root_fd, follow_symlinks=False)
+            phase_fd = os.open(directory, DIRECTORY_FLAGS, dir_fd=root_fd)
+            try:
+                watch(phase_fd, True)
+                phase_before = validate_open_fd(
+                    phase_fd, named, owner, device, 0o700, False)
+            except BaseException:
+                os.close(phase_fd)
+                raise
+            expected = sorted(entry["leaf"] for entry in by_phase[phase])
+            held_phases.append((directory, phase_fd, phase_before, expected))
+            require(inventory(phase_fd, MAX_ARTIFACTS) == expected, "phase inventory")
+            for entry in by_phase[phase]:
+                payload = read_child(
+                    phase_fd, entry["leaf"], MAX_ARTIFACT, owner, device, held_files)
+                require(len(payload) == entry["size"]
+                        and hashlib.sha256(payload).digest() == entry["sha"],
+                        "artifact digest")
+                if entry["encoding"] == 2:
+                    canonical_json(payload)
+                contents[entry["path"]] = payload
+            require(inventory(phase_fd, MAX_ARTIFACTS) == expected,
+                    "phase post-read inventory")
+        events = validate_events(
+            manifest["entries"], contents, summary, manifest["attempt"])
+        values, epochs, source = validate_json_artifacts(manifest, contents)
+        expected_epochs = values[12][0][1]["expectedEpochCount"]
+        verifier_digest_field = values[12][0][1]["verifierExecutableSHA256"]
+        require(verifier_digest_field == verifier_digest,
+                "verifier executable binding")
+        if summary["consumed"]:
+            expected_epochs = values[12][0][1]["expectedEpochCount"]
+            admitting = (expected_epochs == 8
+                         and summary["outcome"] == 2)
+            if admitting:
+                teardown_schema = values[11][0][1]["schemaVersion"]
+                if teardown_schema == 2:
+                    preserved_gate = open_preserved_gate(owner)
+                    non_admitting = True
+                elif teardown_schema in (4, 5):
+                    persistent_preserved_gate = open_persistent_preserved_gate(
+                        owner, values[11][0][1])
+                    require(teardown_schema == 5,
+                            "admitting dual preserved persistent Gate schema")
+                    account = pwd.getpwuid(os.geteuid())
+                    expected_support = canonical_absolute_path(
+                        account.pw_dir + "/Library/Application Support")
+                    expected_parent_leaf = (
+                        "stornaut-iic-evidence-" + seal["campaignUUID"])
+                    expected_parent = os.path.join(
+                        expected_support, expected_parent_leaf)
+                    require(os.path.dirname(root_path) == expected_parent
+                            and os.path.dirname(seal_path) == expected_parent
+                            and os.path.basename(seal_path) == "seal.json",
+                            "evidence Application Support parent")
+                    parent_node = root_walk["nodes"][-2]
+                    support_fd, parent_leaf, parent_fd, _, _ = parent_node
+                    require(parent_fd == root_parent_fd
+                            and parent_leaf == expected_parent_leaf,
+                            "evidence parent name")
+                    watch(parent_fd, True)
+                    parent_before = validate_open_fd(
+                        parent_fd, os.stat(parent_leaf, dir_fd=support_fd,
+                            follow_symlinks=False), owner, device, 0o700, False)
+                    seal_parent_node = seal_walk["nodes"][-2]
+                    seal_support_fd, seal_parent_leaf, seal_parent_fd, _, _ = (
+                        seal_parent_node)
+                    require(seal_parent_leaf == expected_parent_leaf
+                            and path_identity(os.fstat(seal_support_fd))
+                                == path_identity(os.fstat(support_fd))
+                            and path_identity(os.fstat(seal_parent_fd))
+                                == path_identity(parent_before),
+                            "seal/evidence parent identity")
+                    require(inventory(parent_fd, 2)
+                            == sorted([root_leaf, "seal.json"]),
+                            "evidence parent inventory")
+                else:
+                    require(teardown_schema == 3,
+                            "admitting preserved persistent Gate schema")
+                    non_admitting = True
+            trusted_action = (values[4][0][1]["attestationKind"]
+                    == "trustedOperatorInteractiveAction"
+                    and values[4][0][1]["machinePromptObserved"] is True
+                    and values[4][0][1]["humanActionObserved"] is True)
+            require(not admitting or trusted_action,
+                    "admitting prompt attestation")
+            evidence_set = values[12][0][1]["evidenceSetSHA256"]
+            require(all(event["payload"]["evidenceSetSHA256"] == evidence_set
+                        for event in events), "event/verifier evidence set")
+        else:
+            attestation = values[4][0][1]
+            require(values[12][0][1]["expectedConsumed"] is False
+                    and expected_epochs == 0 and not epochs
+                    and attestation["attestationKind"]
+                        == "operatorCancellationBeforeCredential"
+                    and attestation["humanActionObserved"] is False,
+                    "cancelled evidence semantics")
+        receipts = [entry for entry in manifest["entries"] if entry["role"] == 6]
+        if summary["consumed"] and expected_epochs == 8:
+            diagnostics = [entry for entry in manifest["entries"] if entry["role"] == 7]
+            require(len(receipts) == len(diagnostics) == 1, "admitting receipt cardinality")
+            diagnostic = diagnostics[0]
+            validate_receipt_chain(contents[receipts[0]["path"]],
+                contents[diagnostic["path"]], manifest, epochs, source,
+                values[2][0][1], events)
+            if summary["outcome"] != 2:
+                non_admitting = True
+        elif summary["consumed"]:
+            non_admitting = True
+        for record in held_files:
+            revalidate_held_file(record, owner, device)
+        revalidate_held_file(seal_file, owner, seal_file[3].st_dev)
+        revalidate_absolute_walk(seal_walk)
+        for directory, phase_fd, phase_before, expected in held_phases:
+            phase_after = validate_open_fd(
+                phase_fd, os.stat(
+                    directory, dir_fd=root_fd, follow_symlinks=False),
+                owner, device, 0o700, False)
+            require((phase_before.st_dev, phase_before.st_ino, phase_before.st_gen,
+                     phase_before.st_size) ==
+                    (phase_after.st_dev, phase_after.st_ino, phase_after.st_gen,
+                     phase_after.st_size), "final phase identity")
+            require(inventory(phase_fd, MAX_ARTIFACTS) == expected,
+                    "final phase inventory")
+        require(inventory(root_fd, len(PHASES) + 1) == root_names,
+                "root post-read inventory")
+        root_after = validate_open_fd(
+            root_fd, os.stat(
+                root_leaf, dir_fd=root_parent_fd, follow_symlinks=False),
+            owner, device, 0o700, False)
+        require((root_metadata.st_dev, root_metadata.st_ino, root_metadata.st_gen,
+                 root_metadata.st_size) ==
+                (root_after.st_dev, root_after.st_ino, root_after.st_gen,
+                 root_after.st_size), "root post-read identity")
+        if summary["consumed"] and values[11][0][1]["schemaVersion"] == 5:
+            parent_after = validate_open_fd(
+                root_parent_fd, os.stat(
+                    expected_parent_leaf, dir_fd=support_fd,
+                    follow_symlinks=False), owner, device, 0o700, False)
+            require(path_identity(parent_after) == path_identity(parent_before)
+                    and inventory(root_parent_fd, 2)
+                        == sorted([root_leaf, "seal.json"]),
+                    "evidence parent final identity")
+        revalidate_absolute_walk(root_walk)
+        if preserved_gate is not None:
+            revalidate_preserved_gate(preserved_gate, owner)
+        if persistent_gate is not None:
+            revalidate_persistent_gate(persistent_gate, owner)
+        if persistent_preserved_gate is not None:
+            revalidate_persistent_preserved_gate(
+                persistent_preserved_gate, owner)
+        verifier_after = os.fstat(verifier_fd)
+        require(path_identity(verifier_before) == path_identity(verifier_after)
+                and verifier_before.st_size == verifier_after.st_size
+                and hashlib.sha256(os.pread(
+                    verifier_fd, verifier_after.st_size, 0)).hexdigest()
+                    == verifier_digest, "verifier final binding")
+        require(change_queue.control(None, 1, 0) == [],
+                "evidence changed during verification")
+        if non_admitting:
+            raise Rejected("consumed failure is non-admitting")
+    finally:
+        descriptors = [record[2] for record in reversed(held_files)]
+        descriptors += [record[1] for record in reversed(held_phases)]
+        if seal_walk is not None:
+            descriptors += list(reversed(seal_walk["fds"]))
+        if preserved_gate is not None:
+            descriptors += [record[2] for record in reversed(
+                preserved_gate["held_files"])]
+            descriptors.append(preserved_gate["attempt_fd"])
+            descriptors += list(reversed(
+                preserved_gate["base_walk"]["fds"]))
+        if persistent_gate is not None:
+            descriptors += [record[2] for record in reversed(
+                persistent_gate["held_files"])]
+            descriptors += list(reversed(
+                persistent_gate["base_walk"]["fds"]))
+        if persistent_preserved_gate is not None:
+            descriptors += [record[2] for record in reversed(
+                persistent_preserved_gate["held_files"])]
+            descriptors += [item[2] for item in reversed(
+                persistent_preserved_gate["attempts"])]
+            descriptors += list(reversed(
+                persistent_preserved_gate["base_walk"]["fds"]))
+        descriptors += list(reversed(root_walk["fds"]))
+        descriptors.append(verifier_fd)
+        close_descriptors(descriptors)
+        change_queue.close()
+
+try:
+    verify(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
+except (OSError, Rejected, ValueError, KeyError, TypeError) as error:
+    print(f"stornaut ii-c machine evidence rejected: {error}", file=sys.stderr)
+    raise SystemExit(1)
+print("stornaut ii-c machine evidence verified")
+PY

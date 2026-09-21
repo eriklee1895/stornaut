@@ -1,0 +1,240 @@
+{
+  "fixtureVersion": 1,
+  "scenarios": [
+    {
+      "name": "overlap-hardlink-sparse-gap-and-volume-drift",
+      "sessionID": "scan-accounting-overlap",
+      "scopeID": "scope-accounting-overlap",
+      "rootPath": "fixture-root",
+      "volume": {
+        "total": 1000,
+        "startFree": 300,
+        "endFree": 280
+      },
+      "entries": [
+        {
+          "id": "snapshot-accounting-root",
+          "path": ".",
+          "kind": "directory",
+          "logical": 10,
+          "allocated": 10,
+          "device": 1,
+          "inode": 1
+        },
+        {
+          "id": "snapshot-accounting-projects",
+          "path": "projects",
+          "kind": "directory",
+          "logical": 10,
+          "allocated": 10,
+          "device": 1,
+          "inode": 2,
+          "classification": {
+            "id": "classification-accounting-projects",
+            "category": "packageAndBuildCaches",
+            "disposition": "readyToReclaim"
+          }
+        },
+        {
+          "id": "snapshot-accounting-cache",
+          "path": "projects/cache",
+          "kind": "directory",
+          "logical": 10,
+          "allocated": 10,
+          "device": 1,
+          "inode": 3,
+          "classification": {
+            "id": "classification-accounting-cache",
+            "category": "rebuildableProjectArtifacts",
+            "disposition": "reviewRecommended"
+          }
+        },
+        {
+          "id": "snapshot-accounting-cache-file",
+          "path": "projects/cache/data.bin",
+          "kind": "regularFile",
+          "logical": 100,
+          "allocated": 50,
+          "device": 1,
+          "inode": 10
+        },
+        {
+          "id": "snapshot-accounting-cache-hardlink",
+          "path": "projects/cache/data-link.bin",
+          "kind": "regularFile",
+          "logical": 100,
+          "allocated": 50,
+          "device": 1,
+          "inode": 10
+        },
+        {
+          "id": "snapshot-accounting-project-file",
+          "path": "projects/other.bin",
+          "kind": "regularFile",
+          "logical": 200,
+          "allocated": 100,
+          "device": 1,
+          "inode": 11
+        },
+        {
+          "id": "snapshot-accounting-unknown",
+          "path": "unknown.bin",
+          "kind": "regularFile",
+          "logical": 80,
+          "allocated": 80,
+          "device": 1,
+          "inode": 12
+        },
+        {
+          "id": "snapshot-accounting-gap",
+          "path": "private",
+          "kind": "inaccessible",
+          "status": "permissionDenied"
+        }
+      ],
+      "expected": {
+        "knownAllocated": 170,
+        "knownLogical": 320,
+        "unknown": 550,
+        "free": 280,
+        "observedUnclassified": 90,
+        "freeDelta": -20,
+        "ownerCount": 2,
+        "gapCount": 1,
+        "status": "partial"
+      }
+    },
+    {
+      "name": "disposition-independent-ready",
+      "sessionID": "scan-accounting-ready",
+      "scopeID": "scope-accounting-ready",
+      "rootPath": "fixture-root",
+      "volume": {
+        "total": 1000,
+        "startFree": 400,
+        "endFree": 400
+      },
+      "entries": [
+        {
+          "id": "snapshot-accounting-ready-root",
+          "path": ".",
+          "kind": "directory",
+          "logical": 10,
+          "allocated": 10,
+          "device": 2,
+          "inode": 1
+        },
+        {
+          "id": "snapshot-accounting-ready-file",
+          "path": "cache.bin",
+          "kind": "regularFile",
+          "logical": 120,
+          "allocated": 100,
+          "device": 2,
+          "inode": 2,
+          "classification": {
+            "id": "classification-accounting-ready",
+            "category": "packageAndBuildCaches",
+            "disposition": "readyToReclaim"
+          }
+        }
+      ],
+      "expected": {
+        "knownAllocated": 100,
+        "knownLogical": 120,
+        "unknown": 500,
+        "free": 400,
+        "observedUnclassified": 10,
+        "freeDelta": 0,
+        "ownerCount": 1,
+        "gapCount": 0,
+        "status": "reconciled"
+      }
+    },
+    {
+      "name": "disposition-independent-review",
+      "sessionID": "scan-accounting-review",
+      "scopeID": "scope-accounting-review",
+      "rootPath": "fixture-root",
+      "volume": {
+        "total": 1000,
+        "startFree": 400,
+        "endFree": 400
+      },
+      "entries": [
+        {
+          "id": "snapshot-accounting-review-root",
+          "path": ".",
+          "kind": "directory",
+          "logical": 10,
+          "allocated": 10,
+          "device": 3,
+          "inode": 1
+        },
+        {
+          "id": "snapshot-accounting-review-file",
+          "path": "cache.bin",
+          "kind": "regularFile",
+          "logical": 120,
+          "allocated": 100,
+          "device": 3,
+          "inode": 2,
+          "classification": {
+            "id": "classification-accounting-review",
+            "category": "packageAndBuildCaches",
+            "disposition": "reviewRecommended"
+          }
+        }
+      ],
+      "expected": {
+        "knownAllocated": 100,
+        "knownLogical": 120,
+        "unknown": 500,
+        "free": 400,
+        "observedUnclassified": 10,
+        "freeDelta": 0,
+        "ownerCount": 1,
+        "gapCount": 0,
+        "status": "reconciled"
+      }
+    },
+    {
+      "name": "known-exceeds-volume-used",
+      "sessionID": "scan-accounting-inconsistent",
+      "scopeID": "scope-accounting-inconsistent",
+      "rootPath": "fixture-root",
+      "volume": {
+        "total": 100,
+        "startFree": 90,
+        "endFree": 90
+      },
+      "entries": [
+        {
+          "id": "snapshot-accounting-inconsistent",
+          "path": "clone.bin",
+          "kind": "regularFile",
+          "logical": 80,
+          "allocated": 80,
+          "device": 4,
+          "inode": 1,
+          "classification": {
+            "id": "classification-accounting-inconsistent",
+            "category": "protected",
+            "disposition": "protected"
+          }
+        }
+      ],
+      "expected": {
+        "knownAllocated": 80,
+        "knownLogical": 80,
+        "unknown": null,
+        "free": 90,
+        "observedUnclassified": 0,
+        "freeDelta": 0,
+        "ownerCount": 1,
+        "gapCount": 0,
+        "status": "inconsistent"
+      }
+    }
+  ]
+}

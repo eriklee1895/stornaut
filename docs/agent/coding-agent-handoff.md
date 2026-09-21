@@ -1,0 +1,1154 @@
+# Stornaut Coding Agent Handoff
+
+> **2026-09-18 排期修订：** 当前执行入口为
+> [三天完整收尾冲刺](../plans/active/README.md#三天完整收尾冲刺2026-09-18-至-2026-09-20)。
+> Tasks 40–43 可在生产 gate 关闭时按接口/fixture 开发；Phase E/F 本机工作不再
+> 等待整个 Phase D 才启动。验证按冲刺分层，Task 39/44 的最终安全和产品准入不变。
+> 下文长篇历史状态不再决定排期；产品不变量、历史证据与精确授权约束仍有效。
+
+> 面向接手实现的 Coding Agent  
+> 最近更新：2026-08-27
+> 当前状态：产品、Agent、UI 功能交互与品牌基线完成；Epic 0–1 evidence
+> gate 已完成；Epic 2–4 Tasks 9–26 通过最终 unified verifier 并归档；
+> Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
+> Tasks 27–28 已完成；ADR 0004 回顾发现的旧 Broker-only Runtime 漂移已由
+> capability-first Runtime R1–R6 gate 关闭；
+> R1–R2 已完成；R2 结论为 `configurationReady`；R3 的原 process-group
+> candidate 因 new-session descendant escape 被拒，用户批准的 audit-session
+> lifecycle supervisor 随后通过 final privileged composition，R3 得出
+> `behaviorReady` candidate；用户 review 后已继续。R4 已完成 strict
+> Investigation Envelope v2、Swift identity binding、ProcessSupport/ProbeBridge
+> module separation 与 structural no-Executor verifier，结论为
+> `protocolReady`。用户明确当前只需个人本机运行，不要求分发；R5 已采用
+> root-only `/Library/Application Support/Stornaut/` App + fixed plist 的
+> local-only lifecycle candidate。provider/schema/raw-event compatibility、
+> closed auth projection 与 machine verifier 已实现；官方 `openai` +
+> ChatGPT subscription `gpt-5.6-luna` worker 已观察 9/9 capabilities，
+> errno-only IPv4/IPv6/
+> private/local/Unix denial 与 worker containment 6/6。2026-08-13 post-fix
+> review 进一步关闭 command/image/subagent evidence forgery、random denial
+> token 映射、privacy-preflight outer/inner launcher 漂移与漏 staged
+> `codex-code-mode-host`；后续独立审查又修复 current-build binding、XPC
+> one-shot continuation、external-state priority 与 subagent sender identity；
+> final live fixes 关闭 vanished-process errno 分类、strict-schema `$ref`
+> sibling、direct-read fixed command 漂移和 shell gate Codable shape。
+> 最新 Codex 227 passed + 8 explicit opt-in skipped、Lifecycle 60/60、
+> serial 537/537、headless selected
+> 534/534、Xcode/Release/no-Executor gates 通过。历史
+> TeamoRouter/`usageLimitExceeded`
+> 仅为 superseded 调试证据。
+> current-source signed App/helper machine report 已得出 `signedRuntimeReady`
+>（9/9 capabilities、12/12 integrity，SHA-256
+> `08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193`），
+> 随后完成 fixed topology 零残留卸载并独立提交推送。R6 已完成 exact
+> admitted receipt、five-dimensional Settings status、typed bilingual
+> disclosure、actual-window evidence、final matrix 与 independent post-fix
+> review，runtime foundation 结论为 `go`，无 unresolved P0–P2。Task 29 的
+> closed execution profiles、one-snapshot Activity/Evidence、Quick Scan
+> integration、完整 Store join、Cleanup Plan Builder、bounded Review
+> projection、independent review 与 unified verifier 已完成。Task 30 的
+> collector/pure-gate、memory-only selection、typed stale contract、
+> actor-owned one-shot authorization、independent review 与 unified verifier
+> 已完成。Task 31 的 serial injected fake-Trash coordinator、durable journal、
+> per-item fresh Policy、Manifest/accounting、audit retry、no-replay recovery、
+> independent review 与 unified verifier 已完成。Task 32 的 typed
+> Scan→Review routing、Core-backed Plan/Policy、write-disabled execution seam、
+> native UI、实际窗口验证、independent review 与 authoritative unified
+> verifier 已完成；真实 App Trash 依赖仍保持关闭。
+> Task 33 的 exact terminal Plan/Policy admission、typed Evidence enrichment、
+> immutable Manifest/journal projection、Reversible First Cleanup Result、
+> read-only Manifest detail、Open Trash/audit-only retry、真实
+> Review→confirmation→terminal DEBUG fixtures、独立 review findings 修复、
+> App tests/focused XCUITest、actual-App/Peekaboo 与 authoritative full
+> verifier 已完成，后者单次 exit 0。production execution 继续
+> `writeDisabled`。
+> Task 34 的 Store v3 Manifest paging、独立 7/90-day retention、typed
+> Quick Scan/Manifest History union、exact local-record deletion、
+> privacy-bounded export、non-causal trend marker、实际窗口证据与独立 review
+> 已完成；authoritative `scripts/verify --full` 单次 exit 0（826.52 秒）。
+> Task 35 的 closed runtime facade、strict signed-App diagnostic、
+> recovery-only runtime、Phase C product gate、benchmark 与 App/Core
+> regressions 已实现。唯一授权的真实 Trash attempt 已消费：exact
+> diagnostic-owned fixture 被移动且 journal durably 停在
+> `actionOutcomeRecorded`；Manifest timeline 缺陷使原 report 正确保持
+> `signedAppTrashBlocked` / `executionFailed`，未重试。随后独立 signed
+> recovery-only App 以 Executor invocation `0` 完成 journal finalization、
+> one-record Manifest、1 success / 0 failed/cancelled/unknown、permanent bytes
+> `0`，并按 identity 恢复 fixture，证明原位置存在且 Trash destination
+> 不存在。privacy-safe checked receipt 已绑定原始/恢复 reports、final Store
+> 与安全关键源码。
+> mutation scripts 现均 sealed；authoritative `scripts/verify --full` 最终只
+> 验证 receipt/source/raw evidence，绝不再调用真实 Trash 或 recovery。
+> 旧 global same-UID Node safe-window 已删除，contracts 禁止
+> `pkill`/`killall`/`pgrep`/`ps -U` 全局进程协调；Chrome、Cursor、Claude、
+> MCP 或其他 App 不得因 Task 35 被阻断或终止。focused product gate 74/74、
+> SwiftPM 634/634、完整 App/UI、Debug/Release 与 receipt/raw-evidence gates
+> 均通过；authoritative full verifier 22/22 stages 单次 exit 0（847.921 秒）。
+> 最终 whole-diff 与 timestamp-focused review 均无 unresolved P0–P2，Phase C
+> plans/briefs 已归档，admission 为 `go`。normal App execution 仍不得启用。
+> Phase D Tasks 36–44 plan 已获批并直接绑定 authoritative pushed Task 35
+> baseline `86ee2aa9428cfc71036e18dcb2c1349ec248ec73`。Task 36 deterministic
+> Investigation domain/canonical source projection/Candidate Planner/budget/
+> stop core 已完成：300,002-row / 256 MiB benchmark 连续最慢
+> `22.540198084` 秒、kernel peak increment 最坏 `100,958,328` bytes；
+> maximum benchmarks 已从普通 suites 隔离并在 full 中独立串行一次，
+> Task 35 receipt/source seal 也已前移到所有昂贵步骤之前。independent
+> review 无 unresolved P0–P2，authoritative `scripts/verify --full` 23/23
+> stages 单次 exit 0（875.36 秒）。Task 37 Store v4/persistence/retention/
+> source rejoin 已完成实现与 independent review；两轮完整 Release capacity
+> gate 共 `30/30` 样本通过，最慢 `53.159062` 秒、最坏 kernel footprint
+> increment `210,944,240` bytes。普通 suites 明确跳过该显式 opt-in
+> benchmark，worker 直接运行已构建 test bundle、不嵌套 SwiftPM。
+> authoritative `scripts/verify --full` 23/23 stages 单次 exit 0（893.65 秒）。
+> Task 38 closed dependency-injected Investigation coordinator/fake runtime、
+> Store-owned one-shot admission、strict event/lineage/token normalization、
+> scientific loop、terminal/recovery barrier、versioned prompt 与 structural
+> no-Executor gate 已完成。review 发现的 prose replay、actor reentrancy、
+> Probe usage regression、spawn started/completed、completion-side tool
+> classification 与 terminal deadline 六类 P1 问题均已 tests-first 修复；
+> 811-test serialized regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（884.57 秒）。Task 39 已按
+> 39A/39B checkpoint 拆分；39A strict signed-runtime contract、server-owned
+> turn identity binding 与 package-closed diagnostic facade 已完成。11/11
+> contract、5/5 facade、77/77 Investigation focused tests、829-test
+> serialized regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（891.15 秒）。39B 已拆为
+> 39B1a/39B1b/39B2；39B1a exact Evidence Store v4 path、directly async
+> lifecycle、actor reentrancy/deadline preservation 与 structural
+> no-blocking-bridge gate 已完成，83-test Investigation suite、833-test
+> serialized regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（883.38 秒）。39B1b 已继续
+> 拆为 39B1b-i transport/composition 与 39B1b-ii DEBUG App leaf。39B1b-i
+> package-scoped stateful App Server client、non-product
+> `StornautInvestigationRuntime` target、async root preopen/one-shot Store
+> claim、canonical first-turn injection、server-owned identity mapping、
+> pending reservation/active turn separation 与 transport fail-closed cleanup
+> 已完成。92-test Investigation、240-test Codex、846-test serialized
+> regression、independent post-fix review 与 authoritative
+> `scripts/verify --full` 23/23 stages 单次 exit 0（900 秒）。39B1b-ii strict
+> DEBUG App leaf implementation、11-test dedicated App target、
+> pure-product Debug/Release boundary、846-test serialized regression 与
+> independent post-fix review 已通过；authoritative `scripts/verify --full`
+> 23/23 stages 单次 exit 0（972 秒）。39B2 已拆为 39B2a strict supervised
+> interactive transport、39B2b signed production composition 与 39B2c
+> machine admission。39B2a implementation、73-test Lifecycle、103-test
+> Investigation、865-test serialized regression 与 independent post-fix
+> review 已通过；authoritative full verifier 23/23 stages 单次 exit 0
+> （932 秒）。39B2b 已继续拆为 39B2b-i helper-owned contained worker 与
+> 39B2b-ii signed diagnostic-App/Task 38 composition。39B2b-i 的
+> root-helper/UID-worker boundary、closed broker、fixed contained session、
+> 37-test focused regression、889-test serialized regression 与 independent
+> post-fix review 已完成；authoritative full verifier 23/23 stages 单次
+> exit 0（933.21 秒）。39B2b-i 已完成。39B2b-ii preflight 随后发现
+> diagnostic final Mach-O 因静态链接整个 Core 而携带 concrete cleanup 与
+> Registered Action authority；dead stripping、关闭 Debug dylib、whole-module
+> 与 `-Osize` 均不能移除。前置修复因此拆为 E1 Registered Action authority
+> extraction 与 E2 Trash/Executor authority extraction。E1 已将 concrete
+> `posix_spawn`/process-tree runner 迁入单向
+> `StornautExecution → StornautCore + StornautProcessSupport` target，Core
+> 只保留 typed contract；11-test focused、895-test serialized、
+> independent review 与 authoritative full 23/23 stages 单次通过（timed
+> stages 954.459 秒）。E1 已完成。E2 已继续拆为 E2a package-only seam
+> 与 E2b concrete authority migration；E2a 的 47/47 focused cleanup、
+> 8/8 headless stages（内含 893-test serialized regression）、targeted
+> Debug App build、Task 35 historical source-snapshot correction 与
+> independent review 均通过，未移动 concrete authority。E2a 已完成，
+> E2b 已继续拆为 E2b-i authority relocation 与 E2b-ii strict
+> final-Mach-O admission。E2b-i 已把 concrete Trash/Executor authority
+> 迁入 `StornautExecution`，Core 只保留 typed seam/receipt/无权 runtime
+> state machine；3/3 package、32/32 affected、73/73 Phase C、
+> ordinary/diagnostic App builds 与单次 898-test serial regression 均通过，
+> independent review 无 unresolved P0–P2。E2b-i complete；E2b-ii strict
+> final-Mach-O verifier/review 已完成，built Execution authority 正控制、
+> full diagnostic bundle Mach-O 负控制与六 target Xcode allowlist 均通过，
+> 唯一一次 clean full 23/23 stages 单次通过（timed 1,046.300 秒），无
+> restart 或 stage rerun。E2b-ii complete；
+> 恢复后的 39B2b-ii signed diagnostic composition 已绑定 opaque Task 38
+> facade、delayed auth projection、helper-reported random workspace、exact
+> diagnostic Store 与 dedicated App/helper topology；focused Codex/
+> Investigation/App tests、strict final-Mach-O gate 与 independent post-fix
+> review 已通过；该 checkpoint 唯一一次 authoritative full verifier 以
+> 23/23 stages、898-test serialized regression、981 秒 wall time 单次通过，
+> 无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的窄 attempt-binding
+> prerequisite 已把 raw capability worker evidence 绑定到 exact nonce 与完整
+> signed runtime binding，修复 component-hash review P2，并通过 903-test
+> headless regression 与 post-fix review。随后独立 strict-decoding
+> prerequisite 已关闭 capability report/outcome unknown-field 接受窗口，
+> 255-test serial Codex suite 与 post-fix review 通过。L1 helper-sealed
+> per-run residue observation 随后完成，949-test staged-only serial regression、
+> targeted Debug helper build 与 post-fix review 通过。L2 exact root topology
+> observer 随后完成 package-closed/non-Codable contract、fixed-node/signing/
+> PID-version/audit-token identity 复查与 installed/post-teardown phase proof；
+> root-helper signing review P1 已 tests-first 修复，117-test focused、exact
+> source-boundaries、targeted Debug diagnostic App/helper build、981-test clean
+> staged-only serial 与 post-fix review 通过。L3c2b deterministic failure
+> matrix driver 随后完成；39B2c readiness 仍仅归 L3c4。
+> L3 preflight 随后拆为 L3a trusted target extraction、L3b root driver/L1+L2
+> collection 与 L3c failure matrix/final admission。L3a 已把 machine-only
+> contract/assembler 以 99% rename 迁入非产品 `StornautInvestigationMachine`
+> target，58-test machine focused、151-test Investigation、exact boundaries、
+> targeted Debug diagnostic build、982-test clean staged-only serial 与
+> independent review 通过。L3b1 exact helper-peer/non-reconnectable XPC epoch、
+> operation-bound L1 handoff 与 irreversible one-shot Store 随后完成，987-test
+> clean staged-only serial、targeted helper/diagnostic builds 与 independent
+> post-fix review 通过。L3b2 root-only one-shot L1/L2 collector、exact
+> non-activating service/PID observation 与 synthetic transition contract
+> 随后完成，1001-test clean staged-only serial、targeted builds 与 post-fix
+> review 通过。L3c scope/trust preflight 随后识别出 App-local handoff 无法
+> 跨 App exit 与 managed-proxy/probe retirement 仍为推断两个缺口，因此拆为
+> L3c1 opaque retirement escrow、L3c2 deterministic machine driver、L3c3
+> current-source real-success three-plane composition 与 L3c4 sealed final
+> admission。L3c1a typed owner retirement、strict v3、exact PGID zero 与
+> untrusted-wire boundary 已完成并通过 1012-test serial/post-fix review；
+> L3c1b 已拆为 i/ii；L3c1b-i complete configuration binding、strict v2/v4
+> transport、memory-only helper escrow、1025-test clean staged-only serial 与
+> independent post-fix review；L3c1b-ii complete synthetic non-Codable Machine
+> claim/collector join、1035-test clean staged-only serial 与 independent grouped/
+> cross-group review。L3c1 已关闭；L3c2 mandatory preflight 已拆成 a-i strict
+> claim transport、a-ii non-product root host/topology 与 b eight-scenario
+> driving。L3c2a-i strict Machine-claim transport、36-test focused、144-test
+> Lifecycle、178-test Investigation、targeted build/release boundaries、
+> 1041-test clean staged-only serial 与 independent post-fix review 已完成；
+> L3c2a-ii root host/topology、strict XPC/signing adapters、resolved authority
+> gates、20-test affected、187-test Investigation、targeted builds/release
+> boundary、1046-test clean staged-only serial 与 independent post-fix review
+> 也已完成；L3c2b deterministic eight-scenario driver、exact cohort preflight、
+> Task 38 fake-runtime flow、structural/targeted gates 与 final independent review
+> 已完成，唯一一次 clean staged-only serial 以 1055 tests / 51 suites 通过，
+> accepted tree 为 `dcd6f33e60521a1a6d4adae2173d14e8bb17abc0`；L3c2 已
+> 关闭。L3c3a strict driver-bound attempt schema、App leaf、installed identity
+> join、structural/release gates、199-test Investigation、11-test App、1057-test
+> clean staged-only serial 与 independent post-fix review 已通过；accepted
+> implementation tree 为 `41521e44ba1e349496f3ab708d8e9f3f376620b3`。L3c3b
+> native diagnostic-only driver packaging/topology admission 已按 fresh preflight
+> 拆为 L3c3b-i native packaging 与 L3c3b-ii installer/L2 admission；首个
+> final-Mach-O spike 又证明 full Machine/Core graph 携带 forbidden Cleanup/
+> Policy/Registered Action typed surface，因此插入 L3c3b-0 authority-closed
+> driver runtime extraction。L3c3b-0 零依赖 DriverSupport、Debug/Release final-
+> Mach-O authority gate、1059-test clean staged-only serial 与 independent post-
+> fix review 已完成；accepted tree 为
+> `9b3642ad88fcccf9768141a8ebf1917565c99c49`。L3c3b-i diagnostic-only native
+> target、独立 CodeSignOnCopy、ordinary absence、final artifact gate、202-test
+> Investigation、1060-test clean staged-only serial 与 independent post-fix/
+> cross-group review 已完成；accepted tree 为
+> `e1878eced30a6193aa89ad89dd88d02949e9f2a3`。L3c3b-ii exact installer/L2
+> admission、ACL fail-closed、whole-installer source seal、disposable matrix、
+> 1067-test clean staged-only serial 与 independent grouped/post-fix/cross-group
+> review 已完成；accepted tree 为
+> `1c4a665151e6bca44d784c94b2a9c461217f83e2`。L3c3c-i transport/root-launch
+> audit 已完成：i-a/i-b1/i-b2a 保留 B3/B4 algorithm 和 historical
+> reproducibility evidence；i-b2b-0a 以独立 reviews 证明 `sudo -v` 与
+> separate no-cache stock root commands 均不能形成可接受的 external root
+> trust anchor。i-b2b-0b/i-b2b-1 在执行前 superseded；B4 root count 为 0，
+> 无 root artifact/receipt。ADR 0018 仍 Proposed。L3c3c-ii-a authority-closed
+> installed-driver/manifest observation 与 exact source/final-Mach-O admission
+> 已完成；ii-b preflight 又识别 helper reply handle echo、per-epoch/final-
+> uninstall 语义冲突和零参数 driver input 缺口，现冻结为 ii-b0a/ii-b0b、
+> ii-b1–ii-b5 与 ii-c0；ii-b0a exact frame/capsule implementation、focused/
+> affected/structural/Debug/Release gates、1,107-test staged-only serial 与
+> independent review 已完成；ii-b0b claim/release wire、1,122-test staged-only
+> serial 与 independent review 也已完成。ii-b1 preflight 发现 first-frame
+> epoch origin contradiction，已由 ii-b0c fixed bootstrap prelude关闭。ii-b1
+> authority-free App leaf 随后按 post-RED topology correction 拆成 Debug-only
+> diagnostic 与 dependency-free Release shell，并通过 9/9 leaf、13/13 App、
+> 277 affected、exact structural/final-artifact gates、1,138-test staged-only
+> serial 与 independent post-fix review。ii-b2 ASID prerequisite 随后修正
+> false App/helper same-ASID join，保持完整 App/helper identity 独立绑定并将
+> L1 residue 绑定 helper；1,142-test implementation serial、独立 1,143-test
+> decoder-negative supplement 与 final review 均通过。ii-b2a typed escrow/
+> deadline state、19-test focused、167-test Lifecycle affected、structural/
+> mutation gates、唯一 1,162-test/57-suite combined serial 与 final review 均已
+> 完成；ii-b2b-i non-connected machine-claim server、唯一 1,194-test staged
+> serial、source/package/mutation gates 与 post-fix reviews 已完成；ii-b2b-ii
+> legacy-client quarantine / Machine production block 也已完成并通过 34
+> focused、175 Lifecycle affected、308 Investigation affected、完整
+> App/main-Mach-O gate、1,196-test staged-only serial 与 grouped/cross-group
+> review。ii-b2b-iii 已按 fresh scope/cost preflight 拆为 iii-a handle-v3/
+> single-quantized transfer 与 iii-b public live façade/helper integration；
+> iii-a 已完成并通过 91 focused、181 Lifecycle、309 Investigation、唯一
+> 1,208-test staged-only serial 与 post-fix/cross-group review。iii-b 又拆为
+> iii-b-i semantic/live integration 与 iii-b-ii executable physical-adapter；
+> iii-b-i 已完成并通过 83 focused、499 affected、唯一 1,212-test/58-suite
+> staged-only serial、完整 helper/final-Mach-O gate 与 fresh cross-group review，
+> iii-b-ii 也已完成并通过 51 focused、504 affected、唯一 1,223-test/58-suite
+> staged-only serial、physical/five-symbol final-Mach-O gates 与 post-fix review。
+> iii-b/ii-b2b 已关闭；ii-b3 已拆为 ii-b3a/b3b/b3c，ii-b3a 已完成并通过
+> 35 focused、521 affected、exact contract/structural/artifact gates、唯一
+> 1,234-test/59-suite staged-only serial 与 independent post-fix review；ii-b3b
+> start-to-retire-only seam 与独立 test-only fixture prerequisite 也已完成，
+> 原 1,244/1,245 setup-side issue 由 prerequisite 的唯一 1,245-test clean
+> serial 精确关闭；ii-b3c 已完成并通过 1,257-test/60-suite serial 与 grouped
+> post-fix review；ii-b4 已完成并保持 non-admitting；ii-b5 已拆为
+> b5a0/b5a/b5b-i/b5b-ii/b5b-iii；b5a0/b5a 已完成并保持 non-admitting，
+> b5b-i-a projection/dual-clock contract 与 i-b1 authority-closed semantic
+> target 已完成并保持 non-admitting；i-b1 的 6-path/979-line scope、8 focused、
+> 26 affected、contract/structural/Mach-O gates 与 final review 已收口。唯一
+> 1,311-test/64-suite serial 记录 4 issues、未绿色且未重跑；同 validation tree
+> 的 3 个 exact cases 通过，consumer-count 静态 case 由 final tree 唯一一行
+> `6 → 7` 修复并精确通过。i-b 的余下顺序是 i-b2a artifact/static、i-b2b
+> process/service + narrow C identity 与 i-b3 observer composition；i-b2a 已完成
+> 并保持 non-admitting，i-b2b 已拆为 i-b2b-a/i-b2b-b，两者均已完成并
+> 保持 non-admitting；i-b3 也已完成并保持 non-admitting。fresh preflight
+> 已把 i-c 拆为 i-c1 DriverSupport join/opaque proof 与 i-c2 legacy-owner
+> closure；i-c1 与 aggregate i-c2 semantic/physical-owner closure 已完成并
+> 保持 non-admitting；b5b-ii-a fixed FD-0 capsule intake、b5b-ii-b independent
+> Darwin App identity observation、b5b-ii-c fixed FD-7 session 与 b5b-ii-d
+> exact owned-PGID retirement 已完成并保持 non-admitting。dependency inversion
+> preflight 已把 ii-c0 拆为 c0a/c0b；c0a 保留 v1 capsule/epoch bytes，新增
+> package-only enclosing projected-cohort input 与 paired intake，并已完成、保持
+> non-admitting。b5b-iii 随后已关闭至 iii-b2b-1b；ii-c0b 已冻结为
+> c0b-i/c0b-ii/c0b-iii/c0b-iv。c0b-i 已以 exact 7 non-document paths /
+> 1,900 changed lines、95 tests / 5 suites、three green gates 与 independent
+> final no-unresolved-P0–P2 review 完成并保持 non-admitting；按设计未运行
+> serial/full/root/sudo、App/helper/driver launch、XPC、model/auth 或 network。
+> c0b-ii fresh preflight 已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a 又因
+> 7-path / 2,600-line 预算漂移至预计 2,720–2,870 lines，拆为 exact 3-path /
+> 2,000-line a1 behavior 与 exact 4-path / 1,200-line a2 verifier closure。a1
+> 已以 `d18354b` / tree `d6a4b0e`、3 paths / 1,981 lines、132 concrete cases
+> 与 no-unresolved-P0–P2 review 完成；a2 也已以 implementation
+> `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+> `d0683495ea37d0692677c98f491f3037eaedba4c`、4 paths / 889 lines、aggregate
+> 7 paths / 2,870 lines、bare contract/component/App-Release exit 0 与双人
+> no-unresolved-P0–P2 review 完成并保持 non-admitting。a2 未运行 serial/full、
+> root、App、XPC、model 或 network。retained-base、publication/lease、
+> settlement/recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后
+> 均已完成并推送。c0b-iv fresh preflight 冻结 iv-a0 → iv-a-r → iv-b1a →
+> iv-b1b-i → iv-b1b-ii → iv-b2；iv-a0、iv-a-r、iv-b1a、iv-b1b-i 与
+> iv-b1b-ii 已完成并保持 non-admitting。iv-b1b-ii 以 implementation
+> `373431d4` / tree `b08342e5`、exact 5 paths / 2,193 changed lines、七场景
+> physical matrix、808-test/57-suite clean serial、三项 dedicated gates 与
+> no-unresolved-P0–P2 final reviews 收口；iv-b2 又以 implementation
+> `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+> `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+> shared-deadline repair `c144c1e`、fixed-gate deadline cleanup repair
+> `bc42fbc`、interactive-native identity binding `531f79f` / consumer seal
+> `26e785a` 与 fixed-gate historical replay `aa8a7f1` 均已完成并保持
+> non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与 ii-c-b2a2 已完成；当前严格按
+> ii-c-c unique real machine campaign v8 已到达 `armedConsumed`，随后在
+> Gate prepared receipt 前失败。非 root suspended-sudo probe 证明
+> `PROC_PIDTBSDINFO` 对该 setuid child 返回 `EPERM`，而
+> `KERN_PROC_PID` 可稳定提供 PID/parent/PGID/session/start-time/stopped
+> 证据；对应 Gate、bounded cleanup、source/mutation 与 Debug/Release
+> Mach-O gate 修复已通过 focused 和 1,924-test serial regression。v8 不会
+> 重试。v8 failure-evidence/recovery disposition 已由独立 self-sealed 只读
+> verifier 固化为 consumed transport loss / non-admitting / non-retryable，且
+> 原 evidence tree 未修改。L3c3d 与 L3c4 均依赖现有契约要求的 green machine
+> cohort；用户于 2026-09-05 批准的 replacement v9 首次 launcher 在 install
+> 提示处取消且未消费；修复后 invocation 从 `55c574d` 到达 durable arm，随后
+> `spawnUncertain → terminal`。v9 已消费、non-admitting 且不可重试；固定
+> App/plist/service 已卸载。exact Gate attempt/capsule 原先已由 v2 receipt 验真，
+> 但后续 serial validation 触发历史 physical fixture 的 production stale-recovery
+> 并误删 capsule；原字节无副本可恢复，当前由 v3 post-mutation receipt 固化。
+> fixture 已改为 explicit opt-in 与 discovery/entry 双重保护。macOS
+> `amfid` 以 code `-423` 拒绝携带受限 application-identifier entitlement 的
+> ad-hoc MachineDriver。tests-first root-cause 修复只关闭 MachineDriver
+> entitlement 生成并已通过 focused/structural/Debug/Release binary gates；新
+> campaign 未授权。L3c3d/L3c4 继续 unproven。这些 repairs 是
+> machine-campaign prerequisite checkpoints，不是新的 Task。该
+> pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a` 完成；
+> typed failure receipt、physical compact-frame path、exact 9-path scope 与
+> nine negative mutations 经最终复核无 unresolved P0-P2。唯一 privileged
+> attempt v8 已消费，禁止重跑。
+> b5b-ii-c checkpoint 以 8 个 non-document paths / 3,104 changed lines、35
+> focused tests、1,396-test staged-only serial、三个 verifier gates 与 final
+> no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为 b5b-iii
+> production/artifact composition、ii-c0b non-root capsule-author/launcher preflight，
+> 再到 ii-c 唯一 no-model
+> privileged installed-driver gate。只有
+> L3c4 可作 readiness claim，
+> L3c2b preflight 的 fresh-plan matrix contradiction 已由 plan-freshness
+> prerequisite 关闭：八个 actual plan fingerprints 全唯一、一个 exact
+> target-set fingerprint 绑定 cohort，affected/Investigation/structural/review
+> gates 通过；L3c2b evidence 见
+> `phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md`。
+> final full 尚未消耗。
+> 生产 Deep Dive 仍 unavailable。
+> ii-b 的 authoritative execution order、path/line budgets 与 validation
+> funnel 见
+> [ii-b Split Preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md)；
+> 它 supersede 更早 handoff 中 unsplit ii-b 的 implementation routing。
+> Task 5 的历史
+> Broker-only no-go 已由 ADR 0004 capability-first 决策修订，Deep Dive 因
+> 生产产品流程尚未实现而 unavailable；
+> release signing/notarization 未评估
+
+## 1. 任务目标
+
+构建一个原生 Swift macOS App，将确定性开发者磁盘扫描与 capability-first Codex 深度调查结合起来。产品必须在没有 Codex 和外部工具时完成 Quick Scan；Deep Dive 允许 Codex 使用直接只读 Agent 工具、Probe Broker 与公共互联网调查未知空间。所有写操作由 Swift Policy Gate 与 Executor 控制。
+
+Coding Agent 可以实现已批准的导航、状态模型和原生组件骨架，但不得把任一视觉概念图当作逐像素终稿。Onboarding 使用 A 的三步单焦点结构 + C 的紧凑 Full/Limited 后果说明，并具有 Welcome、FDA、Connect Codex 的 Dark/Light 配对；Overview 的 A+B 融合构图及 Dark/Light 配对方向已经批准；Quick Scan 的 E 主体 + A 阶段 rail 已批准；Scan Results 的 A 默认表格 + D Inspector 已批准；Deep Dive 的 B 默认页 + C Inspector + A Probe 轨迹已经批准；Review 的 A 默认表格 + C Inspector + B 分组解释已经批准；Cleanup Result 使用 B 的可恢复优先层级 + A 计量契约，E 是 partial/error 状态，C/D 分别下沉为 Accounting Details 与 Manifest；History 使用 E master-detail + A 日期分组，C 是按需 Storage Trend；Settings 使用 A 的独立原生侧栏外壳 + C 的 General 状态汇总 + E 的结构化 Local Knowledge，并具有 General、Codex & Deep Dive、Local Knowledge 的 Dark/Light 配对。跨流程状态统一采用“保留有效结果 → 标出受影响范围 → 只提供安全恢复 → 技术细节按需展开”，五组 Light/Dark canonical 覆盖 limited coverage、Deep Dive safety blocked、stale plan、partial investigation 与 expired evidence/corrupt history。圆环只作为功能性存储图，不得实现星座/星图装饰。发现 Codex 不等于验证 capability-first runtime boundary；在“完整调查能力 + 公共联网 + 进程树不可写 + no-Executor”运行时检查通过前 Deep Dive 必须保持 paused。
+
+正式产品名为 `Stornaut`：App/Swift 类型使用该大小写，仓库、CLI 和配置前缀使用 `stornaut`。项目采用 MIT License；首发仅面向开发时最新稳定版 macOS 与 Apple Silicon，不为 Intel 或旧系统牺牲实现简洁度。
+
+不要把项目实现成：
+
+- 一组 Shell 清理脚本的 GUI
+- 把扫描结果发给模型生成文案的“AI 标签”
+- 允许 Agent 任意 `rm` 或执行清理命令的包装器
+- ClearDisk、Mole 或其他项目的简单 Fork
+
+## 2. 必读顺序
+
+1. [文档地图](../README.md)
+2. [PRD](../product/PRD.md)
+3. [技术架构](../architecture/system-architecture.md)
+4. [批准的 Agent 设计规格](../design/agent-disk-governance.md)
+5. [UI/UX 设计规格](../design/ui-ux.md)
+6. [跨流程恢复状态与概念图](../assets/ui-concepts/RESILIENCE-STATES-ROUND-1.md)
+7. [已批准的 Epic 0–1 实施计划](../plans/completed/epic-0-1-foundation-spikes.md)
+8. [上游参考矩阵](../research/upstream-reference-matrix.md)
+9. [竞品报告](../research/competitive-analysis-2026-08-06.md)
+
+规范优先级：用户明确批准的 v1 约束 → PRD 2.3 与两份批准规格 → architecture 2.2 → Epic 0–1 实施计划 → 研究/案例/视觉概念。发现冲突时先报告并提出精确修正文案；未经用户批准不得降低安全边界、扩大权限或修改已批准产品范围。
+
+涉及 App build/run、UI 改动或实际截图验证时，额外读取 [Development Automation](development-tooling.md) 与 [UI Testing Guide](ui-testing-guide.md)。仓库 XcodeBuildMCP/Peekaboo 是 Coding Agent harness，不得进入产品 Deep Dive Codex 的配置或工具面。
+
+## 3. 不可违反的产品不变量
+
+1. Quick Scan 不调用模型。
+2. Codex 只有调查和建议权。
+3. Codex 可直接读取授权扫描范围，并使用 shell/unified exec、live high-context search、browser/direct fetch、image、skills/subagents 与公共互联网；不得设置 Bash/executable/public destination-domain allowlist 或逐命令批准来削弱调查质量。
+4. Probe Broker 是优先的类型化、可预算、可审计证据接口，不是 Agent 磁盘调查的唯一入口。
+5. Codex 与所有后代进程不可写用户数据、不可访问 localhost/私网/任意 Unix socket、不可调用清理链；不得以 `danger-full-access` 换取联网。
+6. Policy Gate 可以否决 Agent，不能反向被 Agent 覆盖。
+7. Executor 只接受 `MoveToTrash` 或 Action Registry 中的类型化动作。
+8. Trash 失败绝不回退为永久删除。
+9. 执行前必须重验证路径与活动状态。
+10. Adapter 可缺失，核心必须独立工作。
+11. Swift Scanner 性能未被证明不足前，不引入 Rust。
+12. 失败保持 `Unknown`/拒绝，不能猜测为 `Ready to Reclaim`。
+13. Evidence Store 默认 7 天；原始受控读取内容不落盘；原始 Codex JSONL 正常结束即删除。
+14. v1 不创建 MenuBarExtra、后台监控、定时扫描或登录启动项。
+15. 顶层导航固定为 Overview、Scan、Investigations、History；Settings 独立。
+16. UI 默认不展示 chat、console、原始 JSONL 或模型思维链。
+17. Agent-only 规则 miss 不能进入默认选中的 Ready to Reclaim。
+18. Local Knowledge 只能保存经确认的结构化事实，不能降低清理 protected-path policy、veto 或 Policy Gate。
+19. `ReclaimDisposition` 只有 Ready to Reclaim、Review Recommended、Protected、Unknown；风险与置信度独立建模。
+20. 权限缺口不得显示为 `0 B`；已经完成且仍有效的结果不得被局部失败抹掉。
+21. stale preflight 没有 `Proceed Anyway`；刷新受影响项之前不得执行任何动作。
+22. safety check 阻断时不得显示尚未发生的 explained gain、finding count 或阶段进度。
+23. linked Evidence 到期不得提前删除最小 Cleanup Manifest；损坏记录只隔离自身。
+
+## 4. 开发方法
+
+每个 Epic 使用以下循环：
+
+```text
+Upstream Study
+→ Implementation Brief
+→ 小型技术设计/ADR
+→ Tests/Fixtures first
+→ 实现
+→ 安全与行为 Benchmark
+→ 文档和 provenance 更新
+```
+
+### Upstream Study Gate
+
+开始编码前，从 [上游参考矩阵](../research/upstream-reference-matrix.md) 选择必读项目，记录：
+
+- URL、commit/version、license
+- 阅读的具体文件和文档
+- 值得借鉴的行为/算法/UX
+- 反面案例
+- 是否复用代码及 attribution
+- Stornaut 的独立方案和预期改进
+
+没有完成 Gate，不进入编码。
+
+## 5. Epic 能力地图与批准交付顺序
+
+Epic 编号用于能力归属，不再被解释为严格的时间顺序。批准的宏观交付顺序见 [Delivery Roadmap](../plans/roadmap.md)：
+
+```text
+Epic 0–1
+→ Epic 2–4
+→ Epic 8 Tasks 27–28
+→ Epic 5 Runtime R1–R6 evidence gate
+→ Epic 8 Tasks 29–35
+→ Epic 5–6（仅在 ADR 0004 capability-first runtime gate 允许时）
+→ Epic 7 + Epic 8 remaining
+→ Epic 9
+```
+
+这样先形成无 Codex 也可工作的 `Quick Scan → Review → Policy Gate → Trash → Manifest` 安全闭环，再条件接入 Deep Dive。以下各 Epic 保留其能力范围。
+
+### Epic 0：仓库与验证骨架
+
+- 验证现有 GitHub/`main`/`origin` 基线；确认并保留现有、已批准的 MIT `LICENSE`
+- 按已接受的 Epic 0 Upstream Study 建立 checked-in Xcode App/Test host 与 Swift Packages；ADR 0001 固化最终 bundle/signing 证据
+- CI、SwiftLint/format、单元测试和 fixture 目录
+- ADR 与 ThirdPartyNotices 机制
+- 建立最小原生单窗口 shell：四个 placeholder workspace 与独立 Settings；不实现品牌化完整 UI
+
+交付：空 App 可启动，Core tests 可在命令行运行。
+
+### Epic 1：高风险技术 Spikes
+
+必须先验证：
+
+1. GUI App 如何可靠发现用户 Codex。
+2. `codex exec --json --output-schema --ephemeral` 的协议。
+3. 超时、取消和子进程树终止。
+4. Codex 是否继承 FDA，以及 direct read/shell/live web/browser 可用时如何强制整个进程树不可写。
+5. 本地 MCP/Probe Broker 或等价桥接作为优先结构化证据接口。
+6. Swift 扫描真实性能。
+7. Trash 和 Registered Action 生命周期。
+
+每项写 ADR。任何安全假设无法成立时，暂停功能开发并更新设计。
+
+### Epic 2：StornautCore 数据模型
+
+- Snapshot、Evidence、Classification、InvestigationTarget
+- CleanupPlan、PolicyDecision、CleanupAction、Manifest
+- SQLite schema/migrations
+- 无 UI 的 fixture tests
+
+### Epic 3：Quick Scan
+
+- Surveyor
+- 扫描取消和流式结果
+- 基础 space accounting
+- Quick Scan UI
+- Overview 的 snapshot-first Space Ledger 与 Scan 动态分类
+- 460GB Benchmark harness
+
+### Epic 4：Knowledge Base 与 Activity
+
+- YAML compiler、provenance、overlay
+- 首批 developer cache 和 artifact 规则
+- Git/IDE/process 信号
+- 清理 protected-path policy 与 veto
+- 与 Mole/ClearDisk/kondo 的 fixture 对照
+
+### Epic 5：Codex Runtime 与 Probe Broker
+
+- Codex detection/capability check
+- JSONL event parser 和 output Schema
+- direct read、shell/unified exec、live search、browser/direct fetch、image、skills/subagents 与公共网络 profile
+- Broker 工具、预算、审计和内容过滤
+- fake Codex integration tests
+- Prompt injection、写入尝试与凭据非持久化测试
+
+### Epic 6：Deep Dive
+
+- Candidate Planner
+- 科学调查状态机和停止条件
+- Evidence Report
+- Deep Dive UI、覆盖率和预算
+- 首次启用时聚合披露 direct read/model context/public network 数据边界
+- Agent 调查 affordance、Investigation Details Inspector 和 `Discovered by Codex` 证据摘要
+
+### Epic 7：Adapters
+
+- macOS 系统探针
+- Mole、kondo、Homebrew、Docker
+- detection/version/capability
+- golden output fixtures 和降级
+
+### Epic 8：Policy、Executor 与结果计量
+
+- Policy Gate 不变量
+- Trash
+- 首批 Registered Actions
+- preflight/dry-run/revalidate/postflight
+- Manifest 和 Cleanup Result UI
+- Review 默认选择策略、永久动作独立确认和 History 审计体验
+
+其中 Policy Gate、Review、MoveToTrash、Manifest 与基础结果计量在 Epic 2–4 后提前交付；真实 Registered Actions 与 Adapter 相关能力在 Epic 7 后补齐。
+
+### Epic 9：真实机器验证与开源准备
+
+- 匿名案例端到端复现
+- 性能、内存、取消、权限和清理归因
+- Developer ID/notarization/FDA 流程
+- 贡献指南、规则 Schema、隐私和安全说明
+
+## 6. 第一份实施计划的范围
+
+第一份 coding plan 只覆盖 Epic 0–1：工程骨架和高风险 Spikes，目前已经完成。
+
+已完成的历史输入：[Epic 0–1 Foundation & Risk Spikes Implementation Plan](../plans/completed/epic-0-1-foundation-spikes.md)。
+[Epic 2–4 Deterministic Product Core Plan](../plans/completed/epic-2-4-deterministic-product-core.md)
+已完成并归档，不再构成当前执行授权。Phase B 最终证据见
+[Epic 2–4 Validation Report](../reports/epic-2-4-validation-report.md)。
+Phase C 详尽计划见已归档的
+[Epic 8 Safe Execution Vertical Slice](../plans/completed/epic-8-safe-execution-vertical-slice.md)，
+已于 2026-08-11 获用户批准并于 2026-08-15 完成。用户在 Task 29 前插入的
+[Capability-First Codex Runtime Evidence Gate](../plans/completed/capability-first-codex-runtime-gate.md)
+也已完成并归档。
+R1–R6 全部通过后才恢复 Tasks 29–35；R4 已完成并得出
+`protocolReady`。R5 的 local-only topology、runtime worker 与 verifier 已
+实现；provider/schema/raw-event 漂移及 post-review closed-protocol findings
+已关闭。官方 `openai` worker 已观察 9/9 capabilities 与 6/6 worker
+containment；post-fix source 已补齐 official code-mode host、
+anti-forgery evidence、current-build binding 与 one-shot XPC reply。历史
+TeamoRouter/usage-limit 报告只作 superseded evidence。current-source signed
+App/helper 已得出 `signedRuntimeReady`，并完成 fixed App/plist/service/
+lease/runtime/process 零残留卸载。R6 final admission 已完成并得出 runtime
+foundation `go`；Task 29 已完成并通过 review/verify。实现与完成证据见
+[Task 29 Implementation Brief](../plans/completed/task-29-implementation-brief.md)
+与 [Task 29 Review](../reports/epic-8-task-29-review.md)。Task 30 详细边界见
+[Task 30 Implementation Brief](../plans/completed/task-30-implementation-brief.md)；
+完成证据见
+[Task 30 Review](../reports/epic-8-task-30-review.md)。Task 31 详细边界见
+[Task 31 Implementation Brief](../plans/completed/task-31-implementation-brief.md)；
+完成证据见
+[Task 31 Review](../reports/epic-8-task-31-review.md)。Task 32 只可接入 fake
+或 write-disabled coordinator，不得启用真实 App Trash。Task 32 详细边界见
+[Task 32 Implementation Brief](../plans/completed/task-32-implementation-brief.md)，
+当前 completion audit 见
+[Task 32 Review](../reports/epic-8-task-32-review.md)。
+Task 33 详细边界见
+[Task 33 Implementation Brief](../plans/completed/task-33-implementation-brief.md)；
+completion audit 见
+[Task 33 Review](../reports/epic-8-task-33-review.md)。Task 33 只展示已接受的
+Core terminal Manifest；它不启用真实 App Trash、Task 34 History 或 Task 35
+signed-App admission。
+Task 34 详细边界见
+[Task 34 Implementation Brief](../plans/completed/task-34-implementation-brief.md)；
+完成证据见
+[Task 34 Review](../reports/epic-8-task-34-review.md)。Task 34 将 Manifest
+加入 typed History，但仍未执行或启用真实 App Trash。
+逐项 artifact/command/gate 缺口与恢复顺序见
+[R2–R6 Progress Audit](../reports/capability-first-runtime-progress-audit-2026-08-13.md)。
+R1 当前证据见
+[study](../upstream-studies/epic-5-capability-first-runtime.md) 与
+[ADR 0013](../adr/0013-capability-first-runtime-containment.md)：唯一候选需要
+same-session parent-owned random loopback managed proxy transport。该精确例外
+已获用户批准用于 R2 configuration candidate；R3 behavior evidence 因
+process-tree lifecycle escape 拒绝原 process-group design，随后由用户批准的
+[ADR 0016](../adr/0016-investigation-lifecycle-supervisor.md) audit-session
+supervisor 关闭 hard gate。R3 final verdict 为 `behaviorReady` candidate。
+R4 随后用 strict v2 advisory protocol 与 package graph separation 关闭
+no-Executor protocol seam；R5 signed-App helper 与 R6 final admission 已
+完成。FDA/TCC product flow 与 production Deep Dive 仍不在当前 admission。
+
+Phase D 当前实现入口为
+[Conditional Deep Dive Plan](../plans/active/phase-d-conditional-deep-dive.md)、
+[Investigation Canonical v1](../specs/investigation-canonical-v1.md) 与
+[Task 39 Brief](../plans/active/task-39-implementation-brief.md)；Task 36 的
+完成证据见 [Task 36 Review](../reports/phase-d-task-36-review.md)，Task 37
+完成证据见 [Task 37 Review](../reports/phase-d-task-37-review.md)，Task 38
+完成证据见 [Task 38 Review](../reports/phase-d-task-38-review.md)。Task 39
+继续保持 active/incomplete；Task 40 的 closed-fixture report、current-Store
+reconciliation、conservative Review 与 Store-owned continuation 已完成，证据见
+[Task 40 Review](../reports/phase-d-task-40-review.md)。Task 41 是当前产品流
+下一实现入口，Task 44 production admission 仍受 Task 39 green machine gate
+约束。Task 39
+的 39A contract/composition foundation 已完成，证据见
+[Task 39A Review](../reports/phase-d-task-39a-review.md)。39B1a prerequisite
+closure 也已完成，证据见
+[Task 39B1a Review](../reports/phase-d-task-39b1a-review.md)。39B1b-i
+transport/composition 也已完成，证据见
+[Task 39B1b-i Review](../reports/phase-d-task-39b1b-i-review.md)；39B1b-ii/
+39B2 只按 signed-App diagnostic
+[Implementation Brief](../plans/active/task-39-implementation-brief.md) 实施。
+39B1b-ii implementation/review evidence 见
+[Task 39B1b-ii Review](../reports/phase-d-task-39b1b-ii-review.md)；其
+authoritative full verifier 已通过。39B2a implementation/review evidence 见
+[Task 39B2a Review](../reports/phase-d-task-39b2a-review.md)；其
+authoritative full verifier 23/23 stages 单次 exit 0。39B2b-i
+implementation/focused review evidence 见
+[Task 39B2b-i Review](../reports/phase-d-task-39b2b-i-review.md)；
+889-test serialized regression 与 authoritative full verifier 23/23 stages
+单次 exit 0（933.21 秒）已通过。39B2b-ii authority-extraction prerequisites
+与 resumed signed composition evidence 见
+[Task 39B2b-ii Review](../reports/phase-d-task-39b2b-ii-review.md)；focused
+acceptance、independent post-fix review 与唯一一次 authoritative full
+23/23 stages 已通过；该 run 包含 898-test serialized regression，wall time
+981 秒，无 restart 或 stage retry。39B2b-ii 已完成。39B2c attempt-binding
+prerequisite evidence 见
+[review](../reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md)；
+其 903-test headless regression 与 independent post-fix review 已通过，
+strict-decoding prerequisite evidence 见
+[review](../reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md)；
+其 255-test serial Codex suite 与 independent post-fix review 已通过，
+L1 helper-sealed residue evidence 见
+[review](../reports/phase-d-task-39b2c-l1-residue-observation-review.md)；
+其 949-test staged-only serial regression、targeted helper build 与 independent
+post-fix review 已通过。L2 root topology evidence 见
+[review](../reports/phase-d-task-39b2c-l2-root-topology-observation-review.md)；
+其 117-test Lifecycle focused、exact source-boundaries、targeted Debug
+diagnostic build、981-test clean staged-only serial 与 independent post-fix
+review 已通过。
+L3a trusted machine target evidence 见
+[review](../reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md)；
+其 151-test focused、targeted Debug build、982-test clean staged-only serial 与
+independent review 已通过。
+L3b1 peer/L1 handoff 见
+[review](../reports/phase-d-task-39b2c-l3b1-peer-retirement-handoff-review.md)；
+其 987-test clean staged-only serial、targeted builds 与 post-fix review 已通过。
+L3b2 trusted lifecycle collector 见
+[review](../reports/phase-d-task-39b2c-l3b2-lifecycle-topology-collector-review.md)；
+其 1001-test clean staged-only serial、targeted builds 与 post-fix review 已
+通过。L3c 已按 scope/trust preflight 拆成 L3c1–L3c4；L3c1a typed owner
+retirement、L3c1b-i configuration-bound helper escrow 与 L3c1b-ii synthetic
+Machine claim/collector join 已完成，L3c1 已关闭；L3c2 已拆为 a-i/a-ii/b，
+L3c2a-i strict claim transport、1041-test clean staged-only serial 与
+independent post-fix review 已完成；L3c2a-ii non-product root host/topology、
+1046-test clean staged-only serial 与 independent post-fix review 也已完成；
+L3c2b eight-scenario driver、1055-test clean staged-only serial 与 final
+independent review 已完成，L3c2 已关闭；L3c3a strict driver-bound attempt
+schema、1057-test clean staged-only serial 与 post-fix review 已完成；L3c3b
+拆为 b-i native packaging / b-ii installer+L2 admission；final-Mach-O blocker
+插入的 b-0 authority closure、1059-test clean staged-only serial 与 independent
+post-fix review 已完成；b-i native packaging、1060-test clean staged-only serial
+与 independent post-fix/cross-group review 也已完成；b-ii installer/L2 admission、
+ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
+independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
+audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
+B4 root execution count 为 0。L3c3c-ii-a 与 ii-b0a 已完成；
+ii-b0a/ii-b0b/ii-b0c/ii-b1 与 ii-b2 ASID prerequisite 已完成，
+ii-b2a、ii-b2b-i 与 ii-b2b-ii legacy-client quarantine / Machine production
+block、iii-a、iii-b-i 与 iii-b-ii 均已完成；ii-b3 已拆为 b3a/b3b/b3c，
+ii-b3a/ii-b3b/ii-b3c/ii-b4/ii-b5a0/ii-b5a complete/non-admitting，
+ii-b5 split；b5b-i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3
+complete/non-admitting；i-c 已拆为 i-c1 join/proof 与 i-c2 legacy closure，
+i-c1 与 aggregate i-c2 complete/non-admitting；ii-b5b-ii-a/ii-b/ii-c/ii-d
+   complete/non-admitting；ii-c0 已拆为 c0a/c0b，c0a implementation
+complete/non-admitting。ii-b 已拆为 ii-b0a/ii-b0b/ii-b0c 与
+ii-b1–ii-b5。fresh source/topology preflight 又把 ii-b5b-iii 拆为 b0
+protocol、a per-epoch continuity、b1 injected cohort、b2a0 typed physical
+bridge、b2a-i canonical supervisor admission、b2a-ii-a Darwin physical session
+与 b2b entry/artifact；b0 已冻结，iii-a、iii-b1、iii-b2a0 与 iii-b2a-i 已
+完成并保持 non-admitting。iii-b2a0 的 exact 8-path /
+2,198-line implementation、36-test/3-suite combined selection、580-test/43-suite
+affected selection、1,462-test/76-suite clean serial、三项 boundary gates、
+Debug/Release builds、immutable seal 与 independent semantic/verifier/
+cross-group review 已通过。physical result 是 untrusted DTO，不能直接进入
+single-epoch result 或 continuity。iii-b2a-i 已关闭 canonical protocol、
+one-shot receiver、private admission 与 same-owner containment proof；
+iii-b2a-ii-a1 fixed transport/inner-role closure 也已完成并封印。a2 scope/trust
+preflight 将剩余工作封闭拆为 a2-0 untrusted decode、a2-i inherited-PGID App
+session 与 a2-ii terminal/admission join；a2-0、a2-i 与 a2-ii 已完成并保持
+non-admitting；iii-b2b-0、iii-b2b-1a-0 与 iii-b2b-1a-1 已完成并保持
+non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
+non-admitting；ii-c0b 已冻结，c0b-i 已完成并保持 non-admitting；c0b-ii
+fresh preflight 已拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a budget split 已冻结为
+a1/a2；a1/a2 及后续 c0b-ii/c0b-iii 均已完成并保持 non-admitting。c0b-iv
+fresh preflight 冻结 iv-a0 → iv-a-r → iv-b1a → iv-b1b-i → iv-b1b-ii →
+iv-b2；iv-a0、iv-a-r、iv-b1a、iv-b1b-i 与 iv-b1b-ii 已完成并保持
+non-admitting。iv-b1b-ii exact 5-path physical/verifier closure 通过七场景
+physical、808/808 clean serial、三项 dedicated gates 与 independent
+physical/verifier/cross-group review；iv-b2 也已完成并保持 non-admitting，
+implementation 为 `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+`e02a515283225b0b19443a47fad0b90fe3d0ddfd`。shared-deadline repair
+`c144c1e`、fixed-gate deadline cleanup repair `bc42fbc`、interactive-native
+identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
+replay `aa8a7f1` 均已完成并保持 non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1
+与 ii-c-b2a2、resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4；v8–v13 均已消费失败且不可重试；v13 为 closed post-arm failure，persistent Gate residue 保留；authorization hardening 已完成/non-admitting；基于 `d5a7df3` 的 v14 授权在任何 launch/root action 前被 preservation P0 supersede，仍 unconsumed；preservation prerequisite 已完成/non-admitting；fresh v15 基于 `facf3ea` 获批后因 aggregate scope/xattr evidence gaps 停在 pre-arm，未启动且 superseded/unconsumed；evidence closure 已由 `103a4836` 推送并验证/non-admitting；fresh v16 已唯一执行并以 `receiptInvalid/exited-82/cleanup-02` 消费失败，schema-v9 disposition 绑定九个 raw artifacts 与双 persistent Gate；status-82 identity 与 cleanup-02 typed-attribution repairs 已完成/non-admitting；fresh v17 曾基于 `a69bd33` 获批，但 launch 前发现 v13 TMPDIR raw evidence 丢失，且与 macOS low-disk purge 强时间相关（精确删除 actor 未独立绑定），因而 superseded/unconsumed。当前 frontier 为 v13 purge disposition → future raw-evidence persistent-path repair → fresh authorization → replacement campaign → L3c3d → L3c4；这些 repairs 是 machine-campaign prerequisite
+checkpoints，不是新的 Task。
+ADR 0018 仍 Proposed，L3c4 独占 final admission 与剩余 full。
+iii-b2b-0 completion evidence 见
+[Release graph review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-0-review.md)。
+iii-b2b-1a-1 completion evidence 见
+[Outer observation review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md)：
+implementation `fe4f6ad` / tree `6bd6d384` / seal `2c31a7c`、exact 8
+non-document paths / 2,800 changed lines、1,535-test/80-suite staged serial、
+complete App/Release and contract gates 与 no unresolved P0-P2。
+iii-b2b-1b completion evidence 见
+[Zero-argument entry review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md)：
+1b-i implementation `6b26082` / tree `462d40b`、exact 5 paths / 2,434
+changed lines、1,550-test/81-suite serial 与 post-fix no-unresolved-P0–P2
+review；1b-ii implementation `1c8ab1d` / tree `d7b6c05`、exact 4 paths /
+971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
+tree `aac9d81` 与 no-unresolved-P0–P2 review。
+L3c1b-i/ii 证据见
+[i review](../reports/phase-d-task-39b2c-l3c1b-i-configuration-bound-helper-escrow-review.md)
+与
+[ii review](../reports/phase-d-task-39b2c-l3c1b-ii-synthetic-machine-claim-review.md)。
+L3c2a-i 证据见
+[review](../reports/phase-d-task-39b2c-l3c2a-i-machine-claim-transport-review.md)。
+L3c2a-ii 证据见
+[review](../reports/phase-d-task-39b2c-l3c2a-ii-machine-driver-host-review.md)。
+L3c3b-ii 证据见
+[review](../reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md)。
+L3c3c-i 条件性证据见
+[study](../upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md)、
+[Proposed ADR 0018](../adr/0018-parent-owned-investigation-handoff.md) 与
+[final review](../reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md)、
+[i-b2a reproducibility review](../reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md)、
+[i-b2b-0a root-launch audit](../reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md)
+与 [installed-driver preflight](../reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md)。
+[ii-b0 exact-wire preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md)
+冻结当前 byte contract 与预算。
+[ii-b0a review](../reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md)
+记录 frame/capsule implementation completion。
+[ii-b0b review](../reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md)
+记录 claim/evidence/release wire implementation completion。
+[ii-b0c epoch bootstrap preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md)
+冻结 PRE_DROP_READY 前的 driver-owned epoch UUID/deadline prelude。
+[ii-b0c review](../reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md)
+记录 fixed STNP prelude implementation completion。
+[ii-b1 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md)
+冻结 post-RED Debug-only diagnostic/dependency-free Release-shell correction；
+[ii-b1 review](../reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md)
+记录 authority-free leaf completion 与 non-admitting evidence。
+[ii-b2b server integration preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md)
+冻结 i/ii/iii implementation order；
+[ii-b2b-i review](../reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md)
+记录 sealed non-connected server completion 与 non-admitting evidence。
+[ii-b4 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md)
+冻结 fixed helper-claim client contract；
+[ii-b4 review](../reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md)
+记录 7-path/3,153-line implementation、47 focused cases、102 affected tests、
+1,269-test staged-only serial、Debug/Release final-Mach-O gates 与 final
+no-unresolved-P0–P2 review。ii-b5a typed composer completion 见
+[ii-b5a review](../reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md)：5-path/
+1,500-line implementation、1,290-test clean staged-only serial 与 final
+no-unresolved-P0–P2 review。ii-b5b-i-a completion 见
+[projection review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md)：
+5-path/1,086-line implementation、1,302-test/63-suite clean staged-only serial 与
+final no-unresolved-P0–P2 review。i-b1 completion 见
+[semantic-target review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md)：
+6-path/979-line implementation、honest non-green 1,311-test/64-suite serial、
+exact-case closure 与 final no-unresolved-P0–P2 review。ii-b4/ii-b5a0/ii-b5a/
+i-a/i-b1/i-b2a/i-b2b-a/i-b2b-b/i-b3/i-c1、aggregate i-c2 与
+ii-b5b-ii-a/ii-b/ii-c/ii-d 与 ii-c0a complete/non-admitting；ii-b5b-iii-b0
+preflight frozen/non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/
+iii-b2a-ii-a1/a2-0/a2-i/a2-ii complete/non-admitting；a2 已冻结并关闭，
+iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与 iii-b2b-1b
+complete/non-admitting；ii-c0b split frozen，c0b-i complete/non-admitting，
+c0b-ii ownership split complete，ii-a budget split frozen，ii-c0b-ii-a1
+与 ii-c0b-ii-a2 complete/non-admitting；ii-b retained-base split 已冻结，
+c0b-ii/c0b-iii 以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并保持
+non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
+identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
+replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
+ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4；v8–v13 均已消费失败且不可重试；v13 为 closed post-arm failure，persistent Gate residue 保留；authorization hardening 已完成/non-admitting；基于 `d5a7df3` 的 v14 授权在 launch 前被 preservation P0 supersede，仍 unconsumed；preservation prerequisite 已完成/non-admitting；fresh v15 基于 `facf3ea` 获批后因 aggregate scope/xattr evidence gaps 停在 pre-arm，未启动且 superseded/unconsumed；evidence closure 已由 `103a4836` 推送并验证/non-admitting；fresh v16 已唯一执行并以 `receiptInvalid/exited-82/cleanup-02` 消费失败；相关 repairs 已完成/non-admitting；fresh v17 曾基于 `a69bd33` 获批，但 launch 前发现 v13 TMPDIR raw evidence 丢失，且与 macOS low-disk purge 强时间相关（精确删除 actor 未独立绑定），因而 superseded/unconsumed；当前 frontier 为 v13 purge disposition → future raw-evidence persistent-path repair → fresh authorization → replacement campaign → L3c3d → L3c4。
+iv-b1b-i completion evidence 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md)：
+implementation `41d34f26` / tree `8ab58932`、exact 3 paths / 1,173
+production changed lines、806/806 affected tests、clean staged-only Release
+target build 与两组 no-unresolved-P0-P2 final review。
+iv-b1b-ii completion evidence 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md)：
+implementation `373431d4` / tree `b08342e5`、exact 5 paths / 2,193 changed
+lines、七场景 physical、808/808 clean serial、三项 dedicated gates 与三组
+no-unresolved-P0-P2 final review。
+iv-b2 completion evidence 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md)：
+implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+`e02a515283225b0b19443a47fad0b90fe3d0ddfd`；complete/non-admitting。
+后续 repairs 的冻结范围与完成证据见
+[shared-deadline preflight](../reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md)、
+[shared-deadline completion audit](../reports/phase-d-task-39b2c-shared-deadline-repair-review.md)、
+[fixed-gate cleanup preflight](../reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md)
+与
+[fixed-gate cleanup completion audit](../reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md)。
+[interactive-native completion audit](../reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md)、
+[fixed-gate historical replay preflight](../reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md)
+与
+[fixed-gate historical replay completion audit](../reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md)。
+i-b2a completion 见
+[artifact/static reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md)。
+[fixed service reader review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md)
+记录 6-path/709-line scope、46 affected tests、1,341-test clean serial 与
+post-fix/cross-group no-unresolved-P0–P2 review。
+[observer composition review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md)
+记录 5-path/863-line scope、52 affected tests、1,348-test clean serial 与
+production/verifier/cross-group no-unresolved-P0–P2 review。
+[i-c1 review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md)
+记录 implementation 8-path/1,092-line diff、1,355-test serial、final test-only
+1/1 closure、Debug/Release real-driver gates 与 no-unresolved-P0–P2 review。
+[i-c2a review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2a-review.md)
+记录 14-path/1,614-line semantic-owner closure、honest non-green 642-test
+serial + exact six-case closure、index-backed mutation gates 与 final
+no-unresolved-P0–P2 review。
+[i-c2b preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-preflight.md)
+冻结 12-path aggregate absence-only physical-owner closure；
+[i-c2b review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md)
+记录三段预算内提交、1,344-test serial 与 final exact/affected/verifier/review
+closure。
+[ii-b5b-ii preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md)
+将 fixed Darwin runtime 拆为 FD-0 capsule、Darwin identity、FD-7 session 与
+PGID retirement 四个 bounded checkpoints；ii-a/ii-b/ii-c/ii-d 已完成并保持
+non-admitting；ii-c0a complete/non-admitting，ii-b5b-iii-b0 preflight frozen/
+non-admitting，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1
+complete/non-admitting；a2 已冻结为 a2-0/a2-i/a2-ii，三项均
+complete/non-admitting，iii-b2b-0、iii-b2b-1a-0、iii-b2b-1a-1 与
+iii-b2b-1b complete/non-admitting；ii-c0b four-way split frozen，c0b-i
+complete/non-admitting，c0b-ii ownership split complete，ii-a budget split
+frozen，ii-c0b-ii-a1 与 ii-c0b-ii-a2 complete/non-admitting；c0b-ii/c0b-iii
+以及 iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 已完成并保持
+non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
+identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
+replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
+ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4；v8–v13 均已消费失败且不可重试；v13 为 closed post-arm failure，persistent Gate residue 保留；authorization hardening 已完成/non-admitting；基于 `d5a7df3` 的 v14 授权在 launch 前被 preservation P0 supersede，仍 unconsumed；preservation prerequisite 已完成/non-admitting；fresh v15 基于 `facf3ea` 获批后因 aggregate scope/xattr evidence gaps 停在 pre-arm，未启动且 superseded/unconsumed；evidence closure 已由 `103a4836` 推送并验证/non-admitting；fresh v16 已唯一执行并以 `receiptInvalid/exited-82/cleanup-02` 消费失败；相关 repairs 已完成/non-admitting；fresh v17 曾基于 `a69bd33` 获批，但 launch 前发现 v13 TMPDIR raw evidence 丢失，且与 macOS low-disk purge 强时间相关（精确删除 actor 未独立绑定），因而 superseded/unconsumed；当前 frontier 为 v13 purge disposition → future raw-evidence persistent-path repair → fresh authorization → replacement campaign → L3c3d → L3c4。
+ii-a completion 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md)，ii-b
+completion 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md)。
+ii-c completion 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md)。
+ii-d completion 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md)。
+[ii-c0a preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md)
+冻结 v1-preserving enclosing projected-cohort contract、8-path/2,600-line
+scope 与 corrected remaining order；
+[ii-c0a review](../reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) 记录
+commit `c7cab4d` / tree `6064ccc`、exact 8 paths / 1,863 changed lines、
+90 focused、536 affected、1,418-test/73-suite clean staged-only serial、三项
+boundary gates 与 no-unresolved-P0-P2 review。该 checkpoint 未运行 root、
+App/XPC、model/auth、network 或 authoritative full。
+[ii-c0b-i review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) 记录
+implementation `2493e0f` / parent `e5ed33e` / tree `8155d64`、exact 7
+non-document paths / 1,900 changed lines、95 tests / 5 suites、full
+Investigation boundary、exact staged scope、contract gates 与 final
+no-unresolved-P0–P2 review；c0b-i complete/non-admitting。
+[ii-c0b-ii ownership preflight](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md)
+记录 APFS physical evidence 与 ii-c0b-ii-a/ii-c0b-ii-b split；
+[ii-c0b-ii-a budget split](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md)
+冻结 exact 3-path / 2,000-line a1 behavior 与 exact 4-path / 1,200-line a2
+verifier closure；a1 completion 见
+[review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md)；a2 completion
+见 [review](../reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md)，记录
+implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+`d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 paths / 889 lines、
+aggregate 7 paths / 2,870 lines、bare contract/component/App-Release exit 0
+与双人 no-unresolved-P0–P2 review；未运行 serial/full/root/App/XPC/model/
+network。a2 complete/non-admitting；retained-base/capsule/fixed-gate sequence
+随后已完成；iv-a0/iv-a-r/iv-b1a/iv-b1b-i/iv-b1b-ii/iv-b2 也已完成并保持
+non-admitting；shared-deadline、fixed-gate deadline cleanup、interactive-native
+identity binding `531f79f` / consumer seal `26e785a` 与 fixed-gate historical
+replay `aa8a7f1` 均已完成/non-admitting。ii-c-a、ii-c-b1、ii-c-b2a1 与
+ii-c-b2a2 与 resolved-lineage L1/L2 已完成/non-admitting，L2 final review none；历史 pre-v8 顺序为 ii-c-c → L3c3d → L3c4；v8–v13 均已消费失败且不可重试；v13 为 closed post-arm failure，persistent Gate residue 保留；authorization hardening 已完成/non-admitting；基于 `d5a7df3` 的 v14 授权在 launch 前被 preservation P0 supersede，仍 unconsumed；preservation prerequisite 已完成/non-admitting；fresh v15 基于 `facf3ea` 获批后因 aggregate scope/xattr evidence gaps 停在 pre-arm，未启动且 superseded/unconsumed；evidence closure 已由 `103a4836` 推送并验证/non-admitting；fresh v16 已唯一执行并以 `receiptInvalid/exited-82/cleanup-02` 消费失败；相关 repairs 已完成/non-admitting；fresh v17 曾基于 `a69bd33` 获批，但 launch 前发现 v13 TMPDIR raw evidence 丢失，且与 macOS low-disk purge 强时间相关（精确删除 actor 未独立绑定），因而 superseded/unconsumed；当前 frontier 为 v13 purge disposition → future raw-evidence persistent-path repair → fresh authorization → replacement campaign → L3c3d → L3c4。
+[ii-b5b-iii-b0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md)
+冻结 long-lived outer/disposable inner、FD 0/1/2/7/8/9、inner-led PGID、
+parent-crash containment 与 iii-a/b1/b2a/b2b budgets。
+[ii-b5b-iii-a review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md)
+记录 per-epoch completion/continuity、40 focused、559 affected、1,446-test
+serial、三项 boundary gates 与 no-unresolved-P0-P2 review。
+[ii-b5b-iii-b1 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md)
+冻结 one-shot eight-epoch actor、final continuity destruction、7-path/3,200-line
+scope 与 tests-first matrix；
+[ii-b5b-iii-b1 review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md)
+记录 exact 7-path/2,438-line implementation、13 focused、573 affected、
+1,455-test/75-suite clean serial、三项 boundary gates、immutable replay seal 与
+no-unresolved-P0–P2 review。
+[ii-b5b-iii-b2a0 preflight](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md)
+冻结 package-only exact invocation/result bridge 与 untrusted DTO boundary；
+[ii-b5b-iii-b2a0 review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md)
+记录 exact 8-path/2,198-line implementation、36 combined、580 affected、
+1,462-test/76-suite clean serial、三项 boundary gates、immutable seal 与
+semantic/verifier/cross-group no-unresolved-P0–P2 review。
+[ii-b5b-iii-b2a-i review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md)
+记录 original 10-path/3,236-line implementation、8-path/977-line r1 closure、
+12 focused、593 affected、1,475-test/77-suite frozen-tree serial、三项 boundary
+gates、Debug/Release builds、immutable seal 与 no-unresolved-P0–P2 review；
+保持 non-admitting；
+[ii-b5b-iii-b2a-ii-a1-v review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md)
+记录 fixed transport/inner-role closure、7-path/1,694-line implementation、
+1,485-test/78-suite serial、immutable seal 与 no-unresolved-P0–P2 review；
+保持 non-admitting；
+[a2-0 review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md)
+记录 8-path/703-line self-contained untrusted decode、1,487-test/78-suite
+serial 与 no-unresolved-P0–P2 review；
+[a2-i review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md)
+记录 10-path/1,965-line inherited-PGID App session、1,500-test/78-suite serial、
+four Mach-O projections、complete contract replay 与 final no-unresolved-
+P0–P2 review；
+[a2-ii review](../reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md)
+记录 12-path/3,673-line terminal/admission composition、1,516-test/79-suite
+serial、complete contract/final-Mach-O gates、immutable seal 与 final
+no-unresolved-P0–P2 review；iii-b2b 接续 zero-argument entry/final artifact。
+生产 Deep Dive 继续 unavailable，直到 Task 44 final admission。
+
+跨 Epic 的阶段依赖、no-go 分支和交付顺序由 [Delivery Roadmap](../plans/roadmap.md) 管理；新 active plan 不得另起一套宏观路线。
+
+原因：Codex capability-first 写隔离、FDA 继承、公共联网、Probe Broker 和 Swift 扫描性能是架构成立的前提。在这些结果出来前批量实现 UI、规则或 Agent 流程会造成返工。
+
+第一里程碑 evidence gate（已完成，见 [验证报告](../reports/epic-0-1-validation-report.md)）：
+
+- 真实、可本地签名的 `.app` host 能定位并启动用户 Codex；SwiftPM/CLI 进程不能替代 App-context 证据
+- Codex 通过受控本地桥接调用一个 fake/真实只读 Probe，并对任意 Shell、直接文件系统工具和未注册能力形成明确的 go/no-go 证据
+- 可以取消并确认进程树退出
+- 已记录实际文件读取隔离边界
+- Swift Scanner 在受控目录上有可重复 Benchmark
+- `trashItem` 和一个 fake registered action 通过生命周期测试
+
+以上是 Epic 0–1 的历史验收口径。ADR 0004 已接受 Broker-only 无法成立并改为 capability-first；历史 no-go 证据保留，但不再作为当前产品限制。新的 Deep Dive gate 验证完整调查能力与公共联网可用时，进程树仍不可写且没有 Executor 路径。
+
+## 7. 测试优先级
+
+最高优先：
+
+- 清理 protected-path policy
+- path canonicalization、symlink、mount/root protection
+- Agent 建议 Ready to Reclaim vs rule veto
+- 执行前 stale evidence
+- Shell/skills/subagents 尝试写入、调用清理链或访问本机私网/Unix socket
+- prompt injection in README/path
+- Codex/Adapter 崩溃和取消
+
+其次：
+
+- taxonomy 覆盖
+- UI 状态和进度
+- 性能与空间计量
+
+漂亮动画、品牌材质和完整可视化不能早于安全核心；v1 不实现菜单栏体验。
+
+## 8. 外部代码与许可证
+
+- 不要复制 Mole GPL 代码；只做行为参考或调用用户安装的只读命令。
+- MIT 代码复用必须记录源文件、commit、版权和许可证文本。
+- Pearcleaner 按 source-available 对待。
+- Spaci 无 LICENSE，不复制。
+- CodeCleaner/CleanMyMac CLI 只做黑盒 Benchmark。
+- 新增依赖前记录许可证、维护状态和为什么需要。
+
+## 9. Coding Agent 工作纪律
+
+- 不假设文档中的命令在当前 Codex 版本一定存在；运行 `--help` 验证。
+- 不假设 README 的安全声明等于真实执行路径；阅读代码和测试。
+- UI 改动不能只通过 SwiftUI 源码审查验收；必须构建并启动真实 `.app`，用仓库 `scripts/peekaboo-readonly` 截取/检查实际窗口，再以 XCUITest 和 `scripts/verify` 固化可重复契约。
+- 开发 MCP 必须通过 `scripts/bootstrap-dev-tools` / `scripts/doctor-dev-tools` 使用固定版本。Peekaboo 仅允许 `image`、`see`、`inspect_ui`、`list`、`permissions`，不得为自动化方便授予 Accessibility/Event Synthesizing 或扩大写能力。
+- 不把“可重建”写成“可恢复”。
+- 不把 Trash 大小写成已经释放空间。
+- 不把扫描权限失败写成零占用。
+- 不在未授权情况下创建远程服务、遥测或规则下载。
+- 遇到架构级不确定性先写 Spike/ADR，不用大段代码掩盖。
+
+## 10. 当前工作区注意事项
+
+截至 2026-08-09，仓库已经初始化并发布到 GitHub，默认分支为 `main`，远端为 `origin`，`main` 跟踪 `origin/main`。MIT `LICENSE` 已由用户批准并提交。Epic 0 不再执行 `git init`、创建远端或首次文档提交。仓库开发 harness 由 `.trae/.mcp.json`、`.xcodebuildmcp/config.yaml`、`scripts/*dev-tools*`、`scripts/xcodebuildmcp` 和 `scripts/peekaboo-readonly` 管理；工具产物保持 ignored。每个完成且验证通过的小迭代创建独立 commit 并及时 push `origin/main`；force-push、发布、公证和 CI 外部运行仍需单独授权。
+
+## 11. Handoff Prompt
+
+可以把下面内容交给 Coding Agent：
+
+```text
+你正在实现 Stornaut。先从 docs/README.md 进入文档地图，再完整阅读 docs/agent/coding-agent-handoff.md 指定的文档，尤其是产品/Agent/UI 三份批准规格，遵守所有产品不变量和 Reference Study Gate。不要直接实现整个产品，也不要从概念图推断规格外功能。
+
+Epic 0–1 evidence gate 已完成。Phase B 已实现 closed domain/persistence、
+bounded product Quick Scan、incremental Space Ledger、67-rule
+Knowledge/Activity、structured Local Knowledge、snapshot-first Overview、Scan、
+Scan-only History 与六区 Settings。Task 26 的 focused gate、真实 Home
+benchmark、scope audit、actual-window inspection、review 和最终 unified
+verifier 均通过；Epic 2–4 计划与 Task 21–26 briefs 已归档。
+
+Phase C deterministic Epic 8 plan 已于 2026-08-11 获批、于 2026-08-15
+完成并归档至
+docs/plans/completed/epic-8-safe-execution-vertical-slice.md，范围从 Quick
+Scan terminal projection 形成 Review Reclaim Plan，经 pure Policy Gate、
+fresh revalidation、用户确认与默认 MoveToTrash，最后写 immutable Cleanup
+Manifest 和 truthful Cleanup Result/History。Tasks 27–28 已完成。ADR 0004
+回顾发现的旧 Broker-only runtime/UI 漂移已由
+docs/plans/completed/capability-first-codex-runtime-gate.md 的 R1–R6 关闭。
+R1 得出 conditional-go：read-only Seatbelt 阻断 user-data
+writes，managed proxy 可让公网访问成功并阻断 direct/local/private/Unix
+targets，但需要一个 same-session、父进程拥有、随机端口的 loopback proxy
+transport。该精确例外已获用户批准用于 R2 configuration candidate；R2 已
+完成并得出 `configurationReady`；R3 证明 direct `setsid()`、
+`POSIX_SPAWN_SETSID` 与 launchd user-job cleanup 均不能保证整个调查进程树
+回收，随后通过用户批准的 audit-session lifecycle supervisor 取得
+`behaviorReady` candidate：identity drop、outer Seatbelt、ASID inheritance、
+managed-proxy-owner drain 与 stale-lease recovery 均 observed，residue 为 0。
+R4 已完成并得出 `protocolReady`；R5 official `openai` worker gate 已通过
+9/9 capability 与 errno-only IPv4/IPv6/private/local/Unix containment；
+current-source signed App/helper report 进一步通过 9/9 capability、12/12
+integrity 与零残留卸载。R6 已完成 final matrix、five-dimensional status、
+typed disclosure、actual-window evidence 与 post-fix review，runtime
+foundation 结论为 `go`。Tasks 29–35 与完整 Phase C gate 已完成；
+authoritative full verifier 单次 exit 0，计划已归档，Phase C admission 为
+`go`。Task 36 deterministic Investigation foundation 已完成。Task 37 Store
+v4/persistence/retention/source rejoin 已完成实现、independent review 和两轮
+完整容量 gate，authoritative full verifier 23/23 stages 单次 exit 0；Task 37
+已完成。Task 38 closed coordinator/fake runtime、strict normalization、
+terminal/recovery barrier 与 structural no-Executor gate 已完成，
+authoritative full verifier 23/23 stages 单次 exit 0。Task 39 的 39A
+strict contract、server-owned turn binding 与 package-closed diagnostic
+facade 已完成并通过 authoritative full verifier；39B1a exact Store binding、
+directly async lifecycle、actor reentrancy/deadline preservation 与
+no-blocking-bridge gate 也已完成并通过 authoritative full verifier。39B1b-i
+package-closed transport/non-product composition 也已完成并通过 authoritative
+full verifier。39B1b-ii strict DEBUG App leaf implementation、11-test
+dedicated App target、pure-product Debug/Release boundary、846-test serialized
+regression、independent post-fix review 与 authoritative full verifier 已
+通过。39B2a strict lifecycle contract、signed-peer XPC client、
+cancellation/dispatch linearization 与 package-closed transport
+implementation 已完成；73-test Lifecycle、103-test Investigation、865-test
+serialized regression 与 independent post-fix review 已通过，authoritative
+full verifier 23/23 stages 单次 exit 0（932 秒）。39B2a 已完成。39B2b 已
+拆为 39B2b-i helper-owned contained worker 与 39B2b-ii signed
+diagnostic-App/Task 38 composition；39B2b-i implementation、37-test focused
+regression、889-test serialized regression 与 independent post-fix review
+已完成，authoritative full verifier 23/23 stages 单次 exit 0（933.21 秒）。
+39B2b-i 已完成。39B2b-ii preflight 发现 final Mach-O 的静态 Core
+dependency closure 携带 concrete cleanup/Registered Action authority；
+dead stripping 与优化实验均不能移除。前置修复拆为 E1/E2，E1 已把
+concrete Registered Action process runner 迁入单向 `StornautExecution`
+target，并通过 11-test focused、895-test serialized、independent review
+与 authoritative full 23/23 stages。E2a package-only cleanup seam 随后
+通过 47-test focused、893-test headless regression、targeted Debug App
+build、historical Task 35 source-snapshot gate 与 independent review；
+E2b-i concrete Trash/Executor authority relocation 与 authorized ordinary-App
+linkage 已完成，3/3 package、32/32 affected、73/73 Phase C、
+ordinary/diagnostic App builds 与 898-test serial regression 均通过；
+E2b-ii strict final-Mach-O verifier/review 已完成，built authority 正控制、
+full-bundle Mach-O 负控制与 exact Xcode allowlist 均通过，唯一一次 clean
+full 23/23 stages 单次通过（1,046.300 秒）。E2b-ii complete；原 signed
+composition 已恢复并完成 implementation、focused tests、strict binary
+gate 与 independent post-fix review；该 checkpoint 唯一一次 authoritative
+full 以 23/23 stages、898-test serialized regression、981 秒 wall time
+单次通过，无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的 exact
+attempt-binding prerequisite、L1 helper residue、L2 root topology observer 与
+L3c2 deterministic machine driver/failure matrix 均已完成；L3c3c-i root-launch
+audit 已完成并给出 external NO-GO，i-b2b-0b/i-b2b-1 在执行前 superseded，
+B4 root execution count 为 0；L3c3c-ii-a 已完成，ii-b split preflight 已
+冻结 ii-b0a/ii-b0b、ii-b1–ii-b5 与 ii-c0；ii-b0a/ii-b0b/ii-b0c/ii-b1
+已完成；ii-b2 ASID prerequisite 也已通过 1,142-test implementation serial、
+独立 1,143-test decoder-negative supplement 与 final review；ii-b2a typed
+deadline state 与 ii-b2b-i non-connected machine-claim server 也已完成。
+ii-b2b-ii legacy-client quarantine / Machine production block 已完成，
+ii-b2b-iii 已拆为 iii-a/iii-b，iii-a handle-v3/single-quantized transfer
+已完成；iii-b 又拆为 iii-b-i/iii-b-ii，两者均已完成，iii-b/ii-b2b 已关闭；
+ii-b3 已拆为 b3a/b3b/b3c，ii-b3a fixed-channel/root-peer/drop adapter 与
+ii-b3b start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native
+entry 已完成；ii-b4 fixed helper-claim client 也已完成并保持
+non-admitting；ii-b5 已拆为 b5a0 claim-abort、b5a typed composer、b5b-i
+L2/projection、b5b-ii Darwin runtime 与 b5b-iii production/artifact；b5a0/
+b5a、b5b-i-a、i-b1、i-b2a、i-b2b-a、i-b2b-b 与 i-b3 已完成并保持
+non-admitting；i-c 已拆为 i-c1 DriverSupport join/opaque proof 与 i-c2
+legacy-owner closure；i-c1 与 aggregate i-c2 已完成并保持 non-admitting；
+ii-b5b-ii-a fixed FD-0 capsule intake、ii-b5b-ii-b independent Darwin App
+identity observation、ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact
+owned-PGID retirement 与 ii-c0a 已完成并保持 non-admitting；ii-b5b-iii-b0
+preflight 已冻结，iii-a/iii-b1/iii-b2a0/iii-b2a-i/iii-b2a-ii-a1/a2-0/a2-i/a2-ii
+已完成并保持 non-admitting；a2 已关闭，iii-b2b-0、iii-b2b-1a-0 与
+iii-b2b-1a-1 与拆分后的 iii-b2b-1b-i/1b-ii 已完成并保持
+non-admitting；ii-c0b 已冻结为四段，c0b-i 已完成并保持 non-admitting；
+ii-c0b-ii-a1 与 ii-c0b-ii-a2 已完成并保持 non-admitting；retained-base、
+publication/lease、settlement/recovery、verifier closure 与 c0b-iii fixed gate
+均已完成。c0b-iv 的 iv-a0、iv-a-r、iv-b1a、iv-b1b-i、iv-b1b-ii 与 iv-b2 已
+完成并保持 non-admitting；shared-deadline 与 fixed-gate deadline cleanup
+repairs、interactive-native identity binding `531f79f` / consumer seal
+`26e785a` 与 fixed-gate historical replay `aa8a7f1` 也已完成/non-admitting。
+ii-c-a、ii-c-b1、ii-c-b2a1、ii-c-b2a2、ii-c-b2b 与 resolved-lineage L1/L2
+均已完成/non-admitting；历史后续顺序为 ii-c-c、L3c3d、L3c4，ii-c-c v8
+已消费失败且不可重试；v9、v10 与 v11 也已消费失败且不可重试。v11 的
+legacy generic reason 已由 successor schema-v2 post-arm diagnostic repair
+闭合；v12 已从 `212320f` 唯一执行并 consumed/no-go；credential repair 与 persistent Gate P1/P2 已完成/non-admitting；v13 已从 `8885161` 唯一执行并以 closed post-arm failure consumed/no-go，persistent Gate residue 保留；authorization hardening 已完成/non-admitting；基于 `d5a7df3` 的 v14 授权在 launch 前被 preservation P0 supersede，仍 unconsumed；preservation prerequisite 已完成/non-admitting；fresh v15 基于 `facf3ea` 获批后因 aggregate scope/xattr evidence gaps 停在 pre-arm，未启动且 superseded/unconsumed；evidence closure 已由 `103a4836` 推送并验证/non-admitting；fresh v16 已唯一执行并以 `receiptInvalid/exited-82/cleanup-02` 消费失败；相关 repairs 已完成/non-admitting；fresh v17 曾基于 `a69bd33` 获批，但 launch 前发现 v13 TMPDIR raw evidence 丢失，且与 macOS low-disk purge 强时间相关（精确删除 actor 未独立绑定），因而 superseded/unconsumed；当前 frontier 为 v13 purge disposition → future raw-evidence persistent-path repair → fresh authorization → replacement campaign → L3c3d → L3c4。
+ii-c-b2 的冻结拆分见
+[preflight](../reports/phase-d-task-39b2c-iic-b2-split-preflight.md)，b2a1 completion
+evidence 见 [review](../reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md)。
+ii-c-b2a2 completion evidence 与 b2b frozen scope 见
+[independent verifier review](../reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md)
+与 [transport preflight](../reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md)。
+这些 repairs 是
+machine-campaign prerequisite checkpoints，不是递归命名的新 Task；不得再把
+review finding 或局部修复升级为新的命名 Task。
+已完成部分均为
+non-admitting prerequisite，
+L3c4 才是 machine admission。该最终 gate
+要求证明完整调查能力和公共联网可用时，
+Codex 全进程树不可写用户数据、不可
+访问 localhost/私网/任意 Unix socket 且无 Executor 路径；不得用
+`danger-full-access`、命令/公共域名
+allowlist、逐命令审批或关闭调查能力绕过。生产 Deep Dive、Adapter、真实
+destructive Registered Action、release/notarization 仍不在当前授权范围。
+
+任何权限、安全或许可证假设都必须有实际证据。设计或 PRD 如有冲突，先报告并修正文档。ADR 0004 已批准的直接只读 Agent 工具与公共联网无需再次缩减或请求授权；不得自行扩大本地写入、私网或 Executor 权限。
+```

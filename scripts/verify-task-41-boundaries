@@ -1,0 +1,558 @@
+#!/bin/zsh -f
+# task41_self_sha=43efffe41c1a6a1dbfa7cd8123169835902a268b1f6eec132c7dc82d0bc4dcc6
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+self_sha=$(/usr/bin/sed -E \
+    's/^# task41_self_sha=[0-9a-f]{64}$/# task41_self_sha=SELF/' \
+    "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')
+expected_self_sha=$(/usr/bin/sed -nE \
+    's/^# task41_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}")
+[[ ${#expected_self_sha} == 64 && $self_sha == $expected_self_sha ]] || {
+    print -u2 "Task 41 verifier self-seal drifted"
+    exit 1
+}
+
+disclosure=Sources/StornautCore/Settings/DeepDiveDisclosure.swift
+availability=Sources/StornautCore/Settings/DeepDiveAvailability.swift
+first_use=Sources/StornautCore/Settings/DeepDiveFirstUse.swift
+configuration=Sources/StornautCore/Evidence/LocalStoreConfiguration.swift
+settings_root=Sources/StornautCore/Settings
+core_root=Sources/StornautCore
+tests=(
+    Tests/StornautCoreTests/DeepDiveDisclosureTests.swift
+    Tests/StornautCoreTests/DeepDiveAcceptanceStoreTests.swift
+    Tests/StornautCoreTests/DeepDiveAvailabilityTests.swift
+    Tests/StornautCoreTests/DeepDiveFirstUseTests.swift
+)
+
+for source_path in $disclosure $availability $first_use $configuration \
+    "${tests[@]}"; do
+    [[ -f $source_path && ! -L $source_path ]] || {
+        print -u2 "Task 41 boundary source unavailable: $source_path"
+        exit 1
+    }
+done
+settings_sources=(
+    "${(@f)$(find "$settings_root" -type f \
+        -name '*.swift' -print | LC_ALL=C sort)}"
+)
+core_sources=(
+    "${(@f)$(find "$core_root" -type f \
+        -name '*.swift' -print | LC_ALL=C sort)}"
+)
+
+/usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+    $disclosure $availability $first_use $configuration "${tests[@]}"
+
+/usr/bin/python3 -I - \
+    $disclosure $availability $first_use $configuration \
+    "${tests[@]}" --settings "${settings_sources[@]}" \
+    --core "${core_sources[@]}" <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+settings_index = sys.argv.index("--settings")
+core_index = sys.argv.index("--core")
+paths = list(map(Path, sys.argv[1:settings_index]))
+settings_paths = list(map(Path, sys.argv[settings_index + 1:core_index]))
+core_paths = list(map(Path, sys.argv[core_index + 1:]))
+disclosure_path, availability_path, first_use_path, configuration_path = paths[:4]
+test_paths = paths[4:]
+sources = {path: path.read_text(encoding="utf-8") for path in paths}
+settings_sources = {
+    path: path.read_text(encoding="utf-8") for path in settings_paths
+}
+core_sources = {
+    path: path.read_text(encoding="utf-8") for path in core_paths
+}
+expected_settings_paths = {
+    Path("Sources/StornautCore/Settings/DeepDiveAvailability.swift"),
+    Path("Sources/StornautCore/Settings/DeepDiveDisclosure.swift"),
+    Path("Sources/StornautCore/Settings/DeepDiveFirstUse.swift"),
+    Path("Sources/StornautCore/Settings/SettingsPreferences.swift"),
+}
+if set(settings_paths) != expected_settings_paths:
+    raise SystemExit("Task 41 Settings source inventory drifted")
+
+def code_without_comments_or_strings(source):
+    output = []
+    index = 0
+    block_depth = 0
+    line_comment = False
+    string_delimiter = None
+    while index < len(source):
+        if line_comment:
+            if source[index] == "\n":
+                line_comment = False
+                output.append("\n")
+            else:
+                output.append(" ")
+            index += 1
+            continue
+        if block_depth:
+            if source.startswith("/*", index):
+                block_depth += 1
+                output.extend("  ")
+                index += 2
+            elif source.startswith("*/", index):
+                block_depth -= 1
+                output.extend("  ")
+                index += 2
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if string_delimiter is not None:
+            if source.startswith(string_delimiter, index):
+                output.extend(" " * len(string_delimiter))
+                index += len(string_delimiter)
+                string_delimiter = None
+            elif source[index] == "\\" and string_delimiter == '"':
+                output.extend("  ")
+                index += min(2, len(source) - index)
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if source.startswith("//", index):
+            line_comment = True
+            output.extend("  ")
+            index += 2
+        elif source.startswith("/*", index):
+            block_depth = 1
+            output.extend("  ")
+            index += 2
+        elif source.startswith('"""', index):
+            string_delimiter = '"""'
+            output.extend("   ")
+            index += 3
+        elif source[index] == '"':
+            string_delimiter = '"'
+            output.append(" ")
+            index += 1
+        else:
+            output.append(source[index])
+            index += 1
+    return "".join(output)
+
+def code_without_comments(source):
+    output = []
+    index = 0
+    block_depth = 0
+    line_comment = False
+    string_delimiter = None
+    while index < len(source):
+        if line_comment:
+            if source[index] == "\n":
+                line_comment = False
+                output.append("\n")
+            else:
+                output.append(" ")
+            index += 1
+            continue
+        if block_depth:
+            if source.startswith("/*", index):
+                block_depth += 1
+                output.extend("  ")
+                index += 2
+            elif source.startswith("*/", index):
+                block_depth -= 1
+                output.extend("  ")
+                index += 2
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if string_delimiter is not None:
+            output.append(source[index])
+            if source.startswith(string_delimiter, index):
+                index += len(string_delimiter)
+                output.extend(string_delimiter[1:])
+                string_delimiter = None
+            elif source[index] == "\\" and string_delimiter == '"':
+                if index + 1 < len(source):
+                    index += 1
+                    output.append(source[index])
+                index += 1
+            else:
+                index += 1
+            continue
+        if source.startswith("//", index):
+            line_comment = True
+            output.extend("  ")
+            index += 2
+        elif source.startswith("/*", index):
+            block_depth = 1
+            output.extend("  ")
+            index += 2
+        elif source.startswith('"""', index):
+            string_delimiter = '"""'
+            output.extend('"""')
+            index += 3
+        elif source[index] == '"':
+            string_delimiter = '"'
+            output.append('"')
+            index += 1
+        else:
+            output.append(source[index])
+            index += 1
+    return "".join(output)
+
+def enum_cases(source, name):
+    match = re.search(
+        rf"public enum {re.escape(name)}[^{{]*\{{(.*?)\n\}}",
+        source,
+        flags=re.S,
+    )
+    if not match:
+        raise ValueError(f"Task 41 enum missing: {name}")
+    return re.findall(r"(?m)^\s*case\s+([A-Za-z_][A-Za-z0-9_]*)", match.group(1))
+
+expected_source_sha256 = {
+    disclosure_path: "374647b2212a153356ea58b0141138f40391189b7dc514c50ee26c2e85f7f92f",
+    availability_path: "c2ec58f1a94f7d0cb0b18b8effe2133cc1e54c5feaaace7ddecd070af6279c2c",
+    first_use_path: "e3e31ef4dd646af7c0fae7d9087a0ea1df2ca17173cdee05f3058411eadc4ebf",
+    configuration_path: "4234db51f2bb9a472be4bcf333ee8330fb74174182c143b886e1af5df4cda0c3",
+    test_paths[0]: "9faa30cd47cf9373927ea9fc54b112c4e56074c4a4a1625afa4e08e218c41f60",
+    test_paths[1]: "3fc373c1778b444cb0210c625a7c9e8a936c49d66f9d53015bdad539aaf50932",
+    test_paths[2]: "55596b293c6e444a2076c19d2d29c98a22cd4e8ea74ebfe5384e09a5d67cd83d",
+    test_paths[3]: "ee813d400efe96f3febeafbf27f066a2331ec0949b96c0696654b2e31b8e98a0",
+}
+
+def validate(candidate, enforce_seals=True):
+    if enforce_seals:
+        for path, expected in expected_source_sha256.items():
+            actual = hashlib.sha256(candidate[path].encode()).hexdigest()
+            if actual != expected:
+                raise ValueError(f"Task 41 source/test seal drifted: {path}")
+    disclosure = candidate[disclosure_path]
+    availability = candidate[availability_path]
+    first_use = candidate[first_use_path]
+    configuration = candidate[configuration_path]
+    contract = disclosure + "\n" + availability + "\n" + first_use
+    code = code_without_comments_or_strings(contract)
+    disclosure_code = code_without_comments_or_strings(disclosure)
+    availability_code = code_without_comments_or_strings(availability)
+    first_use_code = code_without_comments_or_strings(first_use)
+    disclosure_no_comments = code_without_comments(disclosure)
+    configuration_no_comments = code_without_comments(configuration)
+    identifiers = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code))
+    forbidden = {
+        "StornautExecution", "CleanupPlan", "CleanupPolicyGate",
+        "TrashMoving", "ExecutionAuthorization",
+        "AuthorizationServices", "EvidenceStore",
+        "LocalKnowledgeStore", "InvestigationCoordinator",
+        "InvestigationRuntimeAdmission", "startInvestigation",
+        "trustCodex", "proceedAnyway", "bypass",
+        "UserDefaults", "URLSession", "CloudKit",
+        "NSUbiquitousKeyValueStore", "NSWorkspace",
+        "AXIsProcessTrusted", "SMAppService", "tccutil",
+        "CodexConfiguration", "CodexConfigWriter",
+    }
+    leaked = sorted(identifiers.intersection(forbidden))
+    if leaked:
+        raise ValueError(
+            "Task 41 disclosure gained authority or bypass: "
+            + ",".join(leaked)
+        )
+    no_authority_identifiers = {
+        "FileManager", "FileHandle", "Process", "Darwin",
+        "open", "openat", "creat", "fopen", "freopen",
+        "fdopen", "read", "pread", "write", "pwrite",
+        "rename", "remove", "removeItem", "moveItem",
+        "copyItem", "replaceItem", "createFile",
+        "createDirectory", "unlink", "chmod", "chown",
+        "posix_spawn", "popen", "execv", "execve",
+        "system", "kill", "killpg", "socket", "connect",
+    }
+    for label, owner_code in (
+        ("availability", availability_code),
+        ("first-use", first_use_code),
+    ):
+        owner_identifiers = set(re.findall(
+            r"[A-Za-z_][A-Za-z0-9_]*", owner_code
+        ))
+        leaked = sorted(owner_identifiers.intersection(no_authority_identifiers))
+        if leaked:
+            raise ValueError(
+                f"Task 41 {label} gained direct authority: "
+                + ",".join(leaked)
+            )
+    if not re.search(
+        r'let\s+version\s*=\s*DomainToken\(\s*'
+        r'rawValue:\s*"deep-dive-disclosure-v1"\s*\)',
+        disclosure_no_comments,
+    ):
+        raise ValueError("Task 41 disclosure version drifted")
+    if not re.search(
+        r'let\s+profile\s*=\s*DomainToken\(\s*'
+        r'rawValue:\s*"deep-dive-data-boundary-v1"\s*\)',
+        disclosure_no_comments,
+    ):
+        raise ValueError("Task 41 data-boundary profile drifted")
+    semantic_raw_values = re.findall(
+        r'case\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*"([^"]+)"',
+        disclosure_no_comments.split(
+            "enum DeepDiveDisclosureDecision", 1
+        )[0],
+    )
+    expected_semantics = [
+        "authorized-scope-direct-read",
+        "model-context-evidence",
+        "public-internet-services",
+        "autonomous-read-only-tools",
+        "aggregate-consent",
+        "no-write-cleanup-policy-authorization-executor",
+        "cleanup-rejoin-and-reauthorization",
+        "no-completeness-guarantee",
+        "quick-scan-remains-local",
+    ]
+    if semantic_raw_values != expected_semantics:
+        raise ValueError("Task 41 disclosure semantic inventory drifted")
+    fingerprint_payload = "\n".join(
+        ["deep-dive-disclosure-v1"]
+        + expected_semantics
+        + ["profile:deep-dive-data-boundary-v1"]
+    ).encode()
+    expected_fingerprint = hashlib.sha256(fingerprint_payload).hexdigest()
+    if expected_fingerprint != \
+            "cb7bcd1de22bfb605370e824d0eb151929153b4a43cd01b9db2162dec15993a8":
+        raise ValueError("Task 41 disclosure fingerprint contract drifted")
+    coding_keys = re.search(
+        r"private enum CodingKeys:[^{]+\{(.*?)\n\s*\}",
+        disclosure,
+        flags=re.S,
+    )
+    if not coding_keys:
+        raise ValueError("Task 41 acceptance CodingKeys missing")
+    observed_keys = re.findall(
+        r"(?m)^\s*case\s+([A-Za-z_][A-Za-z0-9_]*)",
+        coding_keys.group(1),
+    )
+    expected_keys = [
+        "schemaVersion", "disclosureVersion", "decision",
+        "decidedAt", "contentFingerprint",
+        "dataBoundaryProfileVersion",
+    ]
+    if observed_keys != expected_keys:
+        raise ValueError("Task 41 acceptance schema drifted")
+    if re.search(r"\[\s*String\s*:", code):
+        raise ValueError("Task 41 gained generic string preference state")
+    public_disclosure_types = re.findall(
+        r"(?m)^public\s+(?:final\s+)?"
+        r"(?:struct|class|actor|enum|protocol|typealias)\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)",
+        disclosure_code,
+    )
+    if public_disclosure_types != [
+        "DeepDiveDisclosureSemanticItem",
+        "DeepDiveDisclosureDescriptor",
+    ]:
+        raise ValueError("Task 41 disclosure public API escaped")
+    protocol = re.search(
+        r"protocol DeepDiveDisclosureRecordStoring:[^{]+"
+        r"\{(.*?)\n\}",
+        disclosure_code,
+        flags=re.S,
+    )
+    if not protocol:
+        raise ValueError("Task 41 disclosure store protocol missing")
+    methods = re.findall(r"func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", protocol.group(1))
+    if methods != ["load", "save", "forget"]:
+        raise ValueError("Task 41 disclosure store protocol escaped closed API")
+    if not re.search(
+        r'var\s+deepDiveDisclosureURL:\s*URL\s*\{.*?'
+        r'path:\s*"DeepDiveDisclosure\.json"',
+        configuration_no_comments,
+        flags=re.S,
+    ):
+        raise ValueError("Task 41 dedicated disclosure path drifted")
+    if enum_cases(availability, "DeepDiveAggregateAvailability") != [
+        "available", "needsBaselineScan", "needsDisclosure",
+        "disclosureDeclined", "codexUnavailable",
+        "runtimeBlocked", "runtimeStale",
+        "dependenciesUnavailable", "workflowBusy",
+        "invalidBudget",
+    ]:
+        raise ValueError("Task 41 aggregate availability inventory drifted")
+    for dimension in (
+        "source", "disclosure", "codex", "runtime",
+        "dependencies", "workflow", "budget",
+    ):
+        if not re.search(rf"public let {dimension}:", availability):
+            raise ValueError(f"Task 41 admission dimension missing: {dimension}")
+    if not re.search(
+        r"normalProductStartEnabled:\s*Bool\s*\{\s*false\s*\}",
+        availability_code,
+    ):
+        raise ValueError("Task 44 final feature gate was weakened")
+    if "@escaping" in first_use_code or "typealias" in first_use_code \
+            or re.search(
+        r"(?::|=)\s*(?:@Sendable\s*)?\([^)]*\)\s*"
+        r"(?:async\s*)?(?:throws\s*)?->",
+        first_use_code,
+    ):
+        raise ValueError("Task 41 first-use owner gained a hidden closure")
+    for required in (
+        "acceptedRequiresFreshAdmission", "persistenceFailed",
+        "presentationRequired", "operationInProgress",
+        "presentationInFlight",
+        "mutationInFlight",
+    ):
+        if required not in first_use_code:
+            raise ValueError(f"Task 41 first-use contract missing: {required}")
+    type_owners = {
+        "DeepDiveDisclosureSemanticItem": {disclosure_path},
+        "DeepDiveDisclosureDecision": {disclosure_path},
+        "DeepDiveDisclosureRecordState": {disclosure_path},
+        "DeepDiveDisclosureStoreError": {disclosure_path},
+        "DeepDiveDisclosureDescriptor": {disclosure_path, first_use_path},
+        "DeepDiveDisclosureRecord": {disclosure_path},
+        "DeepDiveDisclosureRecordStoring": {disclosure_path, first_use_path},
+        "DeepDiveDisclosurePreferenceStore": {disclosure_path, first_use_path},
+        "DeepDiveSourceReadiness": {availability_path},
+        "DeepDiveDisclosureReadiness": {availability_path, first_use_path},
+        "DeepDiveCodexReadiness": {availability_path},
+        "DeepDiveRuntimeReadiness": {availability_path},
+        "DeepDiveDependencyReadiness": {availability_path},
+        "DeepDiveWorkflowReadiness": {availability_path},
+        "DeepDiveBudgetReadiness": {availability_path},
+        "DeepDiveAdmissionDimensions": {availability_path, first_use_path},
+        "DeepDiveAggregateAvailability": {availability_path, first_use_path},
+        "DeepDiveAvailabilityProjection": {availability_path},
+        "DeepDiveAvailabilityEvaluator": {availability_path, first_use_path},
+        "DeepDiveFirstUseRequest": {first_use_path},
+        "DeepDiveDisclosurePresentationReason": {first_use_path},
+        "DeepDiveFirstUseEvaluation": {first_use_path},
+        "DeepDiveFirstUseDecision": {first_use_path},
+        "DeepDiveFirstUseDecisionResult": {first_use_path},
+        "DeepDiveForgetAcceptanceResult": {first_use_path},
+        "DeepDiveFirstUseDecisionOwner": {first_use_path},
+    }
+    effective_core = dict(core_sources)
+    for path in (disclosure_path, availability_path, first_use_path):
+        effective_core[path] = candidate[path]
+    for path, source in effective_core.items():
+        active = code_without_comments_or_strings(source)
+        deep_dive_declarations = re.findall(
+            r"(?m)^(?:public\s+)?(?:final\s+)?"
+            r"(?:struct|class|actor|enum|protocol|typealias)\s+"
+            r"(DeepDive[A-Za-z0-9_]*)",
+            active,
+        )
+        for declaration in deep_dive_declarations:
+            if declaration not in type_owners:
+                raise ValueError(
+                    f"Task 41 unowned Deep Dive type: {declaration}: {path}"
+                )
+        for type_name, owners in type_owners.items():
+            if re.search(rf"\b{re.escape(type_name)}\b", active) \
+                    and path not in owners:
+                raise ValueError(
+                    f"Task 41 type escaped owner: {type_name}: {path}"
+                )
+
+validate(sources)
+
+mutations = []
+def mutate(path, old, new):
+    changed = dict(sources)
+    if old not in changed[path]:
+        raise SystemExit(f"Task 41 verifier mutation anchor missing: {old}")
+    changed[path] = changed[path].replace(old, new, 1)
+    mutations.append(changed)
+
+mutate(
+    disclosure_path,
+    "deep-dive-disclosure-v1",
+    "deep-dive-disclosure-v2"
+    "\n        // deep-dive-disclosure-v1",
+)
+mutate(
+    availability_path,
+    "normalProductStartEnabled: Bool { false }",
+    "normalProductStartEnabled: Bool { true }",
+)
+mutate(
+    configuration_path,
+    "DeepDiveDisclosure.json",
+    "Settings.json"
+    "\n                // DeepDiveDisclosure.json",
+)
+for injection in (
+    "private let startInvestigation: @Sendable () -> Void\n",
+    "public func launch(_ work: () -> Void) { work() }\n",
+    "private typealias Work = @Sendable () -> Void\n",
+    "private let trustCodex = true\n",
+    "private let executionAuthority = StornautExecution.self\n",
+    "private let fileManager = FileManager.default\n",
+    "private let process = Process()\n",
+):
+    changed = dict(sources)
+    anchor = "public actor DeepDiveFirstUseDecisionOwner {\n"
+    changed[first_use_path] = changed[first_use_path].replace(
+        anchor, anchor + injection, 1
+    )
+    mutations.append(changed)
+
+for index, mutation in enumerate(mutations, start=1):
+    try:
+        validate(mutation, enforce_seals=False)
+    except ValueError:
+        continue
+    raise SystemExit(f"Task 41 verifier accepted mutation {index}")
+
+escape_path = Path(
+    "Sources/StornautCore/Settings/DeepDiveStartEscape.swift"
+)
+core_sources[escape_path] = (
+    "public extension DeepDiveFirstUseDecisionOwner { "
+    "func launch(_ work: () -> Void) { work() } }"
+)
+try:
+    validate(sources, enforce_seals=False)
+except ValueError:
+    pass
+else:
+    raise SystemExit("Task 41 verifier accepted cross-file type escape")
+finally:
+    del core_sources[escape_path]
+
+required_test_patterns = {
+    test_paths[0]: [
+        r"func\s+currentDescriptorHasExactVersionFingerprintAndLocaleParity\s*\(",
+        r"func\s+anyMeaningfulSemanticBindingChangeMakesRecordObsolete\s*\(",
+    ],
+    test_paths[1]: [
+        r"func\s+rejectsUnknownKeysSchemasAndOversizedPayloads\s*\(",
+        r"func\s+failedAtomicMutationPreservesLastDurableRecord\s*\(",
+        r"func\s+diskLoadRejectsOversizedSparsePayloadBeforeDecoding\s*\(",
+    ],
+    test_paths[2]: [
+        r"func\s+runtimeAndConsentCannotSubstituteForEachOther\s*\(",
+        r"normalProductStartEnabled\s*==\s*false",
+    ],
+    test_paths[3]: [
+        r"func\s+acceptPersistsThenRequiresFreshFullAdmission\s*\(",
+        r"func\s+concurrentAcceptanceIsSingleFlight\s*\(",
+        r"func\s+concurrentFirstUsePresentationIsSingleFlight\s*\(",
+        r"func\s+directDecisionWithoutCurrentPresentationCannotPersist\s*\(",
+        r"func\s+settingsReviewPresentsCurrentDisclosureWithoutRuntimeAdmission\s*\(",
+    ],
+}
+for path, patterns in required_test_patterns.items():
+    active_test_source = code_without_comments_or_strings(sources[path])
+    if "#if false" in active_test_source or "@Test(.disabled" in active_test_source:
+        raise SystemExit(f"Task 41 required tests disabled: {path}")
+    for pattern in patterns:
+        if not re.search(pattern, active_test_source):
+            raise SystemExit(f"Task 41 required test drifted: {path}: {pattern}")
+PY
+
+print "Task 41 disclosure/admission boundaries verified."

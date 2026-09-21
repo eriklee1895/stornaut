@@ -1,0 +1,103 @@
+# Phase D Task 39B2c ii-c-c v12 replacement campaign authorization
+
+> Status: consumed / non-admitting / non-retryable
+>
+> Authorized source baseline: `0a17726176b0cae0839f398da5fae2f09e6ccef5`
+>
+> Authorized source tree: `00e2c9ebebaed29e205a4676f27c81e009c64791`
+
+## Authorization
+
+The user explicitly authorized one fresh privileged Task 39 ii-c replacement
+machine campaign, now explicitly rebound to the pushed preserved-capsule repair
+baseline above. This authorization permits the sealed zero-argument campaign
+executable to generate
+one fresh nonzero campaign UUID, one fresh nonzero attempt UUID and one fresh
+owner-private evidence root at launch. It must not retry, append to, rewrite,
+remove or reinterpret any v8, v9, v10 or v11 artifact, receipt, Gate capsule or
+evidence root.
+
+The reauthorization-only descendant may change status documentation, structural
+status assertions and their digest pins. It must not change production Swift,
+the campaign/helper/driver/Gate/coordinator/plist/service binaries, the fixed
+prompts, the 1,400-second campaign horizon or any security boundary. Before the
+single executable launch, its exact HEAD/tree must be clean and pushed and the
+existing non-privileged preflight gates must be green.
+
+## Exact authority boundary
+
+This authorization permits only the existing fixed Task 39 ii-c campaign:
+
+- build the current-source Debug diagnostic App and package-only campaign
+  binary;
+- install only the fixed Stornaut App/helper/driver/Gate/coordinator and fixed
+  `com.eriklee.stornaut.lifecycle` plist through the sealed lifecycle script;
+- run the non-executing `/usr/bin/sudo -knv` policy probe;
+- after durable arm, launch the fixed installed driver at most once through the
+  existing `/usr/bin/sudo -N -p` path;
+- let the trusted operator personally enter the administrator credential only
+  after observing one of the three exact fixed prompts: install authorization,
+  driver authorization or uninstall authorization;
+- run the existing eight-scenario no-model machine cohort, independent evidence
+  verifier, fixed uninstall and zero-residue observation.
+
+The Coding Agent must not read, record, request in chat, paste or synthesize the
+administrator credential. Install and uninstall credentials are read directly
+by fixed `/usr/bin/sudo` from the controlling TTY. Only the post-arm driver
+credential is relayed through the campaign's bounded `CChar` buffer and cleared
+with `memset_s` on every path.
+
+No Codex write authority, localhost/private/link-local/Unix access, Executor,
+Trash, Policy, Registered Action, release/notarization, Task 40 start or
+production Deep Dive availability is authorized by this amendment.
+
+## One-shot and stop rules
+
+- Before `armedConsumed`, a preflight failure may be repaired only after exact
+  uninstall and zero-residue proof.
+- Once v12 durably records `armedConsumed`, the attempt is consumed. Any
+  failure, uncertainty, cancellation, timeout or verifier rejection stops the
+  campaign and forbids automatic retry or a v13 attempt.
+- A green independently verified v12 cohort may unblock L3c3d. It does not
+  itself complete Task 39 or enable production Deep Dive.
+- L3c3d remains the sole authenticated real-model step. L3c4 remains the sole
+  readiness/full-verifier admission step. Task 40 remains blocked until Task 39
+  produces and pushes its Ready baseline.
+
+## Preflight order
+
+Before any root/install/sudo action, the source tree must be clean and pushed as
+the exact authorization-only descendant of `0a17726`; the checked v8 receipt
+must retain its documented historical tree-loss non-claim, and the still-present
+v9-v11 evidence trees must verify read-only; the fixed runtime must be absent;
+preserved historical Gate residue must remain unchanged; structural, focused,
+component/final-Mach-O
+and independent-review gates required by the frozen ii-c plan must be green.
+The campaign is then launched exactly once from an interactive Terminal.
+
+No campaign UUID, attempt UUID or evidence root exists at authorization time.
+The sealed executable generates all three at the unique launch and the retained
+evidence binds their exact values.
+
+## Consumed result
+
+The rebound authorization was used exactly once from authorization-only
+descendant `212320fa9f05cad52a40fb9ce02ed7bf73543b04`. It produced campaign
+`2aca496d-83c7-4ab3-8ef4-f433ce9ea493` and attempt
+`9d713dd7-30b4-49a5-96b1-9afdf482f1c2`, then durably reached
+`prepared → armedConsumed → spawnUncertain`. It is consumed and cannot be
+reused. The checked v12 disposition records post-arm authorization-path deadline exhaustion,
+rejected admission and the later unattributed loss of the purgeable Gate cache.
+
+## Superseded pre-launch suspension
+
+Independent authorization review found that baseline `4fd9c53` would invoke
+mandatory stale recovery and remove the preserved v11 Gate capsule before a new
+publication, conflicting with this authorization's explicit historical-evidence
+boundary. No v12 executable was launched, no identifier/evidence root was
+created, and the authorization remained unconsumed. The campaign was suspended
+until the preserved-capsule prerequisite was implemented, reviewed and pushed.
+That prerequisite completed, both post-fix reviews had no unresolved P0-P2,
+and the user explicitly rebound the one-shot authorization to
+`0a17726176b0cae0839f398da5fae2f09e6ccef5` on 2026-09-09. The later unique
+invocation and its identifiers are recorded in the consumed result above.

@@ -1,0 +1,305 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+screenshots_dir=${1:-$repo_root/.derivedData/ui-screenshots}
+screenshots_dir=${screenshots_dir:A}
+
+expected_dir="$repo_root/.derivedData/ui-screenshots"
+if [[ "$screenshots_dir" != "$expected_dir" ]]; then
+    print -u2 "Refusing to inspect unexpected screenshot directory: $screenshots_dir"
+    exit 1
+fi
+
+for screenshot in \
+    stornaut-shell-light.png \
+    stornaut-settings-light.png \
+    stornaut-shell-dark.png \
+    stornaut-settings-dark.png \
+    stornaut-overview-limited.png \
+    stornaut-overview-zh-Hans.png \
+    stornaut-scan-progress-dark.png \
+    stornaut-scan-partial-light.png \
+    stornaut-scan-results-inspector-light.png \
+    stornaut-review-default-light.png \
+    stornaut-review-default-dark.png \
+    stornaut-review-inspector-dark.png \
+    stornaut-review-stale-dark.png \
+    stornaut-review-empty-light.png \
+    stornaut-review-zh-Hans.png \
+    stornaut-cleanup-completed-light.png \
+    stornaut-cleanup-completed-dark.png \
+    stornaut-cleanup-manifest-light.png \
+    stornaut-cleanup-partial-dark.png \
+    stornaut-cleanup-audit-pending-dark.png \
+    stornaut-cleanup-outcome-unknown-dark.png \
+    stornaut-cleanup-zh-Hans.png \
+    stornaut-history-populated-light.png \
+    stornaut-history-expired-dark.png \
+    stornaut-history-corrupt-light.png \
+    stornaut-history-trend-dark.png \
+    stornaut-settings-scanning-light.png \
+    stornaut-settings-privacy-light.png \
+    stornaut-settings-codex-dark.png \
+    stornaut-settings-knowledge-dark.png; do
+    if [[ ! -f "$screenshots_dir/$screenshot" ]]; then
+        print -u2 "Missing UI screenshot: $screenshots_dir/$screenshot"
+        exit 1
+    fi
+done
+
+xcrun swift - "$screenshots_dir" <<'SWIFT'
+import AppKit
+import CoreGraphics
+import Foundation
+
+let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+let names = [
+    "stornaut-shell-light",
+    "stornaut-settings-light",
+    "stornaut-shell-dark",
+    "stornaut-settings-dark",
+    "stornaut-overview-limited",
+    "stornaut-overview-zh-Hans",
+    "stornaut-scan-progress-dark",
+    "stornaut-scan-partial-light",
+    "stornaut-scan-results-inspector-light",
+    "stornaut-review-default-light",
+    "stornaut-review-default-dark",
+    "stornaut-review-inspector-dark",
+    "stornaut-review-stale-dark",
+    "stornaut-review-empty-light",
+    "stornaut-review-zh-Hans",
+    "stornaut-cleanup-completed-light",
+    "stornaut-cleanup-completed-dark",
+    "stornaut-cleanup-manifest-light",
+    "stornaut-cleanup-partial-dark",
+    "stornaut-cleanup-audit-pending-dark",
+    "stornaut-cleanup-outcome-unknown-dark",
+    "stornaut-cleanup-zh-Hans",
+    "stornaut-history-populated-light",
+    "stornaut-history-expired-dark",
+    "stornaut-history-corrupt-light",
+    "stornaut-history-trend-dark",
+    "stornaut-settings-scanning-light",
+    "stornaut-settings-privacy-light",
+    "stornaut-settings-codex-dark",
+    "stornaut-settings-knowledge-dark",
+]
+
+struct ImageStatistics {
+    let meanLuminance: Double
+    let luminanceStandardDeviation: Double
+}
+
+func imageStatistics(at url: URL) throws -> ImageStatistics {
+    guard let image = NSImage(contentsOf: url),
+          let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    else {
+        throw CocoaError(.fileReadCorruptFile)
+    }
+
+    guard cgImage.width >= 400, cgImage.height >= 200 else {
+        throw CocoaError(.coderInvalidValue)
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    let bytesPerRow = width * 4
+    var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+
+    var total = 0.0
+    var totalSquared = 0.0
+    var samples = 0
+
+    try pixels.withUnsafeMutableBytes { buffer in
+        let bytes = buffer.bindMemory(to: UInt8.self)
+
+        guard let baseAddress = buffer.baseAddress,
+              let context = CGContext(
+                  data: baseAddress,
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bytesPerRow: bytesPerRow,
+                  space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue
+                      | CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else {
+            throw CocoaError(.coderInvalidValue)
+        }
+
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        let stride = max(1, min(width, height) / 256)
+
+        for y in Swift.stride(from: 0, to: height, by: stride) {
+            for x in Swift.stride(from: 0, to: width, by: stride) {
+                let offset = y * bytesPerRow + x * 4
+                let alpha = Double(bytes[offset + 3]) / 255
+                let whiteContribution = 255 * (1 - alpha)
+                let red = Double(bytes[offset]) + whiteContribution
+                let green = Double(bytes[offset + 1]) + whiteContribution
+                let blue = Double(bytes[offset + 2]) + whiteContribution
+                let luminance = 0.2126 * red
+                    + 0.7152 * green
+                    + 0.0722 * blue
+                total += luminance
+                totalSquared += luminance * luminance
+                samples += 1
+            }
+        }
+    }
+
+    let mean = total / Double(samples)
+    let variance = max(
+        0,
+        totalSquared / Double(samples) - mean * mean
+    )
+    return ImageStatistics(
+        meanLuminance: mean,
+        luminanceStandardDeviation: sqrt(variance)
+    )
+}
+
+var statistics: [String: ImageStatistics] = [:]
+for name in names {
+    let url = directory.appendingPathComponent("\(name).png")
+    statistics[name] = try imageStatistics(at: url)
+    let current = statistics[name]!
+    print(
+        "\(name)=\(String(format: "%.2f", current.meanLuminance))"
+            + " sd=\(String(format: "%.2f", current.luminanceStandardDeviation))"
+    )
+}
+
+guard let shellLight = statistics["stornaut-shell-light"],
+      let shellDark = statistics["stornaut-shell-dark"],
+      let settingsLight = statistics["stornaut-settings-light"],
+      let settingsDark = statistics["stornaut-settings-dark"],
+      let limitedLight = statistics["stornaut-overview-limited"],
+      let chineseLight = statistics["stornaut-overview-zh-Hans"],
+      let scanProgressDark = statistics["stornaut-scan-progress-dark"],
+      let scanPartialLight = statistics["stornaut-scan-partial-light"],
+      let scanInspectorLight =
+        statistics["stornaut-scan-results-inspector-light"],
+      let reviewDefaultLight =
+        statistics["stornaut-review-default-light"],
+      let reviewDefaultDark =
+        statistics["stornaut-review-default-dark"],
+      let reviewInspectorDark =
+        statistics["stornaut-review-inspector-dark"],
+      let reviewStaleDark =
+        statistics["stornaut-review-stale-dark"],
+      let reviewEmptyLight =
+        statistics["stornaut-review-empty-light"],
+      let reviewChineseLight =
+        statistics["stornaut-review-zh-Hans"],
+      let cleanupCompletedLight =
+        statistics["stornaut-cleanup-completed-light"],
+      let cleanupCompletedDark =
+        statistics["stornaut-cleanup-completed-dark"],
+      let cleanupManifestLight =
+        statistics["stornaut-cleanup-manifest-light"],
+      let cleanupPartialDark =
+        statistics["stornaut-cleanup-partial-dark"],
+      let cleanupAuditDark =
+        statistics["stornaut-cleanup-audit-pending-dark"],
+      let cleanupUnknownDark =
+        statistics["stornaut-cleanup-outcome-unknown-dark"],
+      let cleanupChineseLight =
+        statistics["stornaut-cleanup-zh-Hans"],
+      let historyPopulatedLight =
+        statistics["stornaut-history-populated-light"],
+      let historyExpiredDark =
+        statistics["stornaut-history-expired-dark"],
+      let historyCorruptLight =
+        statistics["stornaut-history-corrupt-light"],
+      let historyTrendDark =
+        statistics["stornaut-history-trend-dark"],
+      let settingsScanningLight =
+        statistics["stornaut-settings-scanning-light"],
+      let settingsPrivacyLight =
+        statistics["stornaut-settings-privacy-light"],
+      let settingsCodexDark =
+        statistics["stornaut-settings-codex-dark"],
+      let settingsKnowledgeDark =
+        statistics["stornaut-settings-knowledge-dark"],
+      settingsLight.meanLuminance - settingsDark.meanLuminance >= 40,
+      shellLight.meanLuminance - shellDark.meanLuminance >= 40,
+      scanPartialLight.meanLuminance
+        - scanProgressDark.meanLuminance >= 40,
+      reviewDefaultLight.meanLuminance
+        - reviewDefaultDark.meanLuminance >= 40,
+      cleanupCompletedLight.meanLuminance
+        - cleanupCompletedDark.meanLuminance >= 40,
+      historyPopulatedLight.meanLuminance
+        - historyExpiredDark.meanLuminance >= 40,
+      (160...250).contains(limitedLight.meanLuminance),
+      (160...250).contains(chineseLight.meanLuminance),
+      (160...250).contains(scanPartialLight.meanLuminance),
+      (160...250).contains(scanInspectorLight.meanLuminance),
+      (160...250).contains(reviewDefaultLight.meanLuminance),
+      (230...254).contains(reviewEmptyLight.meanLuminance),
+      (160...250).contains(reviewChineseLight.meanLuminance),
+      (160...250).contains(cleanupCompletedLight.meanLuminance),
+      (160...250).contains(cleanupManifestLight.meanLuminance),
+      (160...250).contains(cleanupChineseLight.meanLuminance),
+      (160...250).contains(historyPopulatedLight.meanLuminance),
+      (160...250).contains(historyCorruptLight.meanLuminance),
+      shellLight.luminanceStandardDeviation >= 20,
+      shellDark.luminanceStandardDeviation >= 20,
+      limitedLight.luminanceStandardDeviation >= 20,
+      chineseLight.luminanceStandardDeviation >= 20,
+      scanProgressDark.luminanceStandardDeviation >= 20,
+      scanPartialLight.luminanceStandardDeviation >= 20,
+      scanInspectorLight.luminanceStandardDeviation >= 20,
+      reviewDefaultDark.meanLuminance <= 120,
+      reviewInspectorDark.meanLuminance <= 120,
+      reviewStaleDark.meanLuminance <= 120,
+      reviewDefaultLight.luminanceStandardDeviation >= 20,
+      reviewDefaultDark.luminanceStandardDeviation >= 20,
+      reviewInspectorDark.luminanceStandardDeviation >= 20,
+      reviewStaleDark.luminanceStandardDeviation >= 15,
+      reviewEmptyLight.luminanceStandardDeviation >= 15,
+      reviewChineseLight.luminanceStandardDeviation >= 20,
+      cleanupCompletedDark.meanLuminance <= 120,
+      cleanupPartialDark.meanLuminance <= 120,
+      cleanupAuditDark.meanLuminance <= 120,
+      cleanupUnknownDark.meanLuminance <= 120,
+      cleanupCompletedLight.luminanceStandardDeviation >= 20,
+      cleanupCompletedDark.luminanceStandardDeviation >= 20,
+      cleanupManifestLight.luminanceStandardDeviation >= 20,
+      cleanupPartialDark.luminanceStandardDeviation >= 20,
+      cleanupAuditDark.luminanceStandardDeviation >= 20,
+      cleanupUnknownDark.luminanceStandardDeviation >= 20,
+      cleanupChineseLight.luminanceStandardDeviation >= 20,
+      historyPopulatedLight.luminanceStandardDeviation >= 20,
+      historyExpiredDark.luminanceStandardDeviation >= 20,
+      historyCorruptLight.luminanceStandardDeviation >= 20,
+      historyTrendDark.meanLuminance <= 120,
+      historyTrendDark.luminanceStandardDeviation >= 20,
+      settingsScanningLight.meanLuminance
+        - settingsCodexDark.meanLuminance >= 40,
+      settingsPrivacyLight.meanLuminance
+        - settingsKnowledgeDark.meanLuminance >= 40,
+      (160...250).contains(settingsScanningLight.meanLuminance),
+      (160...250).contains(settingsPrivacyLight.meanLuminance),
+      settingsCodexDark.meanLuminance <= 120,
+      settingsKnowledgeDark.meanLuminance <= 120,
+      settingsScanningLight.luminanceStandardDeviation >= 8,
+      settingsPrivacyLight.luminanceStandardDeviation >= 8,
+      settingsCodexDark.luminanceStandardDeviation >= 8,
+      settingsKnowledgeDark.luminanceStandardDeviation >= 8
+else {
+    fputs(
+        "Overview/Scan/Review/History/Settings screenshot theme contract failed.\n",
+        stderr
+    )
+    exit(1)
+}
+SWIFT

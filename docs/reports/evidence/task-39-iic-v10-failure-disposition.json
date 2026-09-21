@@ -1,0 +1,106 @@
+{
+  "admission" : "rejected",
+  "artifactSHA256" : {
+    "01-preflight/source-build.json" : "05e411282a7f92bd846393375632865cf46541c0adf55aeb3951c49ab5466c25",
+    "02-install/installed.json" : "ba8bbfdc872a54248a6f0bae2c7d67aac4c946517daa59edc550ea72f90beab1",
+    "03-authorization/attempt-event-0001.bin" : "afedec5a5e2f9ddd9ce937cc7edc5b064a5f8dc6801101d6d90d87e8809b0379",
+    "03-authorization/attempt-event-0002.bin" : "8a0f3b7866669459a5b1f343c680e912b791123cdbc99808b0efb0ca8138a924",
+    "03-authorization/attempt-event-0003.bin" : "7b4e7687f0dfb0dc494408a25b59fc52b181cbc0e24b6429dc863e92ae6800ba",
+    "03-authorization/attempt-event-0004.bin" : "737b2655e189f6c2471d023cdbc81c2309c9022d5ca2932fa4c31e2442fee022",
+    "03-authorization/capability-counts.json" : "a367e91dbb50cc28d5fe6f3c5cd656f30477c98936282e3841077592ed833498",
+    "03-authorization/human-attestation.json" : "c9ed401e4e0d87f7a46db894e0ef3e9d29213ba4ac48395ff83eb635e91d32fb",
+    "03-authorization/policy-probe.json" : "572b24cdcaf91bb741b44e2d2f940e58bf0dcaff7f082eeab86668fe54cc2fc3"
+  },
+  "attemptUUID" : "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+  "campaignUUID" : "b6ee7781-5298-4732-a312-26eb7e0c37d1",
+  "classification" : "consumedCampaignDeadlineExhaustion",
+  "domain" : "stornaut.task39.iic.failure-disposition.v4",
+  "eventChain" : [
+    "prepared",
+    "armedConsumed",
+    "spawnUncertain",
+    "terminal"
+  ],
+  "evidenceSetSHA256" : "d514a5df5866d0a843295a8962cc752f92dc2ebf56107088fac93dc5d31c385f",
+  "nonClaims" : [
+    "no manifest or external seal",
+    "no uninstall or global post-teardown artifact",
+    "no machine admission",
+    "no L3c3d authenticated model success",
+    "no Task 39 readiness",
+    "subsequent campaign residue is not prior campaign success"
+  ],
+  "parentIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "516755944",
+    "size" : "96"
+  },
+  "requiredMissingArtifacts" : [
+    "manifest.bin",
+    "../seal.json",
+    "04-driver-epochs/coordinator-receipt.bin",
+    "04-driver-epochs/diagnostic-output.bin",
+    "05-uninstall/uninstall.json",
+    "06-verifier/global-post-teardown.json",
+    "06-verifier/verification-input.json"
+  ],
+  "retry" : "forbidden",
+  "rootCauseObservation" : {
+    "armedConsumedObservedAtUTCMicroseconds" : "1788786289593855",
+    "campaignOrchestrationAndCleanupReserveSeconds" : 80,
+    "configuredCampaignDeadlineNanoseconds" : "1200000000000",
+    "driverEpochArtifactCount" : 0,
+    "elapsedAfterArmMicroseconds" : "1195056190",
+    "epochCount" : 8,
+    "maximumEpochBudgetSeconds" : 1120,
+    "maximumEpochWallClockSeconds" : 140,
+    "reason" : "sharedCampaignDeadlineExhaustedBeforeCoordinatorReceipt",
+    "source" : "durableAttemptEventTimeline",
+    "spawnUncertainObservedAtUTCMicroseconds" : "1788787484650045"
+  },
+  "rootIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "516755945",
+    "size" : "256"
+  },
+  "schemaVersion" : 4,
+  "sourceBinding" : {
+    "attemptUUID" : "9d79dc3b-dcf0-496a-9dc2-3cbceb2fb9bd",
+    "buildProvenanceSHA256" : "a1ff757bccfa44699369e4d0c2259e2554b151dd45419b2012bee3ae920d7690",
+    "campaignUUID" : "b6ee7781-5298-4732-a312-26eb7e0c37d1",
+    "canonicalSourceManifestSHA256" : "992b6ed5945ea123a34f9ba8e5e1619a19fd06bf2f3b82f001d6a42bf77fd4ae",
+    "preArmFrameSHA256" : "d514a5df5866d0a843295a8962cc752f92dc2ebf56107088fac93dc5d31c385f",
+    "repositoryHEAD" : "b9ade5e49131619c05f8b57e35cc310276b3a6f7",
+    "repositoryTree" : "3542a6d0ae3ca59310fd33230e861e17610a24d3",
+    "role" : "sourceBuildIdentity",
+    "schemaVersion" : 1,
+    "signedRuntimeBindingSHA256" : "a55c10feedf9a3efc3e06b78239b0f745d7bc2bb267514be9762b8c040add1e6"
+  },
+  "subsequentCampaignObservation" : {
+    "attemptUUID" : "18a85048-5e1c-40c5-99e4-3785185070d3",
+    "campaignUUID" : "4ae73d0f-88c7-4cb9-a5e4-9eae2482c99b",
+    "classification" : "consumedPostArmFailureUnclassified",
+    "gateCapsuleByteCount" : 28997,
+    "gateCapsuleName" : "projected-cohort-a2cf07a731ffe2bb02a98cd61a9240cf93d514d97071f7c83ba6fb9bf56d6104.bin",
+    "gateCapsuleSHA256" : "f656a28ec6ac77c65b89b73b28932c716c74427acaa1ef14fedab4e816140e72",
+    "priorDispositionSHA256" : "877d538feca64846a2bafa167dff48c951a47849661efd2dae83011dd67d673e"
+  },
+  "systemObservation" : {
+    "fixedPathsAbsent" : true,
+    "fixedProcessCount" : 0,
+    "fixedServiceAbsent" : true,
+    "gateBaseChangeTimeNanoseconds" : "1788835011432471095",
+    "gateBaseDevice" : "16777229",
+    "gateBaseGeneration" : "0",
+    "gateBaseInode" : "499810932",
+    "gateBaseState" : "ownConsumedAttemptRemovedWithSubsequentAttemptPresent",
+    "ownerLockChangeTimeNanoseconds" : "1787992800592752249",
+    "ownerLockDevice" : "16777229",
+    "ownerLockGeneration" : "0",
+    "ownerLockInode" : "499810933",
+    "ownerLockSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "verifierExecutableSHA256" : "512e6005b0cbe0fcbd4b8a42da31ccfcd245868bc62e31fead257222a86c025b"
+}

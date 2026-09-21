@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "clean-synchronized",
+      "status": "# branch.oid 1111111111111111111111111111111111111111\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +0 -0\n",
+      "lastCommit": "1786310000\n",
+      "expected": {
+        "staged": false,
+        "modified": false,
+        "untracked": false,
+        "upstream": true,
+        "ahead": 0,
+        "behind": 0,
+        "valid": true
+      }
+    },
+    {
+      "id": "dirty-untracked-ahead",
+      "status": "# branch.oid 2222222222222222222222222222222222222222\n# branch.head feature\n# branch.upstream origin/feature\n# branch.ab +2 -0\n1 M. N... 100644 100644 100644 1111111111111111111111111111111111111111 3333333333333333333333333333333333333333 staged.txt\n1 .M N... 100644 100644 100644 4444444444444444444444444444444444444444 4444444444444444444444444444444444444444 modified.txt\n? untracked.txt\n",
+      "lastCommit": "1786310100\n",
+      "expected": {
+        "staged": true,
+        "modified": true,
+        "untracked": true,
+        "upstream": true,
+        "ahead": 2,
+        "behind": 0,
+        "valid": true
+      }
+    },
+    {
+      "id": "clean-without-upstream",
+      "status": "# branch.oid 5555555555555555555555555555555555555555\n# branch.head local-only\n",
+      "lastCommit": "1786310200\n",
+      "expected": {
+        "staged": false,
+        "modified": false,
+        "untracked": false,
+        "upstream": false,
+        "ahead": null,
+        "behind": null,
+        "valid": true
+      }
+    },
+    {
+      "id": "malformed-ahead-behind",
+      "status": "# branch.oid 6666666666666666666666666666666666666666\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +many -0\n",
+      "lastCommit": "1786310300\n",
+      "expected": {
+        "staged": false,
+        "modified": false,
+        "untracked": false,
+        "upstream": true,
+        "ahead": null,
+        "behind": null,
+        "valid": false
+      }
+    }
+  ]
+}

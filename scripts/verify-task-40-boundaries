@@ -1,0 +1,756 @@
+#!/bin/zsh -f
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+projection=Sources/StornautCore/Investigation/InvestigationReportProjection.swift
+reconciler=Sources/StornautCore/Investigation/InvestigationReportReconciler.swift
+review=Sources/StornautCore/Investigation/InvestigationReviewProjection.swift
+continuation=Sources/StornautCore/Investigation/InvestigationContinuationPlanner.swift
+store=Sources/StornautCore/Evidence/EvidenceStore.swift
+sqlite=Sources/StornautCore/Evidence/SQLiteConnection.swift
+builder=Sources/StornautCore/Review/CleanupPlanBuilder.swift
+projection_tests=Tests/StornautCoreTests/InvestigationReportProjectionTests.swift
+reconciler_tests=Tests/StornautCoreTests/InvestigationReportReconcilerTests.swift
+review_tests=Tests/StornautCoreTests/InvestigationReviewProjectionTests.swift
+continuation_tests=Tests/StornautCoreTests/InvestigationContinuationPlannerTests.swift
+builder_tests=Tests/StornautCoreTests/CleanupPlanBuilderTests.swift
+performance_tests=Tests/StornautCoreTests/InvestigationStorePerformanceTests.swift
+app_model_tests=StornautAppTests/InvestigationReportModelTests.swift
+investigation_source_root=Sources/StornautCore/Investigation
+investigation_sources=(
+    "${(@f)$(find "$repo_root/$investigation_source_root" -type f \
+        -name '*.swift' -print | LC_ALL=C sort)}"
+)
+
+for path in $projection $reconciler $review $continuation $store $sqlite $builder \
+    $projection_tests $reconciler_tests $review_tests $continuation_tests \
+    $builder_tests $performance_tests $app_model_tests; do
+    [[ -f $path && ! -L $path ]] || {
+        print -u2 "Task 40 boundary source unavailable: $path"
+        exit 1
+    }
+done
+for path in "${investigation_sources[@]}"; do
+    [[ -f $path && ! -L $path ]] || {
+        print -u2 "Task 40 Investigation source unavailable: $path"
+        exit 1
+    }
+done
+[[ $(/usr/bin/shasum -a 256 $projection | /usr/bin/awk '{print $1}') \
+    == 58749f15f91290be3474a56e0d897d90330f76157212fbbac78a2a22f603855d ]] || {
+    print -u2 "Task 40 projection source seal drifted"
+    exit 1
+}
+[[ $(/usr/bin/shasum -a 256 $reconciler | /usr/bin/awk '{print $1}') \
+    == 71aa8338ddd428db3a1d675f441c3c518073a809fac5ded4e54c472625875ae7 ]] || {
+    print -u2 "Task 40 reconciler source seal drifted"
+    exit 1
+}
+[[ $(/usr/bin/shasum -a 256 $review | /usr/bin/awk '{print $1}') \
+    == cfaabf29eae9f03011f63fb284efb9c0f3b684f9deab1be290aacb8396320520 ]] || {
+    print -u2 "Task 40 Review projection source seal drifted"
+    exit 1
+}
+[[ $(/usr/bin/shasum -a 256 $continuation | /usr/bin/awk '{print $1}') \
+    == 2d035a736c3b2cce6ce91b51609eae3b4a9cd19fb979337c43c386cf85a97b54 ]] || {
+    print -u2 "Task 40 continuation source seal drifted"
+    exit 1
+}
+
+/usr/bin/xcrun swiftc -frontend -parse -enable-bare-slash-regex \
+    $projection $reconciler $review $continuation $projection_tests \
+    $reconciler_tests $review_tests $continuation_tests $builder_tests \
+    $performance_tests $app_model_tests
+
+/usr/bin/python3 -I - \
+    $projection $reconciler $review $continuation $store $sqlite $builder \
+    $projection_tests $reconciler_tests $review_tests $continuation_tests \
+    $builder_tests $performance_tests $app_model_tests <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+projection_path, reconciler_path, review_path, continuation_path, store_path, sqlite_path, builder_path, projection_tests_path, reconciler_tests_path, review_tests_path, continuation_tests_path, builder_tests_path, performance_tests_path, app_model_tests_path = map(Path, sys.argv[1:])
+projection = projection_path.read_text(encoding="utf-8")
+reconciler = reconciler_path.read_text(encoding="utf-8")
+review = review_path.read_text(encoding="utf-8")
+continuation = continuation_path.read_text(encoding="utf-8")
+store = store_path.read_text(encoding="utf-8")
+sqlite = sqlite_path.read_text(encoding="utf-8")
+builder = builder_path.read_text(encoding="utf-8")
+projection_tests = projection_tests_path.read_text(encoding="utf-8")
+reconciler_tests = reconciler_tests_path.read_text(encoding="utf-8")
+review_tests = review_tests_path.read_text(encoding="utf-8")
+continuation_tests = continuation_tests_path.read_text(encoding="utf-8")
+builder_tests = builder_tests_path.read_text(encoding="utf-8")
+performance_tests = performance_tests_path.read_text(encoding="utf-8")
+app_model_tests = app_model_tests_path.read_text(encoding="utf-8")
+tests = (projection_tests + reconciler_tests + review_tests
+         + continuation_tests + builder_tests + performance_tests
+         + app_model_tests)
+investigation_sources = {
+    path: path.read_text(encoding="utf-8")
+    for path in Path("Sources/StornautCore/Investigation").rglob("*.swift")
+}
+expected_investigation_source_names = {
+    "InvestigationBudget.swift",
+    "InvestigationCandidatePlanner.swift",
+    "InvestigationCanonical.swift",
+    "InvestigationContinuationPlanner.swift",
+    "InvestigationPersistence.swift",
+    "InvestigationPlan.swift",
+    "InvestigationReportProjection.swift",
+    "InvestigationReportReconciler.swift",
+    "InvestigationReviewProjection.swift",
+    "InvestigationRuntimeAdmission.swift",
+    "InvestigationSourceProjection.swift",
+    "InvestigationStopEvaluator.swift",
+    "PersistedWebProvenance.swift",
+}
+observed_investigation_source_names = {
+    str(path.relative_to("Sources/StornautCore/Investigation"))
+    for path in investigation_sources
+}
+if observed_investigation_source_names != expected_investigation_source_names:
+    raise SystemExit("Task 40 Investigation source inventory drifted")
+legacy_authority_exception_sha256 = {
+    "InvestigationSourceProjection.swift":
+        "2f00c0c36833d64e78746c44746a4f3f3f11926dc29f59a56e1ce024aee69f33",
+    "InvestigationStopEvaluator.swift":
+        "8ea08f129fdf9e96f477b793207f986027abc2963ae571b005fee13732943a04",
+}
+task40_owner_sources = {
+    projection_path: projection,
+    reconciler_path: reconciler,
+    review_path: review,
+    continuation_path: continuation,
+}
+task40_type_owners = {}
+for owner, source in task40_owner_sources.items():
+    declarations = re.findall(
+        r"(?m)^public\s+(?:(?:final|indirect)\s+)?"
+        r"(?:struct|class|actor|enum|protocol|typealias)\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)",
+        source,
+    )
+    if not declarations or len(declarations) != len(set(declarations)):
+        raise SystemExit(f"Task 40 public type inventory drifted: {owner}")
+    for type_name in declarations:
+        task40_type_owners[type_name] = {owner}
+# Cross-owner production composition references are explicit and bounded.
+task40_type_owners["InvestigationReportProjection"].update({
+    reconciler_path, review_path,
+})
+task40_type_owners["InvestigationEvidenceSummary"].add(review_path)
+task40_type_owners["InvestigationReportTargetBinding"].update({
+    review_path, builder_path,
+})
+task40_type_owners["InvestigationReportReconciliation"].add(review_path)
+task40_type_owners["InvestigationReportReconciler"].add(review_path)
+if hashlib.sha256(builder_path.read_bytes()).hexdigest() != \
+        "c62f3704ea15bf57d729fab4ab3d3ed6575974c684811a5d73904c3359100395":
+    raise SystemExit("Task 40 CleanupPlanBuilder owner source drifted")
+for path in Path("Sources/StornautCore").rglob("*.swift"):
+    if path.is_symlink() or not path.is_file():
+        raise SystemExit(f"Task 40 Core source identity drifted: {path}")
+    source = path.read_text(encoding="utf-8")
+    for type_name, owners in task40_type_owners.items():
+        if type_name in source and path not in owners:
+            raise SystemExit(
+                f"Task 40 type escaped its sole Core source owner: "
+                f"{type_name}: {path}"
+            )
+
+def code_without_comments_or_strings(source):
+    output = []
+    index = 0
+    block_depth = 0
+    line_comment = False
+    string_delimiter = None
+    while index < len(source):
+        if line_comment:
+            if source[index] == "\n":
+                line_comment = False
+                output.append("\n")
+            else:
+                output.append(" " )
+            index += 1
+            continue
+        if block_depth:
+            if source.startswith("/*", index):
+                block_depth += 1
+                output.extend("  " )
+                index += 2
+            elif source.startswith("*/", index):
+                block_depth -= 1
+                output.extend("  " )
+                index += 2
+            else:
+                output.append("\n" if source[index] == "\n" else " " )
+                index += 1
+            continue
+        if string_delimiter is not None:
+            if source.startswith(string_delimiter, index):
+                output.extend(" " * len(string_delimiter))
+                index += len(string_delimiter)
+                string_delimiter = None
+            elif source[index] == "\\" and string_delimiter == '"':
+                output.extend("  " )
+                index += min(2, len(source) - index)
+            else:
+                output.append("\n" if source[index] == "\n" else " " )
+                index += 1
+            continue
+        if source.startswith("//", index):
+            line_comment = True
+            output.extend("  " )
+            index += 2
+        elif source.startswith("/*", index):
+            block_depth = 1
+            output.extend("  " )
+            index += 2
+        elif source.startswith('"""', index):
+            string_delimiter = '"""'
+            output.extend("   " )
+            index += 3
+        elif source[index] == '"':
+            string_delimiter = '"'
+            output.append(" " )
+            index += 1
+        else:
+            output.append(source[index])
+            index += 1
+    return "".join(output)
+
+def code_without_comments(source):
+    source = re.sub(r"(?s)/\*.*?\*/", "", source)
+    return re.sub(r"(?m)//.*$", "", source)
+
+def validate_authority(source, label, allowed=()):
+    identifiers = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", source))
+    forbidden_identifiers = {
+        "StornautExecution", "CleanupPlan", "CleanupPlanItem",
+        "CleanupPolicyGate", "CleanupPlanBuilder", "ReviewProjection",
+        "TrashMoving", "AuthorizationServices",
+        "FileManager", "FileHandle", "Process", "URLSession",
+        "OutputStream", "Darwin", "Glibc",
+        "open", "openat", "creat", "fopen", "freopen", "fdopen",
+        "write", "writev", "pwrite", "pwritev", "fwrite",
+        "fputs", "fprintf", "putc", "fputc",
+        "link", "linkat", "symlink", "symlinkat",
+        "unlink", "unlinkat", "rename", "renameat", "remove",
+        "removeItem", "moveItem", "copyItem", "replaceItem",
+        "createFile", "createDirectory", "rmdir", "mkdir",
+        "mkstemp", "mkdtemp", "mkfifo", "mkfifoat", "mknod",
+        "mknodat", "chmod", "fchmod", "chown",
+        "fchown", "truncate", "ftruncate", "setxattr",
+        "removexattr", "posix_spawn", "popen",
+        "execv", "execve", "kill", "killpg", "socket",
+        "connect", "bind", "listen", "accept", "send",
+    }
+    forbidden = sorted(
+        identifiers.intersection(forbidden_identifiers).difference(allowed)
+    )
+    if forbidden:
+        raise ValueError(
+            f"Task 40 {label} gained authority: {','.join(forbidden)}"
+        )
+    if re.search(r"\bsystem\s*\(", source):
+        raise ValueError(f"Task 40 {label} gained authority: system")
+
+def validate_public_surface(source, label):
+    code = code_without_comments_or_strings(source)
+    normalized = re.sub(r"\s+", " ", code)
+    if re.search(r"\bpublic\s+extension\b", normalized):
+        raise ValueError(
+            f"Task 40 {label} public extension bypasses surface review"
+        )
+    declarations = re.findall(r"\bpublic\b.{0,512}?(?=\{|$)", normalized)
+    forbidden = ("path", "action", "authorization", "command",
+                 "authorize", "execute", "delete", "remove",
+                 "move", "trash", "policy", "rawpayload",
+                 "rawdata", "rawjson")
+    for declaration in declarations:
+        folded = declaration.lower()
+        if any(token in folded for token in forbidden):
+            raise ValueError(
+                f"Task 40 {label} public surface exposes authority/path field"
+            )
+        if re.search(r"\b(?:CleanupPlan|ReviewProjection)\b", declaration):
+            raise ValueError(
+                f"Task 40 {label} public surface exposes raw Plan/projection"
+            )
+    for match in re.finditer(
+        r"\bpublic\s+(?:indirect\s+)?(?:enum|protocol)\s+"
+        r"[A-Za-z_][A-Za-z0-9_]*[^{}]*\{", code
+    ):
+        opening = code.find("{", match.start())
+        depth = 0
+        closing = None
+        for index in range(opening, len(code)):
+            if code[index] == "{":
+                depth += 1
+            elif code[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    closing = index
+                    break
+        if closing is None:
+            raise ValueError(f"Task 40 {label} public container is unterminated")
+        if re.search(
+            r"\b(?:CleanupPlan|ReviewProjection)\b",
+            code[opening + 1:closing],
+        ):
+            raise ValueError(
+                f"Task 40 {label} public container exposes raw Plan/projection"
+            )
+
+for source, label, allowed in (
+    (projection, "projection", ()),
+    (reconciler, "reconciler", ()),
+    (review, "Review projection", {
+        "CleanupPlan", "CleanupPlanBuilder", "ReviewProjection",
+    }),
+    (continuation, "continuation", ()),
+):
+    try:
+        validate_authority(source, label, allowed)
+        validate_public_surface(source, label)
+    except ValueError as error:
+        raise SystemExit(str(error))
+for forbidden in (
+    "CleanupPlanItem(", "CleanupPolicyGate", "StornautExecution",
+    "TrashMoving", "AuthorizationServices", "ProposedCleanupAction",
+):
+    if forbidden in review + continuation:
+        raise SystemExit("Task 40 Review projector gained authority: " + forbidden)
+for marker in (
+    "CleanupPlanBuilder(store: store)",
+    "await builder.buildForInvestigation(",
+    "targetBindings: targetBindings",
+    "store.commitCleanupPlanForInvestigation(",
+):
+    if marker not in review:
+        raise SystemExit("Task 40 Review join contract drifted: " + marker)
+normalized_review = re.sub(
+    r"\s+", " ", code_without_comments_or_strings(review))
+if "public let cleanupPlanID: CleanupPlanID?" not in review:
+    raise SystemExit("Task 40 Review outcome lost opaque cleanup Plan identity")
+if "try await store.createInvestigationContinuation(command)" not in continuation:
+    raise SystemExit("Task 40 continuation bypasses Store-owned continuation")
+for forbidden in ("path:", "targetIDs:", "InvestigationPlan(", "runtime"):
+    if forbidden in continuation:
+        raise SystemExit("Task 40 continuation accepted unowned input: " + forbidden)
+task40_investigation_sources = {
+    projection_path, reconciler_path, review_path, continuation_path,
+}
+for path, source in investigation_sources.items():
+    normalized = re.sub(
+        r"\s+", " ", code_without_comments_or_strings(source)
+    )
+    raw_projection_patterns = (
+        r"\bpublic\s+(?:(?:static|class|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*(?:let|var|typealias)\b[^{}]{0,512}\b(?:CleanupPlan|ReviewProjection)\b",
+        r"\bpublic\s+(?:(?:static|class|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*func\b[^{}]{0,1024}\b(?:CleanupPlan|ReviewProjection)\b[^{}]*\{",
+        r"\bpublic\s+extension\s+(?:CleanupPlan|ReviewProjection)\b",
+    )
+    if any(re.search(pattern, normalized) for pattern in raw_projection_patterns):
+        raise SystemExit(
+            f"Task 40 public Investigation source exposes raw Plan/projection: {path}"
+        )
+    if path in task40_investigation_sources:
+        continue
+    allowed_authority = {"accept"} if path.name == \
+        "InvestigationSourceProjection.swift" else set()
+    if path.name == "InvestigationStopEvaluator.swift":
+        allowed_authority.add("open")
+    if allowed_authority and hashlib.sha256(path.read_bytes()).hexdigest() != \
+            legacy_authority_exception_sha256[path.name]:
+        raise SystemExit(
+            f"Task 40 legacy authority exception source drifted: {path}"
+        )
+    if path == review_path:
+        allowed_authority.update({
+            "CleanupPlan", "CleanupPlanBuilder", "ReviewProjection",
+        })
+    try:
+        validate_authority(source, str(path), allowed_authority)
+    except ValueError as error:
+        raise SystemExit(str(error))
+if "try await store.saveCleanupPlan(canonicalPlan)" not in builder:
+    raise SystemExit("Task 40 ordinary builder persistence drifted")
+if "persistPlan: false" not in builder:
+    raise SystemExit("Task 40 Investigation dry builder drifted")
+
+def function_block(source, signature, label):
+    code = code_without_comments_or_strings(source)
+    start = code.find(signature)
+    if start < 0:
+        raise SystemExit(f"Task 40 {label} is missing")
+    opening = code.find("{", start)
+    if opening < 0:
+        raise SystemExit(f"Task 40 {label} body is missing")
+    depth = 0
+    for index in range(opening, len(code)):
+        if code[index] == "{":
+            depth += 1
+        elif code[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1]
+    raise SystemExit(f"Task 40 {label} body is unterminated")
+
+def require_block_seal(block, expected, label):
+    if hashlib.sha256(block.encode()).hexdigest() != expected:
+        raise SystemExit(f"Task 40 {label} source seal drifted")
+
+join_block = function_block(
+    store, "    func commitCleanupPlanForInvestigation(",
+    "atomic cleanup Plan join",
+)
+require_block_seal(
+    join_block,
+    "cafca36cdddac65ee25b11e7d2a9409b11cad7e76ed7aea504171a21771a50f1",
+    "atomic cleanup Plan join",
+)
+join_code = code_without_comments_or_strings(join_block)
+join_markers = (
+    "rejoinInvestigationInCurrentTransaction(",
+    "current.runID == runID",
+    "run.reportID == reportID",
+    "loadInvestigationReport(",
+    "?.runID == runID",
+    "saveCleanupPlanInCurrentTransaction(plan)",
+)
+if 'connection.transaction(operation: "investigation.cleanupPlanJoin")' \
+        not in join_block:
+    raise SystemExit("Task 40 cleanup Plan join lost its bounded transaction")
+join_positions = [join_code.find(marker) for marker in join_markers]
+if any(position < 0 for position in join_positions) \
+        or join_positions != sorted(join_positions):
+    raise SystemExit("Task 40 exact-lineage atomic join order drifted")
+post_save = join_code[join_positions[-1]:]
+progress_position = post_save.find("connection.reportInvestigationProgress(")
+control_position = post_save.find("try connection.checkOperationControl()")
+if progress_position < 0 or control_position < progress_position:
+    raise SystemExit("Task 40 atomic join lost post-insert cancellation check")
+if re.search(r"(?<!InCurrentTransaction)\bsaveCleanupPlan\s*\(", join_block):
+    raise SystemExit("Task 40 atomic join opened a nested Plan transaction")
+
+builder_block = function_block(
+    builder, "    func buildForInvestigation(",
+    "Investigation CleanupPlanBuilder dry-run",
+)
+require_block_seal(
+    builder_block,
+    "a92f63b17e0076a0b57761ffab1a0e0d9c4476be3009d3b590bcb660287b142b",
+    "Investigation CleanupPlanBuilder dry-run",
+)
+builder_code = code_without_comments_or_strings(builder_block)
+for marker in (
+    "session.completedScopes.count == 1",
+    "buildValidated(",
+    "persistPlan: false",
+    "investigationTargetBindings: targetBindings",
+):
+    if marker not in builder_code:
+        raise SystemExit("Task 40 Investigation dry builder drifted: " + marker)
+if "saveCleanupPlan" in builder_code:
+    raise SystemExit("Task 40 Investigation dry builder persisted before join")
+
+bounded_block = function_block(
+    sqlite, "    private static func isBoundedInvestigationOperation(",
+    "bounded Store operation allowlist",
+)
+require_block_seal(
+    bounded_block,
+    "3e3860cb9189e65435cafd625c3068f930208f7ab81f290919e99e96bbc2b644",
+    "bounded Store operation allowlist",
+)
+for operation in (
+    '"investigation.reportProjection"',
+    '"investigation.cleanupPlanJoin"',
+):
+    if operation not in bounded_block:
+        raise SystemExit("Task 40 Store operation is unbounded: " + operation)
+
+def registered_test_functions(source):
+    code = code_without_comments_or_strings(source)
+    registered = set()
+    for match in re.finditer(
+        r"(?m)^\s*func\s+([A-Za-z][A-Za-z0-9_]*)\s*\(", code
+    ):
+        cursor = match.start()
+        attribute_start = code.rfind("@Test", max(0, cursor - 2_048), cursor)
+        previous_function = code.rfind("func ", max(0, cursor - 2_048), cursor)
+        if attribute_start > previous_function and any(
+            marker in code[attribute_start:cursor]
+            for marker in (".disabled", ".enabled")
+        ):
+            continue
+        while cursor > 0 and code[cursor - 1].isspace():
+            cursor -= 1
+        if code[:cursor].endswith("@Test"):
+            registered.add(match.group(1))
+            continue
+        if cursor == 0 or code[cursor - 1] != ")":
+            continue
+        depth = 0
+        opening = None
+        for index in range(cursor - 1, -1, -1):
+            if code[index] == ")":
+                depth += 1
+            elif code[index] == "(":
+                depth -= 1
+                if depth == 0:
+                    opening = index
+                    break
+        if opening is None:
+            continue
+        prefix = opening
+        while prefix > 0 and code[prefix - 1].isspace():
+            prefix -= 1
+        if code[:prefix].endswith("@Test"):
+            registered.add(match.group(1))
+    return registered
+
+test_functions = registered_test_functions(tests)
+if ".disabled" in tests or ".enabled" in tests \
+        or re.search(r"(?m)^\s*#(?:if|elseif|else|endif)\b", tests):
+    raise SystemExit("Task 40 required coverage contains a disabled condition")
+expected_test_sha256 = {
+    projection_tests_path: "7e2d361fd371c230561cb1c82c41862fb947ad92dcdd6f2884d3d59510c40df4",
+    reconciler_tests_path: "29cb716e8d570742c629b25204f5b1d0ae649783f0e9e82ef41d7c4b1f32ae19",
+    review_tests_path: "48b6f149c924230f458c91734372565e4b78baa3df247be0c7f1f3f35f914063",
+    continuation_tests_path: "c2094c205f066551ebbedc9509c097c6c84ffb0334b1ae5684150491ba08b00b",
+    builder_tests_path: "0d49246f0efac3c8a74daa9e347aad8e6f81af1821dc5c10e84d000448759f14",
+    performance_tests_path: "8495aba292cb664728e062a45777c8f40d84f917cbb13293d7737a1ee19a69b2",
+    app_model_tests_path: "f2e2a03be1da0d8a2103e70b1f85f3d3e9019e2e1f8384875213eabd9ec0e5e9",
+}
+for path, expected in expected_test_sha256.items():
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"Task 40 focused test source seal drifted: {path}")
+for marker in (
+    "[sensitive content redacted]", "containsSensitiveDisplayContent",
+    "InvestigationEvidenceDisplaySource",
+    "duplicateProposalIDs", "isolatedRecordIDs",
+):
+    if marker not in projection:
+        raise SystemExit("Task 40 projection contract drifted: " + marker)
+
+normalized_projection = re.sub(
+    r"\s+", " ", code_without_comments_or_strings(projection))
+normalized_reconciler = re.sub(
+    r"\s+", " ", code_without_comments_or_strings(reconciler))
+normalized_store = re.sub(
+    r"\s+", " ", code_without_comments_or_strings(store))
+for normalized, pattern, label in (
+    (normalized_reconciler,
+     r"\bpublic\s+(?:(?:final|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*struct\s+InvestigationReportReadSnapshot\b",
+     "raw Store snapshot"),
+    (normalized_store,
+     r"\bpublic\s+(?:(?:static|class|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*func\s+investigationReportReadSnapshot\b",
+     "raw Store reader"),
+    (normalized_projection,
+     r"\bpublic\s+(?:(?:class|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*static\s+func\s+make\b",
+     "raw projection factory"),
+):
+    if re.search(pattern, normalized):
+        raise SystemExit("Task 40 internal surface became public: " + label)
+if re.search(
+    r"\bpublic\s+(?:(?:required|convenience|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*init\s*\([^)]*\)",
+    normalized_projection
+):
+    raise SystemExit("Task 40 projection gained a public constructor")
+store_calls = re.findall(
+    r"\bstore\s*\.\s*([A-Za-z][A-Za-z0-9_]*)\s*\(",
+    code_without_comments_or_strings(reconciler),
+)
+if store_calls != ["investigationReportReadSnapshot"] \
+        or "private let store:" in reconciler:
+    raise SystemExit(
+        "Task 40 reconciler Store call surface drifted: " + repr(store_calls)
+    )
+
+start = store.find("    func investigationReportReadSnapshot(")
+end = store.find("\n    public func createInvestigationContinuation(", start)
+if start < 0 or end < 0:
+    raise SystemExit("Task 40 Store projection transaction is missing")
+block = store[start:end]
+ordered = (
+    'connection.transaction(operation: "investigation.reportProjection")',
+    "rejoinInvestigationInCurrentTransaction(",
+    "loadInvestigationRun(",
+    "loadInvestigationReport(",
+    "allInvestigationEvidence(",
+    "allInvestigationDegradations(",
+    "allInvestigationBudgetEvents(",
+)
+positions = [block.find(marker) for marker in ordered]
+if any(position < 0 for position in positions) or positions != sorted(positions):
+    raise SystemExit("Task 40 rejoin/read order drifted")
+
+for marker in (
+    "projectionPreservesSourcesAndRedactsExecutableText_BitsUT",
+    "projectionTruncatesTextAndIsolatesOnlyMalformedRows_BitsUT",
+    "duplicateProposalIdentifiersAreIsolated_BitsUT",
+    "webProvenanceRequiresAWebSourceAndCounterEvidenceDoesNotResolve_BitsUT",
+    "sensitiveDisplayFormsAreFullyRedacted_BitsUT",
+    "omittedPlanTargetPreservesReportButBlocksReview_BitsUT",
+    "conflictingResolvedAndUnresolvedTargetBlocksReview_BitsUT",
+    "duplicateUnresolvedTargetRowsAreIsolated_BitsUT",
+    "finalReportAndEverySourceLabelProjectExactly_BitsUT",
+    "currentAndStaleSourcesPreserveTruthWithoutUnsafeReview_BitsUT",
+    "exactExpiryAndMissingIdentityRemainDistinct_BitsUT",
+    "agentOnlyRuleMissIsReviewRecommendedAndNeverExecutable_BitsUT",
+    "deterministicPlanAndSelectionRemainBuilderOwned_BitsUT",
+    "cleanupJoinFailureDiscardsBuilderOutput_BitsUT",
+    "currentEvidenceBlockCannotBePromotedByAgentProposal_BitsUT",
+    "inconsistentBuilderProjectionFailsClosedWithoutJoining_BitsUT",
+    "builderRowsOutsideInvestigationTargetsFailClosed_BitsUT",
+    "classificationMismatchAndUnresolvedExecutableFailClosed_BitsUT",
+    "currentDeterministicBlockPrecedesHistoricalUnresolved_BitsUT",
+    "cleanupPlanBuilderInvestigationModeDoesNotPersistBeforeJoin",
+    "investigationCleanupPlanJoinIsAtomicAcrossSourceRevalidation",
+    "investigationCleanupPlanJoinCancellationRollsBackInsertedPlan_BitsUT",
+    "investigationCleanupPlanJoinRejectsItemOutsideRetainedTargets_BitsUT",
+    "investigationCleanupPlanJoinRejectsForeignRunOrReport_BitsUT",
+    "investigationReportProjectionHonorsStoreDeadline_BitsUT",
+    "typedRequestDelegatesToStoreOwnedContinuation_BitsUT",
+    "sameRunIdentityFailsBeforeStoreCall_BitsUT",
+    "consumesOnlyThePublicCoreFacade_BitsUT",
+):
+    if marker not in test_functions:
+        raise SystemExit("Task 40 focused coverage drifted: " + marker)
+
+for mutated, label in (
+    (projection + "\npublic var cleanupPath: String { \"\" }\n",
+     "public-path-mutation"),
+    (reconciler + "\npublic func authorize(action: String) {}\n",
+     "public-authority-mutation"),
+    (projection + "\npublic extension InvestigationDisplayText { var cleanupPath: String { value } }\n",
+     "public-extension-mutation"),
+):
+    try:
+        validate_public_surface(mutated, label)
+    except ValueError:
+        pass
+    else:
+        raise SystemExit("Task 40 public-surface mutation accepted: " + label)
+
+authority_mutations = (
+    projection + '\nprivate func mutate() { try? FileManager().removeItem(atPath: "/tmp/x") }\n',
+    projection + '\nprivate func mutate() { _ = Darwin.unlink("/tmp/x") }\n',
+    projection + '\nprivate func mutate() { rename("/tmp/a", "/tmp/b") }\n',
+    projection + '\nprivate func mutate() { try? FileHandle(forWritingTo: URL(filePath: "/tmp/x")).write(contentsOf: Data()) }\n',
+    projection + '\nprivate func mutate(_ path: UnsafePointer<CChar>) { _ = open(path, O_WRONLY | O_TRUNC) }\n',
+    projection + '\nprivate func mutate(_ path: UnsafePointer<CChar>) { _ = fopen(path, "w") }\n',
+    projection + '\nprivate func mutate(_ path: UnsafePointer<CChar>) { _ = mkfifo(path, 0o600) }\n',
+    projection + '\nprivate func mutate(_ a: UnsafePointer<CChar>, _ b: UnsafePointer<CChar>) { _ = link(a, b); _ = symlink(a, b) }\n',
+    projection + '\nprivate func mutate(_ value: Data) { let _ = "\(FileManager.default.createFile(atPath: \"/tmp/x\", contents: value))" }\n',
+    projection + '\nprivate func mutate(_ value: Data) { let _ = "// \(FileManager.default.createFile(atPath: \"/tmp/x\", contents: value))" }\n',
+)
+for index, mutated in enumerate(authority_mutations):
+    try:
+        validate_authority(mutated, f"authority-mutation-{index}")
+    except ValueError:
+        pass
+    else:
+        raise SystemExit(
+            f"Task 40 destructive authority mutation accepted: {index}"
+        )
+if "store." not in reconciler:
+    raise SystemExit("Task 40 reconciler lost its direct Store read")
+alias_mutation = reconciler.replace(
+    "readSnapshot = { investigationID, runID, reportID in",
+    "readSnapshot = { investigationID, runID, reportID in\n            let writer = store\n            try? await writer.deleteInvestigation(id: investigationID)",
+    1,
+)
+if alias_mutation == reconciler:
+    raise SystemExit("Task 40 Store-alias mutation fixture drifted")
+# The exact source seal is the fail-closed proof for aliases and newly invented
+# APIs; this assertion proves the mutation actually changes the sealed bytes.
+import hashlib
+if hashlib.sha256(alias_mutation.encode()).hexdigest() == \
+        hashlib.sha256(reconciler.encode()).hexdigest():
+    raise SystemExit("Task 40 Store-alias mutation was not observable")
+
+internal_surface_mutations = (
+    (reconciler.replace(
+        "struct InvestigationReportReadSnapshot",
+        "public nonisolated(unsafe) struct InvestigationReportReadSnapshot", 1
+     ), "raw Store snapshot"),
+    (store.replace(
+        "    func investigationReportReadSnapshot(",
+        "    public nonisolated(unsafe) func investigationReportReadSnapshot(", 1
+     ), "raw Store reader"),
+    (projection.replace(
+        "    static func make(",
+        "    public nonisolated(unsafe) static func make(", 1
+     ), "raw projection factory"),
+    (projection.replace(
+        "    init(value: String, wasTruncated: Bool)",
+        "    public nonisolated(unsafe) init(value: String, wasTruncated: Bool)", 1
+     ), "display constructor"),
+)
+for mutated, expected_label in internal_surface_mutations:
+    normalized = re.sub(
+        r"\s+", " ", code_without_comments_or_strings(mutated))
+    checks = {
+        "raw Store snapshot": r"\bpublic\s+(?:(?:final|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*struct\s+InvestigationReportReadSnapshot\b",
+        "raw Store reader": r"\bpublic\s+(?:(?:static|class|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*func\s+investigationReportReadSnapshot\b",
+        "raw projection factory": r"\bpublic\s+(?:(?:class|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*static\s+func\s+make\b",
+        "display constructor": r"\bpublic\s+(?:(?:required|convenience|nonisolated(?:\s*\(\s*unsafe\s*\))?)\s+)*init\s*\([^)]*\)",
+    }
+    if not re.search(checks[expected_label], normalized):
+        raise SystemExit(
+            "Task 40 internal-surface mutation accepted: " + expected_label
+        )
+
+comment_only_tests = re.sub(
+    r"(?m)^(\s*)func\s+"
+    r"(projectionPreservesSourcesAndRedactsExecutableText_BitsUT)",
+    r"\1// func \2", projection_tests, count=1)
+comment_functions = registered_test_functions(
+    comment_only_tests + reconciler_tests
+)
+if "projectionPreservesSourcesAndRedactsExecutableText_BitsUT" in comment_functions:
+    raise SystemExit("Task 40 comment-only test mutation accepted")
+string_only_tests = comment_only_tests + '\nlet fake = "func projectionPreservesSourcesAndRedactsExecutableText_BitsUT()"\n'
+string_functions = registered_test_functions(
+    string_only_tests + reconciler_tests
+)
+if "projectionPreservesSourcesAndRedactsExecutableText_BitsUT" in string_functions:
+    raise SystemExit("Task 40 string-only test mutation accepted")
+attribute_removed_tests = projection_tests.replace(
+    "    @Test\n    func projectionPreservesSourcesAndRedactsExecutableText_BitsUT",
+    "    func projectionPreservesSourcesAndRedactsExecutableText_BitsUT",
+    1,
+)
+if "projectionPreservesSourcesAndRedactsExecutableText_BitsUT" in \
+        registered_test_functions(attribute_removed_tests + reconciler_tests):
+    raise SystemExit("Task 40 unregistered test mutation accepted")
+disabled_tests = projection_tests.replace(
+    "    @Test\n    func projectionPreservesSourcesAndRedactsExecutableText_BitsUT",
+    '    @Test(.disabled("mutation"))\n    func projectionPreservesSourcesAndRedactsExecutableText_BitsUT',
+    1,
+)
+if "projectionPreservesSourcesAndRedactsExecutableText_BitsUT" in \
+        registered_test_functions(disabled_tests + reconciler_tests):
+    raise SystemExit("Task 40 disabled test mutation accepted")
+conditionally_disabled_tests = projection_tests.replace(
+    "    @Test\n    func projectionPreservesSourcesAndRedactsExecutableText_BitsUT",
+    "    @Test(.enabled(if: false))\n    func projectionPreservesSourcesAndRedactsExecutableText_BitsUT",
+    1,
+)
+if "projectionPreservesSourcesAndRedactsExecutableText_BitsUT" in \
+        registered_test_functions(
+            conditionally_disabled_tests + reconciler_tests
+        ):
+    raise SystemExit("Task 40 conditionally-disabled test mutation accepted")
+PY
+
+print "Task 40 report projection boundaries passed."

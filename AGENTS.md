@@ -1,0 +1,1065 @@
+# AGENTS.md
+
+Stornaut 是证据驱动的 macOS 开发者磁盘调查与治理工具：Swift 确定性扫描处理已知空间，用户已安装的 Codex 使用直接只读 Agent 工具、Probe Broker 与公共互联网调查未知空间，Swift Policy Gate / Executor 掌握全部写权限。
+
+本文件只保留高频规则与文档路由。文档总入口为 [`docs/README.md`](docs/README.md)，完整实施约束以 [`docs/agent/coding-agent-handoff.md`](docs/agent/coding-agent-handoff.md) 为准。
+
+> 注意：本文件指导的是**实现 Stornaut 的 Coding Agent**。产品内 Deep Dive 启动的 Codex 子进程必须使用隔离配置，**不得**加载本仓库或目标磁盘上的 `AGENTS.md` / 项目指令。
+
+## Always
+
+- 当前排期以 [三天完整收尾冲刺](docs/plans/active/README.md#三天完整收尾冲刺2026-09-18-至-2026-09-20) 为准：用户要求 2026-09-18 至 09-20 收尾。Tasks 40–43 的闭合 fixture/非生产开发不再被 Task 39 阻塞，Phase E/F 本机工作可并行准备；Task 39/44 真实准入、全部安全不变量和操作授权不变。旧的逐 Task 串行/full 和下方历史 frontier 不能覆盖新排期；完整 v1 未验收不得宣称完成。
+- 先读 handoff，再按任务读取最小必要文档；不要从 UI 概念图推断规格外功能，也不要把概念图当逐像素终稿。
+- 遵守全部产品不变量（见 handoff §3）。尤其：Quick Scan 不调模型；Codex 可直接读取并使用 shell/unified exec、live search、browser/direct fetch、image、skills/subagents 与公共互联网，但无写权限或清理执行权；Probe Broker 是优先结构化证据源而非唯一接口；Executor 只接受 `MoveToTrash` 或 Registered Action；Trash 失败绝不永久删除；失败保持 `Unknown`。
+- Epic 0–1 与 Epic 2–4 Tasks 9–26 已完成；Phase B 最终 unified verifier
+  单次 exit 0，计划与 Task 21–26 briefs 已归档；
+  Phase C deterministic Epic 8 详尽 plan 已于 2026-08-11 获用户批准，
+  Tasks 27–28 已完成并通过 unified verifier。ADR 0004 回顾后，用户已批准在
+  Task 29 前插入 capability-first Runtime R1–R6 evidence gate；R1 已完成并
+  transport 例外已获批准；R2 已完成并得出 `configurationReady`；原 R3
+  process-group candidate 的 new-session descendant escape 已由用户批准的
+  audit-session lifecycle supervisor 精确关闭，R3 得出 `behaviorReady`
+  candidate。用户 review 后已继续；R4 的 strict Investigation Envelope v2、
+  Swift identity binding、ProcessSupport/ProbeBridge module separation 与
+  structural no-Executor verifier 已完成并得出 `protocolReady`。用户明确当前
+  只需个人本机运行，不要求分发；R5 已采用 root-only
+  `/Library/Application Support/Stornaut/` App + 固定 plist 的 local-only
+  lifecycle candidate，原 notarization blocker 已转为未来 distribution gate。
+  provider/schema/raw-event 漂移已修复；官方 `openai` + ChatGPT subscription
+  的真实 `gpt-5.6-luna` worker 已观察 9/9 capabilities，errno-only probe
+  已观察 IPv4/IPv6/local/private/Unix denial，worker containment 6/6。
+  2026-08-13 post-fix review 又修复了
+  command/image/subagent 证据伪造窗口、随机 denial token 映射、synthetic
+  outer/inner launcher 漂移与漏 staged 官方 `codex-code-mode-host`；最新
+  focused/Codex/Lifecycle/Xcode/no-Executor/headless gates 通过。后续审查
+  进一步修复 current-build/installed-App 绑定、XPC continuation one-shot、
+  external-state outcome 优先级与 subagent sender identity。历史 TeamoRouter
+  与 `usageLimitExceeded` 只保留为 superseded 调试证据，不是当前 blocker，
+  也不得重新混入产品 profile。
+  最终 current-source signed App/helper machine report 已得出
+  `signedRuntimeReady`：9/9 capabilities observed、12/12 integrity
+  contained；machine report SHA-256 为
+  `08ba7c30373d4736124f0e507fcc9aa972880235251b8bbf636a7b2fabb1d193`。
+  fixed App/plist/service/lease/runtime 与匹配进程随后全部卸载并证明零残留。
+  R5 已独立提交推送。R6 已完成 exact evidence receipt、五维 Settings 状态、
+  bilingual first-use disclosure、actual-window UI evidence、final matrix 与
+  independent review，runtime foundation 结论为 `go`，无 unresolved P0–P2。
+  Task 29 的 closed execution profiles、one-snapshot Activity/Evidence、
+  Quick Scan integration、完整 Store join、Cleanup Plan Builder、bounded
+  Review projection、independent review 与 unified verifier 已完成；Task 30
+  的 memory-only selection、pure Policy、fresh context collector、typed stale
+  contract、one-shot authorization、independent review 与 unified verifier 已
+  完成；Task 31 的 serial injected fake-Trash coordinator、durable journal、
+  per-item fresh Policy、Manifest/accounting、no-replay recovery、independent
+  review 与 unified verifier 已完成；Task 32 的 typed Scan→Review routing、
+  Core-backed Plan/Policy、write-disabled execution seam、原生 UI、实际窗口验证
+  与独立 review 已完成，authoritative unified verifier 单次 exit 0。
+  Task 33 的 exact terminal Plan/Policy admission、typed Evidence enrichment、
+  immutable Manifest/journal projection、Reversible First Cleanup Result、
+  read-only Manifest detail、真实 Review→confirmation→terminal DEBUG fixtures、
+  独立 review findings 修复、App tests/focused XCUITest 与
+  actual-App/Peekaboo 已完成；authoritative full verifier 单次 exit 0。
+  Task 34 的 Store v3 Manifest paging、独立 7/90-day retention、typed
+  Quick Scan/Manifest History union、exact local-record deletion、
+  privacy-bounded export、non-causal trend marker、actual-App/Peekaboo 与
+  independent review 已完成；authoritative full verifier 单次 exit 0。
+  Task 35 的 closed real-Trash composition、strict signed-App disposable
+  diagnostic、recovery-only runtime、Phase C product gate、benchmark 与
+  Core/App regressions 已实现。唯一授权的真实 Trash attempt 已消费：
+  exact diagnostic-owned fixture 被移动且 journal durably 停在
+  `actionOutcomeRecorded`；Manifest timeline 缺陷使原 report 正确保持
+  `signedAppTrashBlocked` / `executionFailed`，没有重试。随后独立 signed
+  recovery-only App 以 Executor invocation `0` 完成 journal
+  `actionOutcomeRecorded → finalized`、one-record Manifest、1 success /
+  0 failed/cancelled/unknown、permanent bytes `0`，并按 identity 恢复 fixture，
+  原位置存在且 Trash destination 不存在。privacy-safe checked receipt 已绑定
+  原始/恢复 report、final Store 与安全关键源码。
+  diagnostic/recovery mutation scripts 现均 sealed；`scripts/verify --full`
+  最终只运行 receipt/source/raw-evidence read-only gate，绝不得再次调用真实
+  Trash 或 recovery。旧 global same-UID Node safe-window 已删除，contracts
+  禁止 `pkill`/`killall`/`pgrep`/`ps -U` 全局进程协调；Chrome、Cursor、
+  Claude、MCP 或其他 App 的进程不得因此被阻断或终止。focused product gate
+  74/74、SwiftPM 634/634、完整 App/UI、receipt/raw evidence 与
+  Debug/Release gates 已通过；authoritative `scripts/verify --full` 22/22
+  stages 单次 exit 0（847.921 秒）。最终 whole-diff 与 timestamp-focused
+  independent review 均无 unresolved P0–P2，Phase C 计划已归档，admission
+  为 `go`。
+  Phase D Task 36 的 strict Investigation domain、canonical binary/source
+  projection、Candidate Planner、budget ledger、stop semantics 与 structural
+  no-Executor gate 已完成。300,002-row / 256 MiB source benchmark 连续三次
+  最慢 `22.540198084` 秒、kernel peak increment 最坏 `100,958,328` bytes；
+  maximum benchmarks 已从普通 suites 精确隔离并只在 full 中独立串行一次。
+  Task 35 receipt/source seal 已前移到所有昂贵步骤之前，未来 verifier 漂移
+  fail-fast。independent review 无 unresolved P0–P2，authoritative
+  `scripts/verify --full` 23/23 stages 单次 exit 0（875.36 秒）。Task 36 已
+  完成。Task 37 Store v4/persistence/retention/source rejoin 已完成实现与
+  independent review；两轮完整 Release capacity gate 共 `30/30` 样本通过，
+  最慢 `53.159062` 秒，最坏 kernel footprint increment `210,944,240` bytes。
+  普通 suites 明确跳过该显式 opt-in benchmark，worker 直接运行已构建 test
+  bundle 而不嵌套 SwiftPM；authoritative `scripts/verify --full` 23/23 stages
+  单次 exit 0（893.65 秒）。Task 38 的 closed dependency-injected
+  Investigation coordinator/fake runtime、Store-owned one-shot admission、
+  strict event/lineage/token normalization、scientific loop、
+  terminal/recovery barrier、versioned prompt 与 structural no-Executor gate
+  已完成。六类 review P1 均已 tests-first 修复；811-test serialized
+  regression、independent post-fix review 与 authoritative
+  `scripts/verify --full` 23/23 stages 单次 exit 0（884.57 秒）。Task 39 已按
+  39A/39B checkpoint 拆分；39A strict signed-runtime contract、
+  server-owned turn identity binding 与 package-closed diagnostic facade 已
+  完成，11/11 contract、5/5 facade、77/77 Investigation focused tests、
+  829-test serialized regression、independent post-fix review 与
+  `scripts/verify --full` 23/23 stages 单次 exit 0（891.15 秒）。39B 已继续
+  拆为 39B1a/39B1b/39B2；39B1a exact Evidence Store v4 path、directly
+  async lifecycle、actor reentrancy/deadline preservation 与 structural
+  no-blocking-bridge gate 已完成，83-test Investigation suite、833-test
+  serialized regression、independent post-fix review 与
+  `scripts/verify --full` 23/23 stages 单次 exit 0（883.38 秒）。39B1b 已继续
+  拆为 39B1b-i transport/composition 与 39B1b-ii DEBUG App leaf。39B1b-i
+  package-scoped stateful App Server client、non-product
+  `StornautInvestigationRuntime` target、async root preopen/one-shot Store
+  claim、canonical first-turn injection、server-owned identity mapping、
+  pending reservation/active turn separation 与 transport fail-closed cleanup
+  已完成。92-test Investigation、240-test Codex、846-test serialized
+  regression、independent post-fix review 与 authoritative
+  `scripts/verify --full` 23/23 stages 单次 exit 0（900 秒）。39B1b-ii strict
+  DEBUG App leaf implementation、11-test dedicated App target、
+  pure-product Debug/Release boundary、846-test serialized regression 与
+  independent post-fix review 已通过；authoritative `scripts/verify --full`
+  23/23 stages 单次 exit 0（972 秒）。39B2 已按 preflight 拆为
+  39B2a strict supervised interactive transport、39B2b signed production
+  composition 与 39B2c machine admission。39B2a implementation、73-test
+  Lifecycle、103-test Investigation、865-test serialized regression 与
+  independent post-fix review 已通过；authoritative full verifier 23/23
+  stages 单次 exit 0（932 秒）。39B2b 已进一步拆为 39B2b-i
+  helper-owned contained worker 与 39B2b-ii signed diagnostic-App/Task 38
+  composition。39B2b-i 的 root-helper/UID-worker boundary、closed broker、
+  fixed contained session、37-test focused regression、889-test serialized
+  regression 与 independent post-fix review 已完成；authoritative full
+  verifier 23/23 stages 单次 exit 0（933.21 秒）。39B2b-i 已完成。
+  39B2b-ii preflight 发现 diagnostic final Mach-O 静态携带 Core concrete
+  cleanup/Registered Action authority，且 dead stripping/优化不能移除；
+  前置修复拆为 E1/E2。E1 已把 concrete Registered Action
+  `posix_spawn`/process-tree runner 迁入单向
+  `StornautExecution → StornautCore + StornautProcessSupport` target；
+  11-test focused、895-test serialized、independent review 与 authoritative
+  full 23/23 stages 单次通过。E1 已完成，E2 Trash/Executor authority
+  extraction 已继续拆为 E2a package-only seam 与 E2b concrete authority
+  migration。E2a 已完成：47/47 focused cleanup、8/8 headless stages（内含
+  893-test serialized regression）、targeted Debug App build、historical
+  Task 35 source-snapshot correction 与 independent review 均通过，且未移动
+  concrete authority。E2b 已按第 15 个必要 verifier 路径继续拆为 E2b-i
+  authority relocation 与 E2b-ii strict final-Mach-O admission。E2b-i 已把
+  concrete Trash/Executor authority 迁入 `StornautExecution`，Core 只保留
+  typed seam/receipt/无权 state machine；3/3 package、32/32 affected、
+  73/73 Phase C、ordinary/diagnostic App builds 与单次 898-test serial
+  regression 通过，independent review 无 unresolved P0–P2。E2b-i 已完成，
+  E2b-ii strict final-Mach-O verifier implementation/review 已完成：
+  built `StornautExecution.o` authority positive control、完整 diagnostic bundle
+  Mach-O negative control 与六 target Xcode allowlist 均通过；E2 checkpoint
+  唯一一次 clean full 23/23 stages 单次通过（timed 1,046.300 秒），无 restart
+  或 stage rerun。E2b-ii 已完成；
+  恢复后的 39B2b-ii signed diagnostic composition 已绑定 opaque Task 38
+  facade、delayed auth projection、helper-reported random workspace、exact
+  diagnostic Store 与 dedicated App/helper topology；focused Codex/
+  Investigation/App tests、strict final-Mach-O gate 与 independent post-fix
+  review 已通过；该 checkpoint 唯一一次 authoritative full verifier 以
+  23/23 stages、898-test serialized regression、981 秒 wall time 单次通过，
+  无 restart 或 stage retry。39B2b-ii 已完成；39B2c 的窄 attempt-binding
+  prerequisite 也已 tests-first 完成：raw capability worker evidence 现绑定
+  exact nonce 与完整 signed runtime binding，component-hash review P2 已修复，
+  903-test headless regression 与 post-fix review 通过。随后独立拆出的
+  strict-decoding prerequisite 已关闭 capability report/outcome unknown-field
+  接受窗口，255-test serial Codex suite 与 post-fix review 通过。L1
+  helper-sealed per-run residue observation 已完成，949-test staged-only serial
+  regression、targeted Debug helper build 与 post-fix review 通过。L2 exact
+  root topology observer 随后完成 package-closed/non-Codable evidence、
+  fixed-node/signing/process identity 复查与 installed/post-teardown phase
+  contract；review 发现的 root-helper signing P1 已 tests-first 修复，117-test
+  Lifecycle focused、exact source-boundaries、targeted Debug diagnostic
+  App/helper build、981-test clean staged-only serial regression 与 post-fix
+  review 均通过。L3c2b deterministic failure matrix driver 随后完成；39B2c
+  readiness 仍仅归 L3c4，
+  ii-c pre-arm failure diagnostic repair 已在 `2ada395` / tree `11e1a0a`
+  完成：typed failure receipt、共享完整帧读取、physical
+  exit-81/EOF/zero-residue、exact 9-path/1,834-line scope 与九类负例通过，
+  final review 无 unresolved P0–P2。随后唯一 privileged v8 attempt 已到达
+  `armedConsumed` 并以 `spawnUncertain` / transport loss 终止；其 8 个保留
+  artifact、缺失 completion artifacts 与当前零 Stornaut runtime 残留已由
+  独立 self-sealed 只读 verifier 固化为 non-admitting/non-retryable，未修改
+  原 evidence，也未创建 replacement attempt。
+  随后的 L3 preflight 已拆为 L3a trusted target extraction、L3b root
+  driver/L1+L2 collection 与 L3c failure matrix/final admission。L3a 已把
+  2,509-line machine-only contract/assembler 以 99% rename 迁入非产品
+  `StornautInvestigationMachine` target；58-test machine focused、151-test
+  Investigation suite、exact source-boundaries、targeted Debug diagnostic
+  build、982-test clean staged-only serial 与 independent review 均通过。L3b/
+  L3c 继续拆分；L3b1 exact connected-helper attestation、non-reconnectable
+  XPC epoch、operation-bound L1/helper handoff 与 irreversible one-shot Store
+  已完成，987-test clean staged-only serial、targeted helper/diagnostic builds
+  与 independent post-fix review 均通过。L3b2 trusted L1/L2 collection 与 L3c
+  final admission 随后继续拆分；L3b2 root-only one-shot L1/L2 collector、
+  non-activating exact service/PID observation 与 synthetic transition contract
+  已完成，1001-test clean staged-only serial、targeted helper/diagnostic builds
+  与 independent post-fix review 均通过。L3c mandatory scope/trust preflight
+  识别出 App-local handoff 无法跨 App exit 与 managed-proxy/probe retirement
+  仍为推断两个真实缺口，因此继续拆为 L3c1 helper-owned opaque retirement
+  escrow、L3c2 deterministic machine driver、L3c3 current-source real-success
+  three-plane composition 与 L3c4 sealed final admission。L3c1 路径 preflight
+  又拆为 L3c1a typed owner retirement 与 L3c1b helper-owned opaque escrow。
+  L3c1a 已完成 typed none/prepared/owned truth、strict response v3、suspended
+  start join、exact PGID zero、strict worker reply、86-test focused、11-test App、
+  1012-test clean staged-only serial 与 post-fix review。L3c1b 又拆为 i/ii；
+  L3c1b-i configuration-bound strict v2/v4 transport、memory-only helper escrow、
+  58-test clean staged focused、136-test Lifecycle、168-test Investigation、
+  11-test App、1025-test clean staged-only serial 与 independent post-fix review
+  已通过；L3c1b-ii synthetic non-Codable Machine claim/collector join、20-test
+  focused、139-test Lifecycle、178-test Investigation、targeted Debug build、
+  1035-test clean staged-only serial 与 independent grouped/cross-group review
+  已通过。L3c1 已关闭；L3c2 mandatory scope/trust/cost preflight 已把 strict
+  claim transport、non-product root host/topology 与 eight-scenario driving
+  拆为 L3c2a-i/L3c2a-ii/L3c2b。L3c2a-i strict Machine-claim transport、
+  36-test focused、144-test Lifecycle、178-test Investigation、targeted
+  build/release boundaries、1041-test clean staged-only serial 与 independent
+  post-fix review 已完成；L3c2a-ii non-product root host/topology、strict
+  XPC/signing adapters、resolved package/source authority gate、20-test affected、
+  187-test Investigation、targeted driver/diagnostic builds、release boundary、
+  1046-test clean staged-only serial 与 independent post-fix review 也已完成；
+  L3c2b deterministic eight-scenario driver、exact cohort preflight、Task 38
+  fake-runtime flow、structural/targeted gates 与 final independent review 已
+  完成；唯一一次 clean staged-only serial 以 1055 tests / 51 suites 通过，
+  accepted tree 为 `dcd6f33e60521a1a6d4adae2173d14e8bb17abc0`。
+  L3c2b preflight 发现的 fresh plan/matrix contradiction 已由 3-path
+  plan-freshness prerequisite 关闭：actual plan fingerprints 全唯一、exact
+  target-set fingerprint 全相同，59-test affected、189-test Investigation、
+  structural gate 与 independent review 已通过；L3c2 已关闭。L3c3a strict
+  driver-bound attempt schema、App leaf、installed identity join、structural/
+  release gates、199-test Investigation、11-test App、唯一一次 1057-test /
+  51-suite clean staged-only serial 与 independent post-fix review 已通过；
+  accepted implementation tree 为
+  `41521e44ba1e349496f3ab708d8e9f3f376620b3`。L3c3b native diagnostic-only
+  driver packaging/topology admission 已由 fresh preflight 拆为 L3c3b-i native
+  packaging 与 L3c3b-ii installer/L2 admission；首个 final-Mach-O spike 又
+  证明 full Machine/Core graph 携带 forbidden Cleanup/Policy/Registered Action
+  typed surface，因此插入 L3c3b-0 authority-closed driver runtime extraction。
+  L3c3b-0 已完成：零依赖 DriverSupport、Debug/Release final-Mach-O authority
+  gate、唯一一次 1059-test / 51-suite clean staged-only serial 与 independent
+  post-fix review 均通过；accepted implementation tree 为
+  `9b3642ad88fcccf9768141a8ebf1917565c99c49`。L3c3b-i diagnostic-only native
+  target、独立 CodeSignOnCopy、ordinary absence、final artifact identity/
+  authority gate、202-test Investigation、唯一一次 1060-test / 51-suite clean
+  staged-only serial 与 independent post-fix/cross-group review 已完成；accepted
+  implementation tree 为 `e1878eced30a6193aa89ad89dd88d02949e9f2a3`。
+  L3c3b-ii exact installer/L2 driver admission、extended-ACL fail-closed、
+  whole-installer source seal、disposable six-case matrix、14/16/11/7 focused、
+  207-test Lifecycle、334-test Investigation、唯一一次 1067-test / 51-suite
+  clean staged-only serial 与 independent grouped/post-fix/cross-group review 已
+  完成；accepted implementation tree 为
+  `1c4a665151e6bca44d784c94b2a9c461217f83e2`。L3c3b-ii 已完成。
+  L3c3c-i transport/root-launch audit 已完成：i-a/i-b1/i-b2a 保留 B3/B4
+  algorithm 与 historical reproducibility evidence；i-b2b-0a 证明 `sudo -v`
+  会产生 ambient authority，且 separate no-cache stock root commands 也无法
+  构成不可跳过的 verify-and-act，外置 root-launch branch 因此 NO-GO。
+  i-b2b-0b/i-b2b-1 在执行前 superseded；B4 root execution count 为 0，无 root
+  artifact/receipt，固定 external paths 保持 absent。ADR 0018 仍 Proposed。
+  L3c3c-ii-a authority-closed installed-driver/manifest observation、exact
+  source/final-Mach-O admission、20/7/11 focused gates 与 independent post-fix
+  review 已完成并推送；唯一 staged-only serial 为 1086/1087，唯一失败是已由
+  独立 prerequisite 4a0a8cb 修复且 exact case 绿色的 fixture-clock expiry，
+  serial 未重跑。ii-b scope/cost preflight 随后发现 current helper response
+  回显 opaque handle、existing post-teardown L2 代表 final uninstall 而非
+  per-epoch retirement，且零参数 driver 缺少 closed configuration ingress；
+  ii-b 因此在编码前进一步拆为 ii-b0 shared wire/capsule contract、ii-b1
+  inherited-FD App leaf、ii-b2 handle-free helper response、ii-b3 concrete App
+  drop/no-auth retirement adapter、ii-b4 fixed helper-claim client 与 ii-b5
+  fixed single-epoch driver composition；ii-c 前另插 ii-c0 TTY/capsule
+  launcher spike。三轮 independent review findings 已逐项关闭，无 unresolved
+  P0–P2。随后 ii-b0 wire completeness audit 又关闭 digest 表示冲突、遗漏的
+  configuration nonce、未定义 payload bytes 与 transcript-splicing 窗口，并在
+  编码前拆为 ii-b0a frame/capsule 与 ii-b0b claim/release wire；ii-b0a 已完成
+  exact implementation、19-test focused、246-test Investigation、Debug/Release
+  builds、structural gates、1,107-test/53-suite staged-only serial 与 independent
+  review；ii-b0b exact claim/evidence/release wire、request-derived expectation、
+  strict Data-only XPC、15-test focused、261-test Investigation、1,122-test/
+  54-suite staged-only serial 与 independent review 也已完成。ii-b1 preflight
+  随后发现 PRE_DROP_READY 无合法 epoch UUID/deadline 来源，已在其前插入
+  ii-b0c fixed 32-byte epoch bootstrap prelude；ii-b0c exact implementation、
+  7-test focused、268-test Investigation、1,129-test/55-suite staged-only serial
+  与 independent review 已完成。ii-b1 authority-free App leaf 随后按
+  post-RED topology correction 拆成 Debug-only diagnostic target 与
+  dependency-free Release-shell target，并通过 9/9 leaf、13/13 App、277
+  affected、exact structural/final-artifact gates、唯一一次 1,138-test/56-suite
+  staged-only serial 与 independent post-fix review。ii-b2 ASID prerequisite
+  随后修正错误的 App/helper 同 ASID join，并保持 L1 residue 绑定 helper；
+  implementation/verifier tree 的 1,142-test serial、独立 1,143-test
+  decoder-negative supplement 与 final review 均通过。ii-b2a typed
+  escrow/deadline state、19-test focused、167-test Lifecycle affected、
+  structural/mutation gates、唯一 1,162-test/57-suite combined serial 与 final
+  review 均已完成；ii-b2b-i sealed transfer、non-actor shared-wire adapter、
+  injected effects、1,194-test staged-only serial、structural/mutation gates 与
+  independent post-fix reviews 已完成；ii-b2b-ii legacy-client quarantine /
+  Machine production block 也已完成：broad Lifecycle concrete client 已移除，
+  legacy selector/service 声明下沉为 helper-private，34 focused、175
+  Lifecycle affected、308 Investigation affected、完整 App/main-Mach-O gate、
+  1,196-test/58-suite staged-only serial 与 grouped/cross-group review 均通过。
+  ii-b2b-iii 已在 fresh preflight 中拆为 iii-a handle-v3/single-quantized
+  transfer 与 iii-b public live façade/helper integration；iii-a 已完成并通过
+  91 focused、181 Lifecycle、309 Investigation、唯一 1,208-test staged-only
+  serial 与 post-fix/cross-group review。iii-b 又按 review 拆为 iii-b-i
+  semantic/live integration closure 与 iii-b-ii executable physical-adapter
+  closure；iii-b-i 已完成并通过 83 focused、499 affected、唯一 1,212-test/
+  58-suite staged-only serial、完整 helper/final-Mach-O gate 与 fresh
+  cross-group review；iii-b-ii 已完成并通过 51 focused、504 affected、
+  唯一 1,223-test/58-suite staged-only serial、physical mutation 与五符号
+  final-Mach-O gates，五项 review P1 已关闭。iii-b 与 ii-b2b 已完成；ii-b3
+  已按 fresh preflight 拆为 ii-b3a fixed-channel/root-peer/drop adapter、ii-b3b
+  start-to-retire-only Lifecycle seam 与 ii-b3c concrete leaf/native entry；
+  ii-b3a 已完成并通过 35 focused、521 affected、exact contract/structural/
+  artifact gates、唯一 1,234-test/59-suite staged-only serial 与 independent
+  post-fix review；ii-b3b start-to-retire-only seam 与独立 PID-fixture
+  prerequisite 已完成，后者以唯一 1,245-test/59-suite staged-only serial
+  关闭原 1,244/1,245 setup-side test-infra issue；ii-b3c concrete leaf/native
+  entry 已完成并通过 exact contract/structural/final-Mach-O gates、唯一
+  1,257-test/60-suite staged-only serial 与 grouped post-fix review；ii-b3 已
+  关闭；ii-b4 fixed helper-claim client、ii-b5a0 claim-abort proof 与 ii-b5a
+  typed composer、ii-b5b-i-a projection/dual-clock contract 与 i-b1
+  authority-closed installed-L2 semantic target 已完成并保持 non-admitting。
+  i-b1 以 6-path/979-line scope、8 top-level focused tests、26-test affected
+  regression、contract/structural/Mach-O gates 与 final no-unresolved-P0–P2
+  review 收口；唯一 1,311-test/64-suite serial 记录 4 issues、未绿色且未重跑，
+  同 validation tree 的 3 个 exact cases 通过，checkpoint-related consumer
+  count 则由 final tree 唯一一行 `6 → 7` 修复并精确通过。ii-b5b-i-b 的 fresh
+  cost/authority audit 将余下 observer extraction 拆为 i-b2a artifact/static
+  readers、i-b2b process/service + narrow C identity 与 i-b3 observer
+  composition；i-b2a、i-b2b-a、i-b2b-b 与 i-b3 已完成并保持 non-admitting。
+  fresh preflight 已把 i-c 拆为 i-c1 DriverSupport join/opaque proof 与 i-c2
+  legacy-owner closure/exactly-one-owner gate；i-c1 已完成，i-c2 又拆为
+  i-c2a semantic-owner closure 与 i-c2b physical-owner closure；aggregate
+  i-c2 已完成并保持 non-admitting；ii-b5b-ii-a fixed FD-0 capsule intake、
+  ii-b5b-ii-b independent Darwin App identity observation、ii-b5b-ii-c fixed
+  FD-7 session 与 ii-b5b-ii-d exact owned-PGID retirement 已完成并保持
+  non-admitting。dependency inversion preflight 已把 ii-c0 拆为 c0a/c0b：
+  c0a 保留 v1 capsule/epoch bytes，新增 package-only enclosing projected-
+  cohort input 与 paired intake；其 exact 8-path / 1,863-line implementation、
+  90 focused、536 affected、1,418-test/73-suite clean staged-only serial、
+  contract/investigation/App-release boundary gates 与 independent final review
+  已通过，保持 non-admitting。fresh source/topology preflight 又把原
+  ii-b5b-iii 拆为 b0 protocol、a per-epoch continuity、b1 injected cohort、
+  b2a0 typed physical bridge、b2a-i canonical supervisor admission、b2a-ii-a
+  Darwin physical session 与 b2b entry/artifact；b0 已冻结，iii-a、iii-b1、
+  iii-b2a0 与 iii-b2a-i 已完成并保持 non-admitting；iii-b2a-ii-a1 fixed
+  transport/inner-role closure 也已完成并保持 non-admitting，a2-0/a2-i/a2-ii
+  随后全部完成并保持 non-admitting；iii-b2b-0 Release graph closure 也已
+  完成并保持 non-admitting；iii-b2b-1a-0 canonical helper-provenance
+  carriage 与 iii-b2b-1a-1 concrete outer observation 也已完成并保持
+  non-admitting；iii-b2b-1b 已拆为 1b-i/1b-ii 并全部完成、保持
+  non-admitting。ii-c0b 已冻结为 c0b-i semantic producer、c0b-ii
+  owner-only capsule node、c0b-iii fixed launcher/stub 与 c0b-iv
+  zero-argument final composition。c0b-i 已以 implementation commit
+  `2493e0f28e0c8d406b4efcdbf17713bde3633449`（parent
+  `e5ed33e27195d9252f02a89ab39664df3848f1ed`、tree
+  `8155d64c4966fb83c332f7d195a92095e0af2ba9`）、exact 7 non-document
+  paths / 1,900 changed lines、95 tests / 5 suites、full
+  `verify-investigation-boundaries`、exact staged scope、`verify-contract` 与
+  independent final no-unresolved-P0–P2 review 完成并保持 non-admitting；
+  按设计未运行 serial/full/root/sudo、App/helper/driver launch、XPC、model/
+  auth 或 network。c0b-ii fresh preflight 已完成并拆为 ii-c0b-ii-a kernel
+  last-close ownership 与 ii-c0b-ii-b capsule owner；ii-a 又因原 7-path /
+  2,600-line 预算漂移至预计 2,720–2,870 lines，在继续编码前拆为 exact
+  3-path / 2,000-line ii-c0b-ii-a1 behavior/focused evidence 与 exact 4-path /
+  1,200-line ii-c0b-ii-a2 verifier/aggregate closure；ii-c0b-ii-a1 已以
+  `d18354b` / tree `d6a4b0e`、3 paths / 1,981 lines、132 concrete cases、
+  target/object/APFS gates 与 no-unresolved-P0–P2 review 完成；ii-c0b-ii-a2
+  又以 implementation `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+  `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 non-document paths /
+  889 changed lines 收口，a1+a2 aggregate 为 7 paths / 2,870 lines；bare
+  verify-contract、component 与 App-Release gates 均 exit 0，双人 review 无
+  unresolved P0–P2。按设计未运行 serial/full/root/App/XPC/model/network；
+  a2 complete/non-admitting。retained-base、publication/lease、settlement/
+  recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后均已完成并
+  推送；accepted checkpoint `ced4da2` 已关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
+  preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
+  provenance/App admission closure，并把原 iv-b1 动态拆为 iv-b1a typed
+  outcome/injected semantic state machine → iv-b1b Darwin authority/structural
+  closure → iv-b2 zero-argument executable/verifier closure。iv-a0 与 iv-a-r
+  已完成并保持 non-admitting；iv-b1a 当前 clean index-only snapshot
+  `db4e936` / tree `412da586d13fae7fd53937231217778b5d9ffd52` 为 exact
+  6 non-document paths、+2,113/-3，
+  clean staged-only 48/48 focused 与 785/785 affected tests 通过，Debug 经
+  tests 编译、clean staged-only Release target build exit 0；initial review 的
+  settlement-before-admission、transport-failure
+  success、close-uncertainty settlement 与 uncertainty ownership release 四项
+  P1 已 tests-first 修复，三组 independent post-fix review 无 unresolved
+  P0–P2。按设计未运行 global serial/full/root、真实 App/XPC、model 或
+  network gate。iv-b1a 已 complete/non-admitting。iv-b1b design review 又细分
+  为 iv-b1b-i exact 3 paths / production ≤1,180 changed lines（Darwin adapter、
+  injected lifecycle、deterministic tests），随后 iv-b1b-ii exact 5 paths
+  （dedicated physical fixture、physical tests、boundary test 与两个 verifier）。
+  iv-b1 aggregate 为 exact 14 non-document paths。iv-b1b-i 又以 implementation
+  `41d34f26a32b9740124bd5fdf3857a4520ebdfea` / tree
+  `8ab58932cf67b5da81d0478968600181149c808f`、exact 3 non-document paths /
+  1,173 production changed lines、806/806 affected tests / 56 suites、clean
+  staged-only Release target build exit 0 与两组终审无 unresolved P0–P2
+  收口，并保持 non-admitting。iv-b1b-ii 又以 implementation
+  `373431d4d1c4022815eca3c0c5ac3dd9aa4c5f2d` / tree
+  `b08342e5a17d678768309a2efd190ef33e37b3e8`、exact 5 non-document paths /
+  2,193 changed lines 完成 dedicated non-product physical fixture/test、boundary
+  与 verifier closure；七场景 physical matrix、808-test/57-suite clean
+  staged-only serial、三项 dedicated gates 与 physical/verifier/cross-group
+  final reviews 均通过，无 unresolved P0–P2，测试后无匹配 process/attempt/temp
+  residue。accepted c0b-iii PTY suite 只覆盖 inner gate topology，不能替代这次
+  outer-adapter evidence。iv-b1b-ii complete/non-admitting；iv-b2 又以
+  implementation `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+  shared-deadline repair 已以 implementation `c144c1e` / tree
+  `3c2d7f0` 完成；随后从 staged serial 暴露的 fixed-gate deadline cleanup
+  repair 也已以 implementation `bc42fbc` / tree `29eb2d0` 完成。
+  interactive-native identity binding repair `531f79f`、consumer seal
+  `26e785a` 与 fixed-gate historical replay `aa8a7f1` 随后完成。以上均
+  non-admitting。ii-c-a static installed topology 已以 implementation
+  `81f185c` / tree `7cf4db75` 完成并保持 non-admitting；ii-c-b1 root-owned
+  Gate admission 已以 implementation `77cde61` / tree `9c59f241`、exact 7
+  paths / 1,900 lines、860/860 serial 与无 unresolved P0–P2 review 完成并
+  保持 non-admitting；ii-c-b2a1 evidence producer 又以 implementation
+  `e3555ec` / tree `f38783f`、exact 4 paths / 3,749 lines、31/31 focused、
+  Release target 与无 unresolved P0–P2 review 完成并保持 non-admitting；
+  ii-c-b2a2 independent verifier 已以 implementation `294bdb2` / tree
+  `dbbffbba`、exact 6 paths / 1,999 lines、38/38 evidence、51/51
+  target-boundary、component/contract gates 与无 unresolved P0–P2 review
+  完成并保持 non-admitting；resolved root-driver lineage L1 又以 implementation
+  `83f6271` / tree `98289e2`、11 paths / 2,786 lines、25 focused tests、
+  单次 959-test serial 的 boundary-only 修复、component/mutation gates 与
+  final no-unresolved-P0–P2 review 完成；L2 implementation `474f634`、
+  cross-UID correction `b664299`、PID-reuse fix `b4c632e` 与 verifier
+  mutation-oracle fix 也已完成/non-admitting，final verifier review none；
+  ii-c-c v8 与 replacement v9 均已作为 real machine campaign 消费并失败；
+  两者只读 disposition 均完成。后续 serial validation 暴露历史 physical
+  fixture 错误触发 production stale-recovery，v9 Gate capsule 实体已被移除且
+  无精确副本可恢复；原 v2 receipt、九份 campaign evidence、v3 predecessor 与
+  before-v11 与当前 v5 receipts 均保留，不能把后续 v10/v11 residue 解释为
+  v9 成功清理。fixture 已改为显式
+  opt-in 并在 discovery/entry 双重拒绝历史 attempt。唯一 1,932-test/99-suite
+  serial 记录 1 个 missing-attempt issue 且未重跑；v3/fixture exact cases 随后
+  通过。v9 的 AMFI `-423` root cause 已 tests-first 修复并以 `05fd0cd`
+  推送；fresh v10 privileged campaign 随后在 durable arm 后耗尽 1,200 秒
+  outer deadline，已消费、non-admitting 且不可重试。其只读 disposition 与
+  1,400 秒 bounded deadline repair 已完成非提权验收并保持 non-admitting；
+  v11 从 `8a286ea` 执行，在 durable arm 后约 16.259 秒记录
+  `spawnUncertain → terminal`；外部 launcher 曾记录 70，但 retained campaign
+  artifacts 未绑定该值。其 legacy generic reason
+  不足以判定 credential/sudo/Gate/protocol/transport 根因，已只读固化为
+  `consumedPostArmFailureUnclassified`、non-admitting/non-retryable；
+  后继 schema-v2 closed diagnostic projection 已完成并通过 focused tests。用户
+  已完成 retained v11 Gate capsule preservation repair；v12 machine campaign
+  已从 `212320f` 唯一执行并因 post-arm authorization path 超过 1,400 秒 horizon
+  而 consumed/non-admitting/non-retryable。bounded credential repair 已完成并
+  通过独立复审，保持 non-admitting；persistent Gate P1/P2 已完成并以
+  `7837705` 推送，schema-v3 lock-only evidence、atomic first-create 与最终
+  1,964-test serial 均通过。用户批准的 fresh v13 已从 `8885161` 唯一执行；
+  以 closed `receiptInvalid/exited-82` 在 shared deadline 边缘返回，当前已
+  consumed/non-admitting/non-retryable，persistent Gate residue 保留；补充
+  unified log 不作 campaign-bound claim。120 秒 authorization sub-deadline
+  与 one-attempt EOF repair 已完成/non-admitting。
+  用户曾批准基于 `d5a7df3` 的 fresh v14，但 launch seal `e717b58`
+  在任何 root action、campaign/attempt UUID 或 launch claim 之前发现 exact
+  v13 capsule preservation P0；该授权未消费但已 superseded。preservation
+  prerequisite 已实现/non-admitting，必须基于其新 pushed commit 重新授权。
+  该处是历史 sequential 状态；当前 Task 40 已按顶部三天冲刺开放闭合
+  fixture/非生产开发，Task 39 仍 incomplete。
+  spawn/transfer uncertainty 不得
+  settlement/unlink 或释放 owner，必须进入 process-lifetime ownership
+  quarantine。
+  iii-b2a0 以
+  exact 8 non-document paths / 2,198 changed lines、
+  36-test/3-suite combined bridge+continuity+cohort、580-test/43-suite affected、
+  1,462-test/76-suite clean staged serial、三项 boundary gates、Debug diagnostic /
+  Release driver builds、immutable seal 与 independent semantic/verifier/
+  cross-group review 收口；physical result 仍是 untrusted DTO，不能直接进入
+  single-epoch result 或 continuity。iii-b2a-i 又以 package-closed canonical
+  request/ownership/acknowledgement/decision/result、one-shot receiver、private
+  admitted token 与 same-owner containment proof 收口；原实现 10 paths /
+  3,236 lines、r1 closure 8 paths / 977 lines、12 focused、593 affected、
+  1,475-test/77-suite frozen-tree serial、三项 boundary gates、Debug/Release
+  builds、immutable seal 与 no-unresolved-P0–P2 review 已通过。iii-b2a-ii-a1
+  又以 7-path / 1,694-line implementation、9 focused、603 affected、1,485-test/
+  78-suite serial、Debug/Release boundaries、immutable seal 与 no-unresolved-
+  P0–P2 review 收口。a2 scope/trust preflight 又把剩余工作封闭拆为 a2-0
+  self-contained untrusted decode、a2-i inherited-PGID App session 与 a2-ii
+  terminal/admission join；a2-0 已以 8-path / 703-line implementation、19
+  focused、605 affected、1,487-test/78-suite staged serial、三项 boundary gates
+  与 independent no-unresolved-P0–P2 review 完成并保持 non-admitting。a2-i
+  又以 10-path / 1,965-line implementation、66 focused、1,500-test/78-suite
+  staged serial、四组 Mach-O projections、complete contract replay 与 final
+  no-unresolved-P0–P2 review 收口；a2-ii 又以 12-path / 3,673-line
+  implementation、55 focused、1,516-test/79-suite staged serial、global source
+  boundary、complete contract/final-Mach-O gates、immutable seal 与 final
+  no-unresolved-P0–P2 review 收口。iii-b2b-0 又以 implementation commit
+  `c8cc514` / tree `d615795`、exact 7 non-document paths /
+  1,096 changed lines、20 focused、37 target-boundary、1,517-test/79-suite
+  staged serial、complete contract/App-Release gates、immutable seal
+  `6474016` 与 independent no-unresolved-P0–P2 review 收口。iii-b2b-1a-0
+  又以 implementation commit `53c5594` / tree `f9322fa`、test-only
+  prerequisite `59d3bb7`、immutable seal `8361168`、exact 8 non-document
+  implementation paths / 1,336 changed lines、38 target-boundary、1,525-test/
+  79-suite staged serial、complete contract/App-Release gates 与 independent
+  no-unresolved-P0–P2 review 收口。iii-b2b-1a-1 又以 implementation
+  `fe4f6ad` / tree `6bd6d384`、immutable seal `2c31a7c`、exact 8
+  non-document paths / 2,800 changed lines、1,535-test/80-suite staged serial、
+  complete App/Release and contract gates 与 no-unresolved-P0–P2 review
+  收口。iii-b2b-1b 随后按预算拆成 1b-i/1b-ii：1b-i 以 implementation
+  `6b26082` / tree `462d40b`、exact 5 paths / 2,434 changed lines、
+  1,550-test/81-suite serial 与 post-fix no-unresolved-P0–P2 review 收口；
+  1b-ii 以 implementation `1c8ab1d` / tree `d7b6c05`、exact 4 paths /
+  971 changed lines、contract/App-Release exit 0、immutable seal `a314b85` /
+  tree `aac9d81` 与 no-unresolved-P0–P2 review 收口。两者均
+  complete/non-admitting；c0b-i/c0b-ii/c0b-iii 均已完成并保持
+  non-admitting。c0b-iv fresh preflight 已动态修正为
+  iv-a0/iv-a-r/iv-b1a/iv-b1b/iv-b2；iv-a0/iv-a-r 已完成并保持
+  non-admitting，iv-b1a、iv-b1b-i 与 iv-b1b-ii 也已
+  complete/non-admitting；iv-b2 也已以
+  `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+  shared-deadline repair `c144c1e` 与 fixed-gate deadline cleanup repair
+  `bc42fbc` 也已完成并保持 non-admitting。interactive-native identity binding
+  repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical replay
+  `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b 与 resolved-lineage
+  L1/L2 已完成/non-admitting，L2 final verifier review none；
+  ii-c-c v8 随后在 `armedConsumed` 后以 transport loss 终止，并已由独立
+  self-sealed 只读 verifier 固化为 non-admitting/non-retryable；replacement v9
+  后续也在 `armedConsumed` 后因 AMFI `-423` 终止并只读固化，修复已通过
+  非提权 gates；v10 又因 outer deadline exhaustion 消费失败且不可重试，
+  1,400 秒 deadline-budget repair 已完成/non-admitting；v11 又以 legacy
+  generic post-arm reason 消费失败，后继 schema-v2 diagnostic repair 已完成/
+  non-admitting。Task 39 当前
+  active/incomplete，L3c3d/L3c4 未证明。这些
+  repairs 是 machine-campaign
+  prerequisite checkpoints，不是递归命名的新 Task；后续
+  review finding 与局部修复也不得再产生新的命名 Task。
+  该 ii-b5b-ii-c checkpoint 以 8 个
+  non-document paths / 3,104 changed lines、35 focused tests、
+  1,396-test staged-only serial、三个 verifier gates 与 final
+  no-unresolved-P0–P2 review 收口；未运行 full。c0a 完成后按序为
+  ii-b5b-iii production/artifact composition、ii-c0b non-root capsule author +
+  launcher/TTY/FD hygiene，再到 ii-c 唯一 no-model
+  privileged machine gate，只有 ii-c 可接受 ADR 0018。
+  只有 L3c4
+  可作 readiness claim，
+  final full 尚未消耗。
+  Task 40 closed-fixture report、current-Store reconciliation、conservative
+  Review 与 Store-owned continuation 已完成并通过 2,030-test serial、
+  source-boundaries、App-model test 与 independent review；Task 41 是当前产品流
+  下一实现入口。Task 44 仍要求新的、明确授权并成功的 machine cohort 才可能
+  解除 `.implementationUnavailable`。
+  真实 App Trash 依赖仍保持关闭，生产 Deep Dive 仍为 implementation unavailable。
+  逐 Task 完成 Upstream Study、
+  实现、code review、分层验证、独立 commit/push；`scripts/verify --full`
+  只作产品/安全 checkpoint 的单次最终验收，绝不作为调试循环。先按
+  structural → focused → one serial SwiftPM → applicable headless/App/binary
+  gate → independent review 排除问题，再运行一次 clean full；失败后只复跑
+  精确失败 stage/case，修复并恢复绿色后才重新开始最终 full。获批 brief
+  明确记录的 package-only seam 可用 headless + targeted App build 替代
+  full/XCUITest；此时 headless 自带的 `swiftpm-tests-serialized` 就是唯一
+  serial regression，不得再独立重复一遍。enclosing product/security
+  checkpoint 仍必须执行最终 full。不得提前混入
+  生产 Deep Dive、Adapter、真实 Registered Action 或 release 工作。
+- 每个实现 checkpoint 编码前做 scope/cost preflight；若预计超过 14 个
+  non-document source/test/script 路径或约 4,000 新增 non-document 行，必须
+  先拆分再编码。不得重现 Tasks 36–38 的超大 review surface。
+- Capability-first runtime foundation 已通过；这不等于生产 Deep Dive 已实现。
+  Deep Dive 必须保持 unavailable，直到 Phase D 完整产品流程自己的实现与 gate
+  通过；发现 Codex、runtime receipt 或 feature flag 都不能单独启用它。
+- 权限、隔离、许可证、性能主张必须有本机证据（`--help`、测试、Benchmark、ADR）。不确定时先 Spike/ADR，不用大段代码掩盖。
+- 保留现有 MIT `LICENSE`；新增依赖前记录许可证与理由。不要复制 Mole GPL 代码。
+- 视觉素材可通过 Web 搜索或 `$erik-gpt-image-2` 生成。Web 素材必须记录来源 URL、作者/版权、许可证和允许用途；AI 生成素材必须保留 prompt/metadata，不提交凭据。现有 UI/UX 与品牌概念图由 `$erik-gpt-image-2` 生成，仍只作非逐像素参考。
+- 不创建遥测、远程规则服务、MenuBarExtra、后台监控、定时扫描或登录启动项（v1）。
+- 目标平台：开发时最新稳定 macOS + Apple Silicon only。
+- 模块命名：App/类型用 `Stornaut*`；仓库、CLI、配置前缀用 `stornaut`。
+- 开发期 Xcode/App 自动化只使用仓库固定的 XcodeBuildMCP + Peekaboo harness（见 `docs/agent/development-tooling.md`）；UI 验收按 `docs/agent/ui-testing-guide.md`。它们是 Coding Agent 工具，不得链接、复制或暴露给产品内 Deep Dive Codex。
+- UI 变更必须形成 `build/test → 启动真实 .app → Peekaboo 截取实际窗口 → 检查截图/AX 结果 → 必要时补 XCUITest` 的闭环；不能只读 SwiftUI 源码就宣称 UI 正确。`scripts/verify` 与 XCUITest 仍是可重复验收真相，Peekaboo 只补充本机运行时视觉证据。
+- Peekaboo 默认只能暴露 `image`、`see`、`inspect_ui`、`list`、`permissions`；不得绕过 `scripts/peekaboo-readonly` 或扩大白名单。Screen Recording 可读权限足够时不要求 Accessibility/Event Synthesizing；不得自动申请、授予、重置或引导点击系统权限。
+- XcodeBuildMCP 必须从 `.xcodebuildmcp/config.yaml` 读取本项目、scheme、Debug 和 workflow 默认值，并保持 Sentry disabled。MCP 结果不能替代 `scripts/verify`，版本/目录升级先更新 checksum、doctor 与开发文档。
+- 推送 GitHub 前若环境存在失效 `GITHUB_TOKEN`，先 `unset GITHUB_TOKEN GH_TOKEN`，以免覆盖 keyring 登录。
+
+## Never build
+
+- Shell 清理脚本的 GUI 包装
+- 把扫描结果发给模型生成文案的“AI 标签”
+- 允许 Agent 任意 `rm` / Shell / 直接文件系统清理的包装器
+- ClearDisk、Mole 或其他上游的简单 Fork
+- 在 Swift Scanner 性能未被证明不足前引入 Rust
+
+## Decision Autonomy
+
+- 可逆、低风险工作可主动推进：文档修正建议、测试、fixture、本地 verify、ADR 草稿、计划内 Task。
+- 先向用户确认：扩大 Codex 本地写入/执行权、开放本机私网或 Unix socket、改产品范围、新增付费/远程服务、force-push、改许可证、发布/公证流程、把未经 runtime gate 的 Deep Dive 从 paused 放开。ADR 0004 已批准的直接只读工具与公共互联网能力不再重复请求授权。
+- 设计/PRD/architecture 冲突时先报告并提出精确修正文案，不得自行放宽边界。
+
+## Docs Router
+
+| 任务 | 先读 |
+| --- | --- |
+| 文档地图与规范优先级 | [docs/README.md](docs/README.md) |
+| 任意实现任务的总入口 | [docs/agent/coding-agent-handoff.md](docs/agent/coding-agent-handoff.md) |
+| 本地构建与 UI 自动化工具 | [docs/agent/development-tooling.md](docs/agent/development-tooling.md) |
+| UI 测试、截图与故障判定 | [docs/agent/ui-testing-guide.md](docs/agent/ui-testing-guide.md) |
+| 产品需求与验收 | [docs/product/PRD.md](docs/product/PRD.md) |
+| 进程边界、模块、安全架构 | [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md) |
+| Agent / 双模式 / 安全基线 | [docs/design/agent-disk-governance.md](docs/design/agent-disk-governance.md) |
+| 导航、文案、品牌、Light/Dark | [docs/design/ui-ux.md](docs/design/ui-ux.md) |
+| 跨 Epic 交付顺序与 Gate | [docs/plans/roadmap.md](docs/plans/roadmap.md) |
+| 当前 active plan 状态 | [docs/plans/active/README.md](docs/plans/active/README.md) |
+| Capability-first Codex Runtime Gate（历史） | [docs/plans/completed/capability-first-codex-runtime-gate.md](docs/plans/completed/capability-first-codex-runtime-gate.md) |
+| R1 Runtime Study / conditional decision | [docs/upstream-studies/epic-5-capability-first-runtime.md](docs/upstream-studies/epic-5-capability-first-runtime.md) / [ADR 0013](docs/adr/0013-capability-first-runtime-containment.md) |
+| R3 Runtime behavior gate | [docs/reports/capability-first-runtime-r3-review.md](docs/reports/capability-first-runtime-r3-review.md) |
+| R4 Protocol / no-Executor gate | [docs/reports/capability-first-runtime-r4-review.md](docs/reports/capability-first-runtime-r4-review.md) |
+| R5 local-only topology decision | [docs/reports/capability-first-runtime-r5-blocker.md](docs/reports/capability-first-runtime-r5-blocker.md) |
+| R5 historical App Server blocker | [docs/reports/capability-first-runtime-r5-api-key-blocker.md](docs/reports/capability-first-runtime-r5-api-key-blocker.md) |
+| R5 historical usage-limit blocker | [docs/reports/capability-first-runtime-r5-usage-limit-blocker.md](docs/reports/capability-first-runtime-r5-usage-limit-blocker.md) |
+| R5 current review | [docs/reports/capability-first-runtime-r5-review.md](docs/reports/capability-first-runtime-r5-review.md) |
+| Runtime final validation / R6 review | [docs/reports/capability-first-runtime-validation-report.md](docs/reports/capability-first-runtime-validation-report.md) / [docs/reports/capability-first-runtime-r6-review.md](docs/reports/capability-first-runtime-r6-review.md) |
+| Runtime R2–R6 progress audit | [docs/reports/capability-first-runtime-progress-audit-2026-08-13.md](docs/reports/capability-first-runtime-progress-audit-2026-08-13.md) |
+| Phase C Epic 8 已完成计划 | [docs/plans/completed/epic-8-safe-execution-vertical-slice.md](docs/plans/completed/epic-8-safe-execution-vertical-slice.md) |
+| Epic 8 Task 29 tests-first brief | [docs/plans/completed/task-29-implementation-brief.md](docs/plans/completed/task-29-implementation-brief.md) |
+| Epic 8 Task 29 review / completion audit | [docs/reports/epic-8-task-29-review.md](docs/reports/epic-8-task-29-review.md) |
+| Epic 8 Task 30 tests-first brief | [docs/plans/completed/task-30-implementation-brief.md](docs/plans/completed/task-30-implementation-brief.md) |
+| Epic 8 Task 30 review / completion audit | [docs/reports/epic-8-task-30-review.md](docs/reports/epic-8-task-30-review.md) |
+| Epic 8 Task 31 tests-first brief | [docs/plans/completed/task-31-implementation-brief.md](docs/plans/completed/task-31-implementation-brief.md) |
+| Epic 8 Task 31 review / completion audit | [docs/reports/epic-8-task-31-review.md](docs/reports/epic-8-task-31-review.md) |
+| Epic 8 Task 32 tests-first brief | [docs/plans/completed/task-32-implementation-brief.md](docs/plans/completed/task-32-implementation-brief.md) |
+| Epic 8 Task 32 review / completion audit | [docs/reports/epic-8-task-32-review.md](docs/reports/epic-8-task-32-review.md) |
+| Epic 8 Task 33 tests-first brief | [docs/plans/completed/task-33-implementation-brief.md](docs/plans/completed/task-33-implementation-brief.md) |
+| Epic 8 Task 33 review / completion audit | [docs/reports/epic-8-task-33-review.md](docs/reports/epic-8-task-33-review.md) |
+| Epic 8 Task 34 tests-first brief | [docs/plans/completed/task-34-implementation-brief.md](docs/plans/completed/task-34-implementation-brief.md) |
+| Epic 8 Task 34 review / completion audit | [docs/reports/epic-8-task-34-review.md](docs/reports/epic-8-task-34-review.md) |
+| Epic 8 Task 35 tests-first brief | [docs/plans/completed/task-35-implementation-brief.md](docs/plans/completed/task-35-implementation-brief.md) |
+| Epic 8 Task 35 review / completion audit | [docs/reports/epic-8-task-35-review.md](docs/reports/epic-8-task-35-review.md) |
+| Phase C final validation | [docs/reports/epic-8-safe-execution-validation-report.md](docs/reports/epic-8-safe-execution-validation-report.md) |
+| Phase D 获批计划 | [docs/plans/active/phase-d-conditional-deep-dive.md](docs/plans/active/phase-d-conditional-deep-dive.md) |
+| Investigation Canonical v1 | [docs/specs/investigation-canonical-v1.md](docs/specs/investigation-canonical-v1.md) |
+| Epic 6 Investigation Study / ADR | [docs/upstream-studies/epic-6-investigation-planning.md](docs/upstream-studies/epic-6-investigation-planning.md) / [ADR 0017](docs/adr/0017-investigation-planning-and-stop-semantics.md) |
+| Phase D Task 36 tests-first brief | [docs/plans/active/task-36-implementation-brief.md](docs/plans/active/task-36-implementation-brief.md) |
+| Phase D Task 36 review / completion audit | [docs/reports/phase-d-task-36-review.md](docs/reports/phase-d-task-36-review.md) |
+| Phase D Task 37 tests-first brief | [docs/plans/active/task-37-implementation-brief.md](docs/plans/active/task-37-implementation-brief.md) |
+| Phase D Task 37 review / completion audit | [docs/reports/phase-d-task-37-review.md](docs/reports/phase-d-task-37-review.md) |
+| Phase D Task 38 tests-first brief | [docs/plans/active/task-38-implementation-brief.md](docs/plans/active/task-38-implementation-brief.md) |
+| Phase D Task 38 review / completion audit | [docs/reports/phase-d-task-38-review.md](docs/reports/phase-d-task-38-review.md) |
+| Phase D Task 39 tests-first brief | [docs/plans/active/task-39-implementation-brief.md](docs/plans/active/task-39-implementation-brief.md) |
+| Phase D Task 39A review / completion audit | [docs/reports/phase-d-task-39a-review.md](docs/reports/phase-d-task-39a-review.md) |
+| Phase D Task 39B1a review / completion audit | [docs/reports/phase-d-task-39b1a-review.md](docs/reports/phase-d-task-39b1a-review.md) |
+| Phase D Task 39B1b-i review / completion audit | [docs/reports/phase-d-task-39b1b-i-review.md](docs/reports/phase-d-task-39b1b-i-review.md) |
+| Phase D Task 39B1b-ii review / completion audit | [docs/reports/phase-d-task-39b1b-ii-review.md](docs/reports/phase-d-task-39b1b-ii-review.md) |
+| Phase D Task 39B2a review / completion audit | [docs/reports/phase-d-task-39b2a-review.md](docs/reports/phase-d-task-39b2a-review.md) |
+| Phase D Task 39B2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-i-review.md](docs/reports/phase-d-task-39b2b-i-review.md) |
+| Phase D Task 39B2b-ii-E1 review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e1-review.md](docs/reports/phase-d-task-39b2b-ii-e1-review.md) |
+| Phase D Task 39B2b-ii-E2a review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2a-review.md](docs/reports/phase-d-task-39b2b-ii-e2a-review.md) |
+| Phase D Task 39B2b-ii-E2b-i review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-i-review.md) |
+| Phase D Task 39B2b-ii-E2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-e2b-ii-review.md) |
+| Phase D Task 39B2b-ii review / completion audit | [docs/reports/phase-d-task-39b2b-ii-review.md](docs/reports/phase-d-task-39b2b-ii-review.md) |
+| Phase D Task 39B2c attempt-binding prerequisite review | [docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-attempt-binding-prerequisite-review.md) |
+| Phase D Task 39B2c strict-decoding prerequisite review | [docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md](docs/reports/phase-d-task-39b2c-strict-capability-decoding-prerequisite-review.md) |
+| Phase D Task 39B2c L3c2b eight-scenario driver review | [docs/reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md](docs/reports/phase-d-task-39b2c-l3c2b-eight-scenario-driver-review.md) |
+| Phase D Task 39B2c L3c3a driver-bound attempt review | [docs/reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md](docs/reports/phase-d-task-39b2c-l3c3a-driver-binding-review.md) |
+| Phase D Task 39B2c L3c3b scope/trust preflight | [docs/reports/phase-d-task-39b2c-l3c3b-scope-trust-preflight.md](docs/reports/phase-d-task-39b2c-l3c3b-scope-trust-preflight.md) |
+| Phase D Task 39B2c L3c3b driver runtime authority preflight | [docs/reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md](docs/reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-preflight.md) |
+| Phase D Task 39B2c L3c3b-0 driver runtime authority review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md](docs/reports/phase-d-task-39b2c-l3c3b-driver-runtime-authority-review.md) |
+| Phase D Task 39B2c L3c3b-i native driver packaging review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md](docs/reports/phase-d-task-39b2c-l3c3b-i-native-driver-packaging-review.md) |
+| Phase D Task 39B2c L3c3b-ii installer/L2 admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md](docs/reports/phase-d-task-39b2c-l3c3b-ii-installer-l2-admission-review.md) |
+| Phase D Task 39B2c L3c3c parent-owned handoff study / Proposed ADR | [docs/upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md](docs/upstream-studies/phase-d-task-39b2c-l3c3c-parent-owned-handoff.md) / [ADR 0018](docs/adr/0018-parent-owned-investigation-handoff.md) |
+| Phase D Task 39B2c L3c3c-i final review | [docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-handoff-launcher-spike-review.md) |
+| Phase D Task 39B2c L3c3c-i-b2a reproducibility review | [docs/reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-b2a-reproducibility-contract-review.md) |
+| Phase D Task 39B2c L3c3c-i-b2b-0a root provenance review | [docs/reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md](docs/reports/phase-d-task-39b2c-l3c3c-i-b2b-0a-root-provenance-review.md) |
+| Phase D Task 39B2c L3c3c-ii installed-driver path/cost preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-installed-driver-path-cost-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv final-composition preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-a0 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-a-r review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-a-r-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b1a review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-i review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b1b-ii review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b1b-ii-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-iv-b2 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-iv-b2-review.md) |
+| Phase D Task 39B2c ii-c-c deadline-budget repair review / completion audit | [docs/reports/phase-d-task-39b2c-iic-deadline-budget-repair-review.md](docs/reports/phase-d-task-39b2c-iic-deadline-budget-repair-review.md) |
+| Phase D Task 39B2c shared-deadline repair preflight | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-preflight.md) |
+| Phase D Task 39B2c shared-deadline repair review / completion audit | [docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md](docs/reports/phase-d-task-39b2c-shared-deadline-repair-review.md) |
+| Phase D Task 39B2c fixed-gate deadline cleanup repair preflight | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-preflight.md) |
+| Phase D Task 39B2c fixed-gate deadline cleanup repair review / completion audit | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-repair-review.md) |
+| Phase D Task 39B2c interactive-native identity binding repair preflight | [docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-preflight.md](docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-preflight.md) |
+| Phase D Task 39B2c interactive-native identity binding repair review / completion audit | [docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md](docs/reports/phase-d-task-39b2c-interactive-native-identity-binding-repair-review.md) |
+| Phase D Task 39B2c fixed-gate historical replay preflight | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-preflight.md) |
+| Phase D Task 39B2c fixed-gate historical replay review / completion audit | [docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md](docs/reports/phase-d-task-39b2c-fixed-gate-deadline-cleanup-historical-replay-review.md) |
+| Phase D Task 39B2c ii-c machine campaign preflight | [docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md](docs/reports/phase-d-task-39b2c-iic-machine-campaign-preflight.md) |
+| Phase D Task 39B2c ii-c-a static installed topology review / completion audit | [docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md](docs/reports/phase-d-task-39b2c-iic-a-static-installed-topology-review.md) |
+| Phase D Task 39B2c ii-c-b1 root-owned Gate review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md](docs/reports/phase-d-task-39b2c-iic-b1-root-owned-gate-review.md) |
+| Phase D Task 39B2c ii-c-b2 split preflight | [docs/reports/phase-d-task-39b2c-iic-b2-split-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2-split-preflight.md) |
+| Phase D Task 39B2c ii-c-b2a1 evidence producer review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md](docs/reports/phase-d-task-39b2c-iic-b2a1-evidence-producer-review.md) |
+| Phase D Task 39B2c ii-c-b2a2 independent verifier review / completion audit | [docs/reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md](docs/reports/phase-d-task-39b2c-iic-b2a2-independent-verifier-review.md) |
+| Phase D Task 39B2c ii-c-b2b PTY / FD 3 transport preflight | [docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md](docs/reports/phase-d-task-39b2c-iic-b2b-transport-preflight.md) |
+| Phase D Task 39B2c resolved root-driver lineage L2 review / completion audit | [docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md](docs/reports/phase-d-task-39b2c-iic-resolved-root-driver-lineage-l2-review.md) |
+| Phase D Task 39B2c ii-c pre-arm failure diagnostic review | [docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md](docs/reports/phase-d-task-39b2c-iic-prearm-failure-diagnostic-review.md) |
+| Phase D Task 39B2c ii-c-c v8 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v8-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v9 replacement campaign authorization | [docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v9-replacement-campaign-authorization.md) |
+| Phase D Task 39B2c ii-c-c v9 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v9-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v10 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v10-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v11 replacement campaign authorization | [docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md](docs/reports/phase-d-task-39b2c-iic-v11-replacement-campaign-authorization.md) |
+| Phase D Task 39B2c ii-c-c v11 failure disposition | [docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md](docs/reports/phase-d-task-39b2c-iic-v11-failure-disposition.md) |
+| Phase D Task 39B2c ii-c-c v11 failure closure review | [docs/reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md](docs/reports/phase-d-task-39b2c-iic-v11-failure-closure-review.md) |
+| Phase D Task 39 blocked/no-go gate audit | [docs/reports/phase-d-task-39-blocked-review.md](docs/reports/phase-d-task-39-blocked-review.md) |
+| Phase D Task 39B2c L3c3c-ii-a installed-driver observation review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-a-installed-driver-observation-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b handoff composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b0 exact wire contract preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0-wire-contract-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b0a frame/capsule review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b0b claim/release review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0b-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b0c epoch bootstrap preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-epoch-bootstrap-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b0c epoch bootstrap review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b0c-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b1 authority-free App leaf preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-app-leaf-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b1 authority-free App leaf review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b server integration preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-server-integration-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-i machine-claim server review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-ii legacy client quarantine review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-ii-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-iii split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-iii-a handle v3 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-iii-b-i live integration review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b2b-iii-b-ii physical adapter review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b2b-iii-b-ii-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3 App adapter split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b3a fixed handoff adapter review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3b fixture prerequisite review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-fixture-prerequisite-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3b start-to-retire seam review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3b-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b3c concrete leaf/entry preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b3c concrete leaf/entry review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b3c-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b4 fixed helper-claim client preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b4 fixed helper-claim client review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b4-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5 single-epoch composition split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5a0 claim-abort review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5a0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5a typed single-epoch composer review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i exact-path split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-exact-path-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-a projection contract review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b1 semantic target review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b2a artifact/static readers review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b2b process/service split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b2b-a identity/process review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b2b-b fixed service reader review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b2b-b-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-b3 observer composition review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-b3-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-c1 DriverSupport join/proof review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-c2a semantic-owner closure review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-c2b absence-only physical-owner preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-i-c2b absence-only physical-owner review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-i-c2b-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii fixed Darwin runtime split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-a fixed capsule intake review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-b Darwin App identity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-b-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-c fixed FD-7 session preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-c fixed FD-7 session review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-c-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-d exact owned-PGID retirement preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-ii-d exact owned-PGID retirement review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-ii-d-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-projection-capsule-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0a projection-in-capsule review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b non-root capsule/launcher preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-i semantic producer review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii ownership split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-ownership-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a budget split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a-budget-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a1 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-a2 review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-a2-review.md) |
+| Phase D Task 39B2c L3c3c-ii-c0b-ii-b retained-base split preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-b-retained-base-split-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-c0b-ii-b-retained-base-split-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b0 outer/inner protocol preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b0-outer-inner-protocol-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-a per-epoch continuity review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-a-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 injected cohort preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b1 injected cohort review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b1-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 typed physical bridge preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-typed-physical-bridge-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a0 typed physical bridge review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i supervisor admission preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-supervisor-admission-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i r1 post-review closure preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-r1-post-review-closure-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-i supervisor admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a1-v transport verifier review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a1-v-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2 scope/trust preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-scope-trust-preflight.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-0 untrusted decode review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-0-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-i inherited-PGID App session review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-i-review.md) |
+| Phase D Task 39B2c L3c3c-ii-b5b-iii-b2a-ii-a2-ii terminal/admission review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2a-ii-a2-ii-review.md) |
+| Phase D Task 39B2c-L1 residue observation review | [docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md](docs/reports/phase-d-task-39b2c-l1-residue-observation-review.md) |
+| Phase D Task 40 review / completion audit | [docs/reports/phase-d-task-40-review.md](docs/reports/phase-d-task-40-review.md) |
+| Phase D Task 39B2c iii-b2b-1a-1 outer observation review | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1a1-review.md) |
+| Phase D Task 39B2c iii-b2b-1b zero-argument entry preflight | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-preflight.md) |
+| Phase D Task 39B2c iii-b2b-1b zero-argument entry review / completion audit | [docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md](docs/reports/phase-d-task-39b2c-l3c3c-ii-b5b-iii-b2b-1b-review.md) |
+| Phase D Task 39B2c-L2 root topology observation review | [docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md](docs/reports/phase-d-task-39b2c-l2-root-topology-observation-review.md) |
+| Phase D Task 39B2c-L3a trusted machine target review | [docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md](docs/reports/phase-d-task-39b2c-l3a-trusted-machine-target-review.md) |
+| Epic 2–4 历史计划 | [docs/plans/completed/epic-2-4-deterministic-product-core.md](docs/plans/completed/epic-2-4-deterministic-product-core.md) |
+| Epic 2–4 最终 Gate | [docs/reports/epic-2-4-validation-report.md](docs/reports/epic-2-4-validation-report.md) |
+| Epic 0–1 历史计划与证据 | [docs/plans/completed/epic-0-1-foundation-spikes.md](docs/plans/completed/epic-0-1-foundation-spikes.md) |
+| Epic 0–1 最终 Gate | [docs/reports/epic-0-1-validation-report.md](docs/reports/epic-0-1-validation-report.md) |
+| Codex discovery/进程/隔离研究 Gate | [docs/upstream-studies/epic-1-codex-runtime.md](docs/upstream-studies/epic-1-codex-runtime.md) |
+| 上游学习与许可证边界 | [docs/research/upstream-reference-matrix.md](docs/research/upstream-reference-matrix.md) |
+| 竞品与可借鉴点 | [docs/research/competitive-analysis-2026-08-06.md](docs/research/competitive-analysis-2026-08-06.md) |
+| UI 概念图（氛围/构图参考） | [docs/assets/ui-concepts/](docs/assets/ui-concepts/) |
+| 品牌概念图 | [docs/assets/brand-concepts/](docs/assets/brand-concepts/) |
+
+规范优先级：用户明确批准的 v1 约束 → PRD 与两份批准规格 → architecture → roadmap 与获批 active plan → 已接受 ADR/report → 研究/案例/视觉概念。
+
+## Current milestone
+
+Epic 0–1 与 Epic 2–4 evidence gates 已完成。Phase B 的
+domain/persistence、product Quick Scan、Space Ledger、Knowledge/Activity
+与 App/UI 产品证据通过最终统一验证。Phase C deterministic Epic 8 plan
+已获批准；Tasks 27–28 已完成。ADR 0004 回顾发现的旧 Broker-only runtime/
+UI 漂移已由 capability-first Runtime R1–R6 gate 关闭；R1 证明 read-only
+writes 隔离与 managed proxy 候选；用户已批准
+same-investigation parent-owned random-loopback managed proxy 例外；R2 已完成
+并得出 `configurationReady`，
+允许 Codex descendants 仅连接 same-investigation、父进程拥有、随机端口的
+loopback managed proxy；其他 localhost/private/link-local 和所有 Unix sockets
+仍须阻断。R3 首先证明 direct `setsid()`、`POSIX_SPAWN_SETSID` 与 launchd
+user-job cleanup 不能保证整个调查进程树回收；用户随后批准 ADR 0016 的窄
+audit-session lifecycle supervisor。最终 privileged composition 已观察到
+identity drop、outer Seatbelt ordering、audit-session inheritance、managed
+proxy owner drain 与 stale-lease recovery，live/combined/recovery 均完成且
+residue 为 0；R3 结论为 `behaviorReady` candidate。R4 已完成 strict v2
+advisory protocol、Swift-owned context binding 与 structural no-Executor
+module seam，结论为 `protocolReady`。R5 的 local-only lifecycle candidate
+已完成 root-only topology、closed ChatGPT projection、App Server
+  provider/schema/raw-event compatibility、signed evidence contract 与 machine
+  verifier。官方 `openai` + ChatGPT subscription worker 已观察 9/9 capabilities；
+  errno-only IPv4/IPv6/private/local/Unix probe 与 write/auth/runtime cleanup 均
+  contained。post-fix source 已补齐 official code-mode host、anti-forgery
+  evidence、current-build binding、one-shot XPC reply、vanished-process
+  classification、provider-compatible group schema 与 fixed direct-read command
+  identity。current-source signed App/helper 已得出 `signedRuntimeReady`，并在
+  gate 后完成 fixed topology 零残留卸载。R6 final admission 已完成并得出
+  runtime foundation `go`；Tasks 29–35 与完整 Phase C gate 已完成，
+  authoritative full verifier 单次 exit 0，计划已归档，Phase C admission
+  为 `go`。Phase D Tasks 36–44 plan 已获批；Task 36 deterministic
+  Investigation domain/planner/budget/stop core 已完成并通过 independent
+  review 与 authoritative full verifier。Task 37 Store v4/persistence/
+  retention/source rejoin 已完成实现、independent review 与两轮完整 capacity
+  gate，authoritative full verifier 23/23 stages 单次 exit 0。Task 38 closed
+  coordinator/fake runtime、strict event/lineage/token normalization、
+  terminal/recovery barrier 与 structural no-Executor gate 已完成并通过
+  independent review 与 authoritative full verifier。Task 39 的 39A strict
+  signed-runtime contract、server-owned turn identity binding 与
+  package-closed diagnostic facade 已完成并通过 independent review 与
+  authoritative full verifier；39B1a exact Store binding、directly async
+  lifecycle、actor reentrancy/deadline preservation 与 no-blocking-bridge gate
+  也已完成并通过 independent review 与 authoritative full verifier。39B1b-i
+  package-closed transport/non-product composition 也已完成并通过 independent
+  review 与 authoritative full verifier。39B1b-ii strict DEBUG App leaf
+  implementation、11-test dedicated App target、pure-product Debug/Release
+  boundary、846-test serialized regression、independent post-fix review 与
+  authoritative full verifier 已通过。39B2a strict lifecycle contract、
+  signed-peer XPC client、cancellation/dispatch linearization 与 package-closed
+  transport implementation 已完成；73-test Lifecycle、103-test
+  Investigation、865-test serialized regression 与 independent post-fix
+  review 已通过，authoritative full verifier 23/23 stages 单次 exit 0
+  （932 秒）。39B2a 已完成。39B2b 已拆为 39B2b-i helper-owned contained
+  worker 与 39B2b-ii signed diagnostic-App/Task 38 composition；39B2b-i
+  implementation、37-test focused regression、889-test serialized regression
+  与 independent post-fix review 已完成，authoritative full verifier 23/23
+  stages 单次 exit 0（933.21 秒）。39B2b-i 已完成。39B2c 才是 machine admission，
+  39B2b-ii-E1 Registered Action authority extraction 与 E2a package-only
+  cleanup seam 已完成；E2a 的 47-test focused、893-test headless regression、
+  targeted Debug App build、independent review 与 Task 35 historical
+  source-snapshot verifier 均通过。E2b-i concrete Trash/Executor authority
+  relocation、authorized ordinary-App linkage、3/3 package、32/32 affected、
+  73/73 Phase C、ordinary/diagnostic App builds 与 898-test serial regression
+  已通过。E2b-i complete；E2b-ii strict final-Mach-O verifier/review 已通过，
+  built authority 正控制、full-bundle Mach-O 负控制与 exact Xcode allowlist
+  均绿色，唯一一次 clean full 23/23 stages 单次通过（1,046.300 秒）。
+  E2b-ii complete；恢复后的 signed composition 已完成实现、focused tests、
+  strict final-Mach-O gate 与 independent post-fix review；唯一一次
+  authoritative full verifier 以 23/23 stages、898-test serialized
+  regression、981 秒 wall time 单次通过，无 restart 或 stage retry。
+  39B2b-ii 已完成。39B2c attempt-binding prerequisite 已关闭跨-attempt
+  capability evidence replay，903-test headless regression 与 post-fix review
+  通过；L1 helper-sealed residue observation 与 949-test staged-only serial
+  regression 已通过；L2 exact root topology observer、117-test focused、
+  targeted Debug diagnostic build、981-test clean staged-only serial 与
+  post-fix review 已通过；L3a non-product trusted machine target extraction、
+  151-test focused、982-test clean staged-only serial 与 independent review
+  已通过；L3b1 peer/L1 handoff、987-test clean staged-only serial 与 post-fix
+  review 已通过；L3b2 trusted root collection 与 L3c failure matrix/final
+  admission 随后继续推进；L3b2 lifecycle collector、1001-test clean
+  staged-only serial 与 post-fix review 已通过；L3c 已按 trust/cost preflight
+  拆成 L3c1–L3c4，L3c1 又拆为 L3c1a/L3c1b；L3c1a 已完成 typed owner
+  retirement、1012-test serial 与 post-fix review；L3c1b 又拆为 i/ii，L3c1b-i
+  configuration-bound helper escrow、1025-test clean staged-only serial 与
+  independent post-fix review 已完成；L3c1b-ii synthetic Machine claim/collector
+  join、1035-test clean staged-only serial 与 independent review 也已完成。L3c1
+  已关闭；L3c2 已拆为 a-i/a-ii/b；L3c2a-i strict claim transport、1041-test
+  clean staged-only serial 与 independent post-fix review 已完成；L3c2a-ii
+  non-product root host/topology、1046-test clean staged-only serial 与
+  independent post-fix review 也已完成；L3c2b eight-scenario driver、1055-test
+  clean staged-only serial 与 final independent review 已完成，L3c2 已关闭；
+  L3c3a driver-bound attempt schema、1057-test clean staged-only serial 与
+  independent post-fix review 已完成；L3c3b 拆为 b-i native packaging / b-ii
+  installer+L2 admission；final-Mach-O blocker 插入的 b-0 authority closure、
+  1059-test clean staged-only serial 与 independent post-fix review 已完成；
+  b-i diagnostic-only native packaging、1060-test clean staged-only serial 与
+  independent post-fix/cross-group review 也已完成；b-ii installer/L2 admission、
+  ACL fail-closed、whole-installer seal、1067-test clean staged-only serial 与
+  independent grouped/post-fix/cross-group review 已完成。L3c3c-i root-launch
+  audit 已完成并拒绝 external branch；i-b2b-0b/i-b2b-1 在执行前 superseded，
+  B4 root execution count 为 0。L3c3c-ii-a installed-driver/manifest observation、
+  exact source/final-Mach-O admission 与 post-fix review 已完成并推送；ii-b
+  已拆为 ii-b0a / ii-b0b / ii-b1 / ii-b2 / ii-b3 / ii-b4 / ii-b5，并插入
+  ii-c0；ii-b0a frame/capsule 与 ii-b0b claim/release wire implementation 均已
+  完成并通过各自 staged-only serial 与 independent review；ii-b1 preflight
+  发现的 first-frame origin contradiction 已由 ii-b0c bootstrap prelude关闭。
+  ii-b1 已完成 corrected Debug-only diagnostic/dependency-free Release-shell
+  topology、layered gates、1,138-test staged-only serial 与 post-fix review；
+  ii-b2 ASID prerequisite 与 ii-b2a typed deadline state 均已完成；ii-b2b-i
+  non-connected machine-claim server 与 ii-b2b-ii legacy-client quarantine /
+  Machine production block 均已完成；ii-b2b-iii 已拆为 iii-a/iii-b，iii-a
+  handle-v3/single-quantized transfer 已完成；iii-b 又拆为 iii-b-i/iii-b-ii，
+  iii-b-i semantic/live integration 与 iii-b-ii executable physical-adapter
+  closure 均已完成，iii-b 与 ii-b2b 已关闭；ii-b3 已拆为 ii-b3a/b3b/b3c，
+  ii-b3a fixed-channel/root-peer/drop adapter、ii-b3b start-to-retire-only
+  Lifecycle seam、test-only fixture prerequisite 与 ii-b3c concrete
+  leaf/native entry 均已完成；ii-b3 已关闭；ii-b4 已完成并保持
+  non-admitting；ii-b5 已按 fresh scope/cost preflight 拆为 b5a0 same-client
+  claim-abort、b5a typed/injected composer、b5b-i L2/projection、b5b-ii fixed
+  Darwin runtime 与 b5b-iii production/artifact composition；b5a0/b5a 已完成并
+  保持 non-admitting；b5b-i-a 与 i-b1 semantic target 已完成，b5b-i-b 余下
+  i-b2a、i-b2b-a、i-b2b-b 与 i-b3 已完成并保持 non-admitting；i-c 已拆为
+  i-c1 DriverSupport join/opaque proof 与 i-c2 legacy-owner closure；i-c1 与
+  aggregate i-c2 已完成并保持 non-admitting；ii-b5b-ii-a fixed FD-0 capsule
+  intake、ii-b5b-ii-b independent Darwin App identity observation 与
+  ii-b5b-ii-c fixed FD-7 session 与 ii-b5b-ii-d exact owned-PGID retirement
+  已完成并保持 non-admitting。dependency-inversion preflight 发现 v1
+  cohort capsule 不含 composer 所需完整 Installed-L2 projection，且 root
+  Driver 不得解析 product JSON；因此 ii-c0 拆为 ii-c0a/ii-c0b。ii-c0a
+  package-only projection-in-capsule contract 已完成并保持 non-admitting。它保留 v1
+  capsule/epoch bytes 不变，仅新增 enclosing projected-cohort binary contract
+  与 paired fixed intake；fresh source/topology preflight 又把 ii-b5b-iii 拆为
+  b0 protocol、a per-epoch continuity、b1 injected cohort、b2a0 typed physical
+  bridge、b2a-i supervisor admission、b2a-ii-a Darwin physical session 与 b2b
+  entry/artifact。b0 已冻结，iii-a、iii-b1、iii-b2a0、iii-b2a-i 与
+  iii-b2a-ii-a1、a2-0、a2-i 与 a2-ii 已完成并保持 non-admitting；iii-b2b-0
+  Release graph closure、iii-b2b-1a-0 canonical helper-provenance carriage 与
+  iii-b2b-1a-1 concrete outer observation 与 iii-b2b-1b zero-argument
+  entry/final artifact 也已完成并保持 non-admitting；ii-c0b 已冻结为四段。
+  c0b-i semantic producer 已完成并保持 non-admitting；c0b-ii fresh preflight
+  已完成并拆为 ii-c0b-ii-a/ii-c0b-ii-b；ii-a budget split 又冻结为 a1/a2，
+  ii-c0b-ii-a1 已以 `d18354b` / tree `d6a4b0e` 完成；ii-c0b-ii-a2 已以
+  `f11eea42ef295f49b20e1c0f3912d4b32448b968` / tree
+  `d0683495ea37d0692677c98f491f3037eaedba4c`、exact 4 paths / 889 lines
+  完成，a1+a2 aggregate 为 7 paths / 2,870 lines；两者均
+  complete/non-admitting。retained-base、publication/lease、settlement/
+  recovery、verifier closure 与 c0b-iii fixed launcher/stub 随后均已完成并
+  推送；accepted checkpoint `ced4da2` 关闭 c0b-i/c0b-ii/c0b-iii。c0b-iv fresh
+  preflight 已冻结 iv-a0 authoritative binding/configuration/source → iv-a-r
+  provenance/App admission closure → iv-b1a semantic outcome/state machine →
+  iv-b1b Darwin/structural closure → iv-b2 zero-argument executable/verifier
+  closure；iv-a0、iv-a-r 与 iv-b1a 已完成并保持 non-admitting；iv-b1b 已拆为
+  iv-b1b-i exact 3 paths / production ≤1,180 lines 与 iv-b1b-ii exact 5 paths，
+  iv-b1 aggregate exact 14 paths；iv-b1b-i 已以 `41d34f2` / tree `8ab58932`、
+  806/806 affected、Release target 与两组终审完成；iv-b1b-ii 已以
+  `373431d4` / tree `b08342e5`、exact 5 paths / 2,193 changed lines、七场景
+  physical、808/808 serial、三项 dedicated gates 与无 unresolved P0–P2 的
+  final reviews 完成；iv-b2 又以
+  `4e8d672d35e4416b0114c5c4dbebb1cb6a4d5089` / tree
+  `e02a515283225b0b19443a47fad0b90fe3d0ddfd` 完成并保持 non-admitting。
+  shared-deadline repair 与随后 fixed-gate deadline cleanup repair 已分别在
+  `c144c1e` 与 `bc42fbc` 完成并保持 non-admitting。interactive-native identity
+  binding repair `531f79f`、consumer seal `26e785a` 与 fixed-gate historical
+  replay `aa8a7f1` 也已完成并保持 non-admitting。ii-c-a、ii-c-b 与
+  resolved-lineage L1/L2 已完成/non-admitting，L2 final verifier review none；
+  pre-arm failure diagnostic repair `2ada395` / tree `11e1a0a` 已完成，
+  exact 9-path scope、physical compact-frame path、nine negative mutations 与
+  final no-unresolved-P0–P2 review 均已关闭。唯一 privileged v8 attempt 后续
+  已消费并以 transport loss 终止，现已只读固化为 non-admitting/non-retryable；
+  replacement v9 的首次 launcher 启动已在未认证 lifecycle install 提示处
+  取消且未消费；修复后 invocation 从 `55c574d` 运行并形成
+  `prepared → armedConsumed → spawnUncertain → terminal`，因此 v9 已消费、
+  non-admitting 且不可重试。固定 App/plist/service 已卸载；Gate attempt/capsule
+  原先已由 v2 receipt 验真，后被历史 physical test 的 stale-recovery 误删，现由
+  v3 predecessor 与 v5 current receipt 如实固化。macOS `amfid` 明确以 code `-423` 拒绝
+  携带受限 application-identifier entitlement 的 ad-hoc MachineDriver；本地
+  tests-first 修复现仅对 MachineDriver 禁止 entitlement 生成并通过 focused、
+  structural、真实 Debug build 与 Debug/Release component gate。后续 v10
+  已消费并因 1,200 秒 outer deadline exhaustion 失败；1,400 秒 deadline-budget
+  repair 随后已完成。v11 也已消费失败，post-arm diagnostic repair 已完成且
+  non-admitting；preservation prerequisite 已完成，v12 privileged campaign
+  已从 `212320f` 唯一执行并 consumed/no-go；credential repair 与 persistent
+  Gate P1/P2 均 complete/non-admitting；用户批准的 fresh v13 已从
+  `8885161` 唯一执行并 consumed/non-admitting/non-retryable；其 persistent
+  Gate residue 保留，failure disposition 与 authorization hardening 已完成/
+  non-admitting；基于 `d5a7df3` 的 fresh v14 授权在任何 launch/root action
+  前因 exact v13 preservation P0 而 superseded/unconsumed；preservation
+  prerequisite 已实现/non-admitting；用户批准基于 `facf3ea` 的 fresh v15，
+  但 pre-arm review 发现 aggregate scope enforcement 与 xattr no-mutation
+  evidence gaps；未发生 launch/root action，v15 superseded/unconsumed。两项
+  evidence-closure 修复已由 `103a4836` 推送并验证/non-admitting；用户已批准
+  基于该 commit 的 fresh v16 已唯一执行并以 closed post-arm
+  `receiptInvalid/exited-82/cleanup-02` 失败；schema-v9 checked disposition
+  绑定九个 raw artifacts、双 persistent Gate attempt/capsule 与零固定运行时
+  live residue。v16 consumed/non-admitting/non-retryable；status-82 identity 与
+  cleanup-02 typed-attribution repairs 已完成/non-admitting；用户已批准基于
+  `a69bd33df8b27e0660e628ec59be308342141625` 的 fresh v17；但 launch 前
+  purgeable TMPDIR 中的 v13 raw evidence 在 macOS low-disk `cache_delete`
+  同一时间窗丢失（精确删除 actor 未独立绑定），
+  因而 v17 superseded-before-launch/unconsumed。当前 frontier 为 v13 purge
+  disposition → future raw-evidence persistent-path repair → fresh authorization
+  → replacement campaign → L3c3d → L3c4；
+  这些 repairs 是 machine-campaign prerequisite checkpoints，
+  不是新的 Task。
+  ADR 0018 仍 Proposed；L3c4 独占 final admission 与
+  剩余 full。
+  Task 39 的 blocked/no-go 评估已固化，但 Task 本身尚未完成；production
+  Deep Dive 未获 admission。
+Deep Dive 的旧 Broker-only no-go 已被 ADR 0004 的 capability-first 边界取代；
+当前仍不可用的原因是生产 Deep Dive 尚未实现，而非 R6 或 Codex 工具能力。
+R6 不证明 release distribution、FDA/TCC 或 production Deep Dive；
+release signing/notarization 仍未评估。Overview、Scan、Scan-only
+History、六区 Settings 与 Scan-owned Review 已是真实 typed
+projection/生命周期，Investigations 仍是 placeholder；真实 Trash 仍未启用。
+
+当前已验证的包布局：
+
+```text
+Sources/StornautCore/    领域类型与安全接口
+Sources/StornautCodex/   Codex 发现、启动、JSONL/schema
+Sources/StornautProcessSupport/
+                        无 Core 权限的通用进程组终止支持
+Sources/StornautCodex/ProbeBridge/
+                        独立 StornautProbeBridge host target
+Sources/StornautLifecycle/
+                        closed audit-session lifecycle foundation
+Sources/StornautCore/Settings/
+                        closed preferences、bookmark 与 exclusions
+Sources/StornautCore/Review/
+                        deterministic execution Evidence、Plan Builder 与 projection
+Sources/StornautCore/Actions/
+                        closed action types、durable execution journal 与 serial coordinator
+Sources/StornautExecution/
+                        concrete Registered Action process/OS authority
+Sources/StornautCore/Accounting/
+                        cleanup Manifest/accounting 与 read-only volume sampling
+Stornaut.xcodeproj/      原生 macOS App/Test host
+StornautApp/             最小原生 .app shell
+StornautAppTests/        App contract tests
+StornautAppUITests/      Light/Dark、Settings 与截图验收
+Tests/                   XCTest / Swift Testing + fixtures
+docs/adr/                架构假设证据
+docs/upstream-studies/   Reference Study Gate 记录
+scripts/verify           默认/full 本机验收；--headless 为普通 CI 构建测试入口
+scripts/verify-ui-automation-mode
+                         完整 verifier 的只读 Automation Mode fail-fast gate
+scripts/bootstrap-dev-tools / doctor-dev-tools
+                         固定版本 XcodeBuildMCP + Peekaboo 开发 harness
+scripts/verify-ui-runtime
+                         awake 本机会话的真实 .app 窗口截图 smoke
+scripts/check-doc-links  文档本地链接检查
+```
+
+App host 拓扑已由 [`docs/upstream-studies/epic-0-foundation.md`](docs/upstream-studies/epic-0-foundation.md) 选定，bundle identifier 已确认为 `com.eriklee.stornaut`；ADR 0001 记录最终 build/signing 证据。
+
+宏观交付顺序以 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) 为准。Epic
+编号表示能力归属，不要求严格按数字顺序交付；获批 Phase D plan 明确复用
+现有 Runtime、Policy/Trash foundations，并保持 production Deep Dive 和普通
+App 执行能力关闭直到各自 gate。
+
+## Working loop
+
+```text
+Upstream Study → Implementation Brief → ADR → Tests/Fixtures first → Implement → Benchmark → Docs/provenance
+```
+
+涉及 App/UI 的小迭代，在 `Implement` 与最终验收之间执行实际窗口验证：
+
+```text
+Narrow build/test → Launch actual .app → Peekaboo read-only capture/inspect → XCUITest/verify
+```
+
+每个完成且验证通过的小迭代都创建独立 commit 并及时 push `origin/main`。不得 push 已知失败、敏感数据或未完成的安全绕过；force-push、release、公证与许可证变更仍先确认。

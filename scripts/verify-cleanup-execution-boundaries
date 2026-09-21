@@ -1,0 +1,152 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+execution_files=(
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+    Sources/StornautCore/Actions/CleanupExecutionState.swift
+    Sources/StornautCore/Accounting/CleanupAccounting.swift
+)
+authorization_file=Sources/StornautCore/Policy/CleanupAuthorization.swift
+collector_file=Sources/StornautCore/Policy/CleanupPolicyContextCollector.swift
+runtime_file=Sources/StornautCore/Actions/CleanupExecutionRuntime.swift
+executor_contract=Sources/StornautCore/Actions/ActionExecutor.swift
+trash_receipt=Sources/StornautCore/Actions/TrashMoving.swift
+execution_authority=Sources/StornautExecution/Actions/CleanupExecutionAuthority.swift
+
+for file in "${execution_files[@]}"; do
+    [[ -f "$file" ]] || {
+        print -u2 "Missing Task 31 execution file: $file"
+        exit 1
+    }
+done
+
+[[ -f "$runtime_file" ]] || {
+    print -u2 "Missing Task 35 closed execution runtime: $runtime_file"
+    exit 1
+}
+
+[[ -f "$execution_authority" ]] || {
+    print -u2 "Missing E2b concrete execution authority: $execution_authority"
+    exit 1
+}
+
+if rg -n \
+    'FileManagerTrashAdapter|TrashMoving\(\)|ActionExecutor\(|runRegisteredAction|RegisteredActionDefinition|FoundationRegisteredActionRunner|StornautCodex|ProbeBridge|Adapter|Process\(|posix_spawn|URLSession|removeItem|unlink\(|rename\(' \
+    "${execution_files[@]}"; then
+    print -u2 "Task 31 execution layer contains a prohibited default/write/runtime dependency."
+    exit 1
+fi
+
+if rg -n \
+    'FoundationRegisteredActionRunner|Process\(|posix_spawn|URLSession|removeItem|unlink\(|rename\(' \
+    "$runtime_file"; then
+    print -u2 "Task 35 closed runtime contains prohibited process/delete authority."
+    exit 1
+fi
+
+if rg -n '^import (SwiftUI|AppKit)$' "${execution_files[@]}"; then
+    print -u2 "Task 31 execution layer imports App/UI frameworks."
+    exit 1
+fi
+
+if rg -n '^import (SwiftUI|AppKit)$' "$runtime_file"; then
+    print -u2 "Task 35 closed runtime imports App/UI frameworks."
+    exit 1
+fi
+
+if rg -n 'try!|fatalError|preconditionFailure' "${execution_files[@]}"; then
+    print -u2 "Task 31 execution layer contains a crash-prone forced path."
+    exit 1
+fi
+
+rg -Fq 'ActionRegistry(definitions: [])' \
+    Sources/StornautCore/Policy/ActionPolicyGate.swift
+rg -q 'private static let schemaVersion = 4' \
+    Sources/StornautCore/Evidence/EvidenceStore.swift
+rg -q '^package actor CleanupExecutionCoordinator' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+rg -q 'executor: any CleanupActionExecuting' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+rg -q 'stage: \.actionStarted' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+rg -q 'try await saveAndVerify\(journal\)' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+rg -q 'permanentlyReleasedLogicalBytes: ByteCount\(0\)' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+rg -q '^public actor CleanupExecutionRuntime' "$runtime_file"
+rg -Fq 'ActionRegistry(definitions: [])' "$execution_authority"
+rg -Fq 'adapter: FileManagerTrashAdapter()' "$execution_authority"
+rg -Fq 'DenyRegisteredActionRunner()' "$execution_authority"
+rg -Fq 'private var pending: PendingPreflight?' "$runtime_file"
+rg -Fq 'self.pending = nil' "$runtime_file"
+rg -Fq 'public func requestStopAfterCurrent()' "$runtime_file"
+rg -Fq 'public func retrySavingAudit(' "$runtime_file"
+rg -Fq 'public func recover()' "$runtime_file"
+for declaration in \
+    'package protocol CleanupActionExecuting' \
+    'package enum CleanupActionExecutionFailure'; do
+    rg -Fq "$declaration" "$executor_contract"
+done
+
+for marker in \
+    'package struct ActionExecutor' \
+    'package struct TrashMoving' \
+    'package struct FileManagerTrashAdapter' \
+    'FileManager.default.trashItem(' \
+    'public extension CleanupExecutionRuntime' \
+    'static func diagnostic('; do
+    rg -Fq "$marker" "$execution_authority"
+done
+
+if rg -n \
+    '\b(struct|actor) (ActionExecutor|TrashMoving|FileManagerTrashAdapter)\b|FileManager\.default\.trashItem\(' \
+    "$executor_contract" \
+    "$trash_receipt" \
+    "$runtime_file"; then
+    print -u2 "StornautCore still contains concrete Trash or Executor authority."
+    exit 1
+fi
+
+for declaration in \
+    'package protocol CleanupExecutionStore' \
+    'package protocol CleanupVolumeSampling' \
+    'package actor CleanupExecutionCoordinator'; do
+    rg -Fq "$declaration" \
+        Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+done
+rg -Fq 'package protocol CleanupActionExecuting' "$executor_contract"
+rg -Fq 'package enum CleanupActionExecutionFailure' "$executor_contract"
+
+rg -Fq 'package protocol CleanupItemPolicyContextCollecting' \
+    "$collector_file"
+rg -Fq 'package let rootURL: URL' "$collector_file"
+rg -Fq 'package let rootAccess: CleanupPolicyRootAccess' "$collector_file"
+rg -Fq 'package actor CleanupAuthorizationController' "$authorization_file"
+rg -Fq 'package struct FoundationCleanupVolumeSampler' \
+    Sources/StornautCore/Accounting/CleanupAccounting.swift
+rg -Fq 'typealias TrashMovingError = CleanupActionExecutionFailure' \
+    "$execution_authority"
+rg -Fq 'catch let error as CleanupActionExecutionFailure' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift
+
+if rg -n \
+    '^public (protocol|actor) (CleanupExecutionStore|CleanupActionExecuting|CleanupVolumeSampling|CleanupExecutionCoordinator|CleanupItemPolicyContextCollecting|CleanupAuthorizationController)\b' \
+    Sources/StornautCore/Actions/CleanupExecutionCoordinator.swift \
+    "$authorization_file" \
+    "$collector_file"; then
+    print -u2 "Cleanup execution package seam escaped as public API."
+    exit 1
+fi
+
+if rg -n \
+    '^public (struct|protocol|actor) (ActionExecutor|TrashMoving|FileManagerTrashAdapter|TrashAdapting)\b' \
+    "$execution_authority"; then
+    print -u2 "Concrete Trash or Executor authority escaped as public API."
+    exit 1
+fi
+
+echo "Cleanup execution boundary verification passed."

@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+source "$repo_root/scripts/dev-tools-common"
+
+verify_xcodebuildmcp_install
+
+export XCODEBUILDMCP_CWD="$repo_root"
+export XCODEBUILDMCP_SENTRY_DISABLED=true
+
+exec "$(stornaut_xcodebuildmcp_binary)" "$@"

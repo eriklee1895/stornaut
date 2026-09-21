@@ -1,0 +1,25 @@
+{
+  "catalogVersion": "fixture-catalog-v1",
+  "category": "rebuildableProjectArtifacts",
+  "classifiedAt": 1786233695000,
+  "confidence": "low",
+  "disposition": "reviewRecommended",
+  "id": "classification-fixture-active-artifact",
+  "missingEvidenceKeys": [
+    "activity.git.upstream"
+  ],
+  "producer": "Fixture package manager",
+  "recovery": {
+    "cost": "medium",
+    "methodKey": "recovery.fixture.restoreDependencies"
+  },
+  "requiredEvidenceKeys": [
+    "activity.git.clean",
+    "activity.git.upstream",
+    "activity.process.inactive"
+  ],
+  "risk": "high",
+  "ruleID": "fixture.project-artifact",
+  "schemaVersion": 1,
+  "snapshotID": "snapshot-fixture-project-artifact"
+}

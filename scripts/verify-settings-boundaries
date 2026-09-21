@@ -1,0 +1,351 @@
+#!/bin/zsh
+# task41_settings_self_sha=514c1b2193cf23a6c8a22d9d7a17d481f07026f8633037f6f8542654745abf3d
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+self_sha=$(/usr/bin/sed -E \
+    's/^# task41_settings_self_sha=[0-9a-f]{64}$/# task41_settings_self_sha=SELF/' \
+    "${0:A}" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')
+expected_self_sha=$(/usr/bin/sed -nE \
+    's/^# task41_settings_self_sha=([0-9a-f]{64})$/\1/p' "${0:A}")
+[[ ${#expected_self_sha} == 64 && $self_sha == $expected_self_sha ]] || {
+    print -u2 "Task 41 Settings verifier self-seal drifted"
+    exit 1
+}
+
+settings_sources=(
+    "${(@f)$(find StornautApp/Settings -type f -name '*.swift' \
+        -print | LC_ALL=C sort)}"
+)
+expected_settings_sources=(
+    StornautApp/Settings/CodexSettingsView.swift
+    StornautApp/Settings/GeneralSettingsView.swift
+    StornautApp/Settings/LocalKnowledgeSettingsView.swift
+    StornautApp/Settings/PermissionsSettingsView.swift
+    StornautApp/Settings/PrivacyDataSettingsView.swift
+    StornautApp/Settings/ScanningSettingsView.swift
+    StornautApp/Settings/SettingsComponents.swift
+    StornautApp/Settings/SettingsModel.swift
+    StornautApp/Settings/SettingsState.swift
+    StornautApp/Settings/StornautSettingsView.swift
+)
+[[ "${(j:\n:)settings_sources}" == \
+    "${(j:\n:)expected_settings_sources}" ]] || {
+    print -u2 "Settings source inventory drifted."
+    exit 1
+}
+app_state_sources=(
+    "${(@f)$(find StornautApp/AppState -type f -name '*.swift' \
+        -print | LC_ALL=C sort)}"
+)
+expected_app_state_sources=(
+    StornautApp/AppState/AppDependencies.swift
+    StornautApp/AppState/AppPageState.swift
+    StornautApp/AppState/DebugAppFixtures.swift
+    StornautApp/AppState/StornautAppModel.swift
+    StornautApp/AppState/StornautLocalization.swift
+)
+[[ "${(j:\n:)app_state_sources}" == \
+    "${(j:\n:)expected_app_state_sources}" ]] || {
+    print -u2 "Task 41 AppState source inventory drifted."
+    exit 1
+}
+settings_views=(
+    StornautApp/Settings/StornautSettingsView.swift
+    StornautApp/Settings/SettingsComponents.swift
+    StornautApp/Settings/GeneralSettingsView.swift
+    StornautApp/Settings/ScanningSettingsView.swift
+    StornautApp/Settings/PermissionsSettingsView.swift
+    StornautApp/Settings/CodexSettingsView.swift
+    StornautApp/Settings/PrivacyDataSettingsView.swift
+    StornautApp/Settings/LocalKnowledgeSettingsView.swift
+)
+
+for source in "${settings_views[@]}"; do
+    test -f "$source"
+done
+
+for forbidden in \
+    EvidenceStore \
+    LocalKnowledgeStore \
+    SettingsPreferencesStore \
+    Surveyor \
+    QuickScanCoordinator \
+    CodexLocator \
+    CodexCapabilityDetector \
+    CodexProcess \
+    ProbeBridge \
+    NSOpenPanel \
+    NSWorkspace \
+    UserDefaults \
+    'Process\(' \
+    TCC \
+    tccutil \
+    '\.clearEvidence\(' \
+    '\.clearManifests\(' \
+    '\.forgetAll\('; do
+    if rg -n "$forbidden" "${settings_views[@]}"; then
+        print -u2 "Settings View boundary violation: $forbidden"
+        exit 1
+    fi
+done
+
+if rg -n \
+    'Start Deep Dive|Trust Codex|Proceed Anyway|Adjust Retention|Accept' \
+    "${settings_views[@]}"; then
+    print -u2 "Deferred or unsafe Settings action leaked into Task 25 Views."
+    exit 1
+fi
+
+if rg -n \
+    'Broker-only|仅限 Broker|pausedRequired|Deep Dive Safety Paused' \
+    StornautApp; then
+    print -u2 "Superseded runtime status copy leaked into the product."
+    exit 1
+fi
+
+rg -q 'enum SettingsRuntimeEvidenceStatus' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'enum SettingsRuntimeGateStatus' \
+    StornautApp/Settings/SettingsModel.swift
+if rg -n \
+    'admittedR5|staleR5|capability-first-v1|gpt-5\.6-luna' \
+    StornautApp/Settings StornautApp/AppState/AppDependencies.swift; then
+    print -u2 "Hard-coded historical runtime receipt leaked into Settings."
+    exit 1
+fi
+rg -q 'let disclosureReadiness: DeepDiveDisclosureReadiness' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'let dependencyReadiness: DeepDiveDependencyReadiness' \
+    StornautApp/Settings/SettingsState.swift
+rg -q 'let projection: DeepDiveAvailabilityProjection' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'projection.normalProductStartEnabled' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'DeepDiveDisclosureDescriptor.current.semanticItems' \
+    StornautApp/Settings/SettingsModel.swift
+rg -q 'runtimeEvidence: .unverified' \
+    StornautApp/AppState/AppDependencies.swift
+rg -q 'evaluateDeepDiveFirstUse' \
+    StornautApp/AppState/AppDependencies.swift
+rg -q 'submitDeepDiveDisclosure' \
+    StornautApp/AppState/AppDependencies.swift
+rg -q 'forgetDeepDiveDisclosureAcceptance' \
+    StornautApp/AppState/AppDependencies.swift
+rg -q \
+    'Runtime boundary verified · Deep Dive implementation not yet available' \
+    StornautApp/Resources/en.lproj/Localizable.strings
+rg -q 'settings.codex.evidence' \
+    StornautApp/Settings/CodexSettingsView.swift
+rg -q 'settings.codex.runtimeGate' \
+    StornautApp/Settings/CodexSettingsView.swift
+rg -q 'settings.codex.deepDiveAvailability' \
+    StornautApp/Settings/CodexSettingsView.swift
+rg -q 'settings.codex.disclosure' \
+    StornautApp/Settings/CodexSettingsView.swift
+
+rg -q 'loadSettings' StornautApp/AppState/AppDependencies.swift
+rg -q 'saveSettingsPreferences' StornautApp/AppState/AppDependencies.swift
+rg -q 'clearSettingsEvidence' StornautApp/AppState/AppDependencies.swift
+rg -q 'forgetSettingsKnowledge' StornautApp/AppState/AppDependencies.swift
+rg -q 'refreshSettings' StornautApp/AppState/StornautAppModel.swift
+rg -q 'reviewDeepDiveDisclosure' \
+    StornautApp/AppState/StornautAppModel.swift
+rg -q 'SettingsPrimaryRoot' \
+    Sources/StornautCore/Settings/SettingsPreferences.swift
+rg -q 'case userExcluded' \
+    Sources/StornautCore/Surveyor/PathSnapshot.swift
+
+/usr/bin/python3 -I - \
+    "${settings_sources[@]}" --app-state "${app_state_sources[@]}" \
+    --tests StornautAppTests/DeepDiveSettingsModelTests.swift \
+    StornautAppTests/SettingsAppModelTests.swift <<'PY'
+from pathlib import Path
+import hashlib
+import re
+import sys
+
+app_index = sys.argv.index("--app-state")
+test_index = sys.argv.index("--tests")
+settings_paths = list(map(Path, sys.argv[1:app_index]))
+app_paths = list(map(Path, sys.argv[app_index + 1:test_index]))
+test_paths = list(map(Path, sys.argv[test_index + 1:]))
+all_paths = settings_paths + app_paths + test_paths
+sources = {path: path.read_text(encoding="utf-8") for path in all_paths}
+
+expected_sha = {
+    Path("StornautApp/Settings/SettingsState.swift"):
+        "9e9e51dfdf80783132edfd97639b834580d825bebf1a47751fe32348625880cb",
+    Path("StornautApp/Settings/SettingsModel.swift"):
+        "cfe56ac2f6c08d693281ef6e3537eeb7109eff1a4437522beee13ac7d0a72973",
+    Path("StornautApp/Settings/StornautSettingsView.swift"):
+        "8f49ff3e1e13f66d17c2b771ccea99c5987750f0d3a50be6f4dfd1fb1854f417",
+    Path("StornautApp/AppState/AppDependencies.swift"):
+        "32b76ac7cd2c228edc9cf0268400d10b1f2166013791a0149a7cb4868235e621",
+    Path("StornautApp/AppState/StornautAppModel.swift"):
+        "eebd18607738608ceb6a349454334594e4b755e75fc9b8c11636a124589de688",
+    Path("StornautAppTests/DeepDiveSettingsModelTests.swift"):
+        "3ce596f430ac009f058b652bd208c92df7236b1d781703ef76ad77be8590a997",
+    Path("StornautAppTests/SettingsAppModelTests.swift"):
+        "dd363399b6a31f5d028669dc5c40cf4941b7e93e7d6f7fd3f16c142eadf3fdd0",
+}
+
+def code_without_comments_or_strings(source):
+    output = []
+    index = 0
+    block_depth = 0
+    line_comment = False
+    string_delimiter = None
+    while index < len(source):
+        if line_comment:
+            if source[index] == "\n":
+                line_comment = False
+                output.append("\n")
+            else:
+                output.append(" ")
+            index += 1
+            continue
+        if block_depth:
+            if source.startswith("/*", index):
+                block_depth += 1
+                output.extend("  ")
+                index += 2
+            elif source.startswith("*/", index):
+                block_depth -= 1
+                output.extend("  ")
+                index += 2
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if string_delimiter is not None:
+            if source.startswith(string_delimiter, index):
+                output.extend(" " * len(string_delimiter))
+                index += len(string_delimiter)
+                string_delimiter = None
+            elif source[index] == "\\" and string_delimiter == '"':
+                output.extend("  ")
+                index += min(2, len(source) - index)
+            else:
+                output.append("\n" if source[index] == "\n" else " ")
+                index += 1
+            continue
+        if source.startswith("//", index):
+            line_comment = True
+            output.extend("  ")
+            index += 2
+        elif source.startswith("/*", index):
+            block_depth = 1
+            output.extend("  ")
+            index += 2
+        elif source.startswith('"""', index):
+            string_delimiter = '"""'
+            output.extend("   ")
+            index += 3
+        elif source[index] == '"':
+            string_delimiter = '"'
+            output.append(" ")
+            index += 1
+        else:
+            output.append(source[index])
+            index += 1
+    return "".join(output)
+
+owners = {
+    "SettingsRuntimeEvidenceReceipt": {
+        Path("StornautApp/Settings/SettingsState.swift"),
+        Path("StornautApp/Settings/SettingsModel.swift"),
+        Path("StornautApp/AppState/AppDependencies.swift"),
+        Path("StornautApp/AppState/DebugAppFixtures.swift"),
+    },
+    "SettingsRuntimeEvidence": {
+        Path("StornautApp/Settings/SettingsState.swift"),
+        Path("StornautApp/Settings/SettingsModel.swift"),
+        Path("StornautApp/Settings/CodexSettingsView.swift"),
+        Path("StornautApp/AppState/AppDependencies.swift"),
+        Path("StornautApp/AppState/DebugAppFixtures.swift"),
+    },
+    "SettingsDeepDiveModel": {
+        Path("StornautApp/Settings/SettingsModel.swift"),
+    },
+    "DeepDiveFirstUseDecisionOwner": {
+        Path("StornautApp/AppState/AppDependencies.swift"),
+    },
+    "DeepDiveFirstUseRequest": {
+        Path("StornautApp/AppState/AppDependencies.swift"),
+    },
+    "DeepDiveFirstUseEvaluation": {
+        Path("StornautApp/AppState/AppDependencies.swift"),
+        Path("StornautApp/AppState/StornautAppModel.swift"),
+    },
+    "DeepDiveFirstUseDecision": {
+        Path("StornautApp/AppState/AppDependencies.swift"),
+        Path("StornautApp/AppState/StornautAppModel.swift"),
+    },
+    "DeepDiveFirstUseDecisionResult": {
+        Path("StornautApp/AppState/AppDependencies.swift"),
+    },
+    "DeepDiveForgetAcceptanceResult": {
+        Path("StornautApp/AppState/AppDependencies.swift"),
+    },
+    "DeepDiveDisclosurePresentationReason": {
+        Path("StornautApp/AppState/StornautAppModel.swift"),
+    },
+}
+
+for path, expected in expected_sha.items():
+    if hashlib.sha256(sources[path].encode()).hexdigest() != expected:
+        raise SystemExit(f"Task 41 Settings owner/test seal drifted: {path}")
+
+module_sources = {path: sources[path] for path in settings_paths + app_paths}
+
+def validate(candidate):
+    for path, source in candidate.items():
+        active = code_without_comments_or_strings(source)
+        for type_name, allowed in owners.items():
+            if re.search(rf"\b{re.escape(type_name)}\b", active) \
+                    and path not in allowed:
+                raise ValueError(
+                    f"Task 41 App type escaped owner: {type_name}: {path}"
+                )
+    settings_active = "\n".join(
+        code_without_comments_or_strings(candidate[path])
+        for path in settings_paths
+    )
+    forbidden = {
+        "StornautExecution", "InvestigationCoordinator",
+        "ExecutionAuthorization", "CleanupPolicyGate",
+        "TrashMoving", "MoveToTrash", "RegisteredAction",
+        "startInvestigation", "CodexConfigWriter", "UserDefaults",
+        "Process", "posix_spawn", "tccutil",
+    }
+    identifiers = set(re.findall(
+        r"[A-Za-z_][A-Za-z0-9_]*", settings_active
+    ))
+    leaked = sorted(identifiers.intersection(forbidden))
+    if leaked:
+        raise ValueError(
+            "Task 41 Settings gained authority: " + ",".join(leaked)
+        )
+
+validate(module_sources)
+for path in (
+    Path("StornautApp/Settings/SettingsState.swift"),
+    Path("StornautApp/AppState/AppPageState.swift"),
+):
+    mutated = dict(module_sources)
+    mutated[path] += (
+        "\nextension DeepDiveFirstUseDecisionOwner { "
+        "func startInvestigation() {} }\n"
+    )
+    try:
+        validate(mutated)
+    except ValueError:
+        continue
+    raise SystemExit(f"Task 41 Settings verifier accepted escape: {path}")
+PY
+
+print "Settings UI/service boundaries verified."

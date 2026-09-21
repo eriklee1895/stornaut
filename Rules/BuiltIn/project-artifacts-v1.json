@@ -1,0 +1,566 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "project-artifacts-v1",
+  "rules": [
+    {
+      "id": "project-flutter-build",
+      "match": {
+        "pathPattern": "**/build",
+        "expectedKind": "directory"
+      },
+      "producer": "Flutter tool",
+      "rationaleKey": "rationale.project.flutter-build",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.flutter-build",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.pubspec",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.flutter-build",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Flutter",
+            "url": "https://github.com/flutter/flutter/blob/28e6279c3580382dbd1ba599e19c681d3debcc70/packages/flutter_tools/lib/src/commands/clean.dart",
+            "revision": "28e6279c3580382dbd1ba599e19c681d3debcc70",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-flutter-build-positive",
+        "project-flutter-build-active",
+        "project-flutter-build-root",
+        "project-flutter-build-source"
+      ]
+    },
+    {
+      "id": "project-go-vendor",
+      "match": {
+        "pathPattern": "**/vendor",
+        "expectedKind": "directory"
+      },
+      "producer": "Go command",
+      "rationaleKey": "rationale.project.go-vendor",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.go-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.go-mod",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.go-mod-vendor",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Go command",
+            "url": "https://github.com/golang/go/blob/e5ec1263ca5e1428d233206b99dc21c38ea2a124/src/cmd/go/alldocs.go",
+            "revision": "e5ec1263ca5e1428d233206b99dc21c38ea2a124",
+            "license": "BSD-3-Clause",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-go-vendor-positive",
+        "project-go-vendor-ambiguous",
+        "project-go-vendor-root",
+        "project-go-vendor-source"
+      ]
+    },
+    {
+      "id": "project-java-gradle-build",
+      "match": {
+        "pathPattern": "**/build",
+        "expectedKind": "directory"
+      },
+      "producer": "Gradle",
+      "rationaleKey": "rationale.project.gradle-build",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.gradle-build",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.gradle",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.gradle-build",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Gradle",
+            "url": "https://github.com/gradle/gradle/blob/f85ff712e07bb79dd122880d87b3b6f0e974a35a/platforms/documentation/docs/src/docs/userguide/reference/core-plugins/base_plugin.adoc",
+            "revision": "f85ff712e07bb79dd122880d87b3b6f0e974a35a",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-java-gradle-build-positive",
+        "project-java-gradle-build-active",
+        "project-java-gradle-build-root",
+        "project-java-gradle-build-source"
+      ]
+    },
+    {
+      "id": "project-java-maven-target",
+      "match": {
+        "pathPattern": "**/target",
+        "expectedKind": "directory"
+      },
+      "producer": "Apache Maven",
+      "rationaleKey": "rationale.project.maven-target",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.maven-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.maven-pom",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.maven-build",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Apache Maven Clean Plugin",
+            "url": "https://github.com/apache/maven-clean-plugin/blob/d4e0c52c730bc88b579ac6fe503bdb96bcdccc76/src/site/markdown/usage.md.vm",
+            "revision": "d4e0c52c730bc88b579ac6fe503bdb96bcdccc76",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-java-maven-target-positive",
+        "project-java-maven-target-dirty",
+        "project-java-maven-target-root",
+        "project-java-maven-target-source"
+      ]
+    },
+    {
+      "id": "project-node-modules",
+      "match": {
+        "pathPattern": "**/node_modules",
+        "expectedKind": "directory"
+      },
+      "producer": "Node package managers",
+      "rationaleKey": "rationale.project.node-dependencies",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.node-modules",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.package-json",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.package-manager-install",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "npm CLI",
+            "url": "https://github.com/npm/cli/blob/4cdcceac047f82571d0ec734e18b87d1d130e042/docs/lib/content/commands/npm-install.md",
+            "revision": "4cdcceac047f82571d0ec734e18b87d1d130e042",
+            "license": "Artistic-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-node-modules-positive",
+        "project-node-modules-dirty",
+        "project-node-modules-root",
+        "project-node-modules-source"
+      ]
+    },
+    {
+      "id": "project-php-composer-vendor",
+      "match": {
+        "pathPattern": "**/vendor",
+        "expectedKind": "directory"
+      },
+      "producer": "Composer",
+      "rationaleKey": "rationale.project.composer-vendor",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.composer-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.composer-json",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.composer-install",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Composer",
+            "url": "https://github.com/composer/composer/blob/c435d285c9120efdca35696769c72ea9fdcc0466/doc/03-cli.md",
+            "revision": "c435d285c9120efdca35696769c72ea9fdcc0466",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-php-composer-vendor-positive",
+        "project-php-composer-vendor-ambiguous",
+        "project-php-composer-vendor-root",
+        "project-php-composer-vendor-source"
+      ]
+    },
+    {
+      "id": "project-python-venv",
+      "match": {
+        "pathPattern": "**/.venv",
+        "expectedKind": "directory"
+      },
+      "producer": "Python venv",
+      "rationaleKey": "rationale.project.python-venv",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.python-venv",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.python-dependencies",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.python-venv-recreate",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "CPython",
+            "url": "https://github.com/python/cpython/blob/5107fd700d70abf62762d09f766200532866e823/Doc/library/venv.rst",
+            "revision": "5107fd700d70abf62762d09f766200532866e823",
+            "license": "Python-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-python-venv-positive",
+        "project-python-venv-active",
+        "project-python-venv-root",
+        "project-python-venv-source"
+      ]
+    },
+    {
+      "id": "project-ruby-bundle-vendor",
+      "match": {
+        "pathPattern": "**/vendor/bundle",
+        "expectedKind": "directory"
+      },
+      "producer": "Ruby Bundler",
+      "rationaleKey": "rationale.project.bundler-vendor",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "high",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.bundler-vendor",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.gemfile",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.bundle-install",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "RubyGems Bundler",
+            "url": "https://github.com/rubygems/rubygems/blob/236160535f659cc49b54b7da5e841fe8cafa3c06/lib/bundler/man/bundle-install.1.ronn",
+            "revision": "236160535f659cc49b54b7da5e841fe8cafa3c06",
+            "license": "MIT",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-ruby-bundle-vendor-positive",
+        "project-ruby-bundle-vendor-unpushed",
+        "project-ruby-bundle-vendor-root",
+        "project-ruby-bundle-vendor-source"
+      ]
+    },
+    {
+      "id": "project-rust-target",
+      "match": {
+        "pathPattern": "**/target",
+        "expectedKind": "directory"
+      },
+      "producer": "Cargo",
+      "rationaleKey": "rationale.project.cargo-target",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.cargo-target",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.cargo-toml",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.cargo-build",
+        "cost": "medium"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Cargo",
+            "url": "https://github.com/rust-lang/cargo/blob/a07c49a989d565727725e5bb5a8038ff402006a8/doc/book/src/commands/cargo-clean.md",
+            "revision": "a07c49a989d565727725e5bb5a8038ff402006a8",
+            "license": "Apache-2.0",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-rust-target-positive",
+        "project-rust-target-unpushed",
+        "project-rust-target-root",
+        "project-rust-target-source"
+      ]
+    },
+    {
+      "id": "project-xcode-derived-data",
+      "match": {
+        "pathPattern": "**/DerivedData/*",
+        "expectedKind": "directory"
+      },
+      "producer": "Xcode",
+      "rationaleKey": "rationale.project.xcode-derived-data",
+      "category": "rebuildableProjectArtifacts",
+      "disposition": "reviewRecommended",
+      "risk": "medium",
+      "confidenceRequirement": "high",
+      "veto": false,
+      "requiredEvidenceKeys": [
+        "evidence.artifact.layout.xcode-derived-data",
+        "evidence.artifact.not-versioned",
+        "evidence.project.marker.xcode-project",
+        "evidence.recovery.inputs-present"
+      ],
+      "requiredActivityKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "recovery": {
+        "methodKey": "recovery.project.xcode-rebuild",
+        "cost": "high"
+      },
+      "recommendedAction": "moveToTrash",
+      "provenance": {
+        "sources": [
+          {
+            "project": "Apple Xcode documentation",
+            "url": "https://developer.apple.com/documentation/xcode/building-and-running-an-app",
+            "revision": "Xcode-26.6",
+            "license": "Apple-Documentation",
+            "usage": "officialDocumentation"
+          },
+          {
+            "project": "Stornaut Epic 4 study",
+            "url": "https://github.com/eriklee1895/stornaut/blob/b8633ae019e272aeeaa5e64938d6b098c3940ca0/docs/upstream-studies/epic-4-knowledge-activity.md",
+            "revision": "b8633ae019e272aeeaa5e64938d6b098c3940ca0",
+            "license": "MIT",
+            "usage": "behaviorReferenceOnly"
+          }
+        ],
+        "independentlyVerified": true,
+        "verifiedAt": "2026-08-09"
+      },
+      "fixtureIDs": [
+        "project-xcode-derived-data-positive",
+        "project-xcode-derived-data-active",
+        "project-xcode-derived-data-root",
+        "project-xcode-derived-data-source"
+      ]
+    }
+  ]
+}

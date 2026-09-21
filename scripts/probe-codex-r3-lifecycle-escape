@@ -1,0 +1,619 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+codex_executable=${CODEX_EXECUTABLE:-$(command -v codex 2>/dev/null || true)}
+if [[ -z "$codex_executable" || ! -x "$codex_executable" ]]; then
+    print -u2 "Codex executable is unavailable."
+    exit 1
+fi
+codex_executable=${codex_executable:A}
+if [[ "$codex_executable" == */@openai/codex/bin/codex.js ]]; then
+    codex_package_root=${codex_executable:h:h}
+    native_candidate="$codex_package_root/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+    if [[ ! -x "$native_candidate" ]]; then
+        print -u2 "Native Codex executable is unavailable."
+        exit 1
+    fi
+    codex_executable=${native_candidate:A}
+fi
+
+for required_tool in \
+    /usr/bin/clang \
+    /usr/bin/python3 \
+    /usr/bin/sandbox-exec \
+    /usr/bin/uuidgen \
+    /bin/launchctl
+do
+    if [[ ! -x "$required_tool" ]]; then
+        print -u2 "Required tool is unavailable: $required_tool"
+        exit 1
+    fi
+done
+
+host_architecture=$(uname -m)
+if [[ "$host_architecture" != arm64 ]]; then
+    print -u2 "R3 lifecycle evidence requires Apple Silicon."
+    exit 1
+fi
+codex_version=$("$codex_executable" --version)
+if [[ "$codex_version" != "codex-cli 0.147.0" ]]; then
+    print -u2 "R3 lifecycle evidence requires codex-cli 0.147.0."
+    exit 1
+fi
+
+probe_root=$(mktemp -d /private/tmp/stornaut-r3-lifecycle.XXXXXX)
+typeset -a tracked_pids=()
+launch_label=
+launch_bootstrapped=false
+cleanup_in_progress=false
+
+process_is_live() {
+    local process_id=$1
+    local process_state
+
+    if ! kill -0 "$process_id" 2>/dev/null; then
+        return 1
+    fi
+    process_state=$(ps -o stat= -p "$process_id" 2>/dev/null | tr -d ' ')
+    [[ -n "$process_state" && "$process_state" != Z* ]]
+}
+
+process_belongs_to_probe() {
+    local process_id=$1
+    local command_line
+
+    command_line=$(ps -o command= -p "$process_id" 2>/dev/null || true)
+    [[ "$command_line" == *"$probe_root/"* ]]
+}
+
+remember_recorded_pid() {
+    local evidence_path=$1
+    local field_index=$2
+    local process_id
+
+    [[ -s "$evidence_path" ]] || return 0
+    process_id=$(awk -v field_index="$field_index" \
+        '{ print $field_index; exit }' "$evidence_path")
+    if [[ "$process_id" == <-> ]]; then
+        tracked_pids+=("$process_id")
+    fi
+}
+
+remember_probe_processes() {
+    local process_id
+
+    while read -r process_id; do
+        if [[ "$process_id" == <-> && "$process_id" != "$$" ]]; then
+            tracked_pids+=("$process_id")
+        fi
+    done < <(
+        ps -axo pid=,command= | awk -v root="$probe_root/" \
+            'index($0, root) != 0 { print $1 }'
+    )
+}
+
+terminate_tracked_processes() {
+    local process_id
+
+    for process_id in "${tracked_pids[@]:-}"; do
+        if [[ -n "$process_id" ]] && \
+            process_is_live "$process_id" && \
+            process_belongs_to_probe "$process_id"
+        then
+            kill -KILL "$process_id" 2>/dev/null || true
+        fi
+    done
+    for _ in {1..100}; do
+        local survivor=false
+        for process_id in "${tracked_pids[@]:-}"; do
+            if [[ -n "$process_id" ]] && \
+                process_is_live "$process_id" && \
+                process_belongs_to_probe "$process_id"
+            then
+                survivor=true
+                break
+            fi
+        done
+        [[ "$survivor" == false ]] && return 0
+        /bin/sleep 0.01
+    done
+    return 1
+}
+
+cleanup() {
+    local cleanup_failed=false
+
+    if [[ "$cleanup_in_progress" == true ]]; then
+        return 0
+    fi
+    cleanup_in_progress=true
+    set +e
+    if [[ "$launch_bootstrapped" == true ]]; then
+        /bin/launchctl bootout \
+            "gui/$(id -u)/$launch_label" >/dev/null 2>&1 || true
+    fi
+    remember_recorded_pid \
+        "$probe_root/codex/runtime/direct.identity" \
+        1
+    remember_recorded_pid \
+        "$probe_root/strict/runtime/spawn.result" \
+        2
+    remember_recorded_pid \
+        "$probe_root/strict/runtime/spawn.identity" \
+        1
+    remember_recorded_pid \
+        "$probe_root/launchd/launch.result" \
+        2
+    remember_recorded_pid \
+        "$probe_root/launchd/launch.identity" \
+        1
+    remember_probe_processes
+    if ! terminate_tracked_processes; then
+        cleanup_failed=true
+    fi
+    for _ in {1..10}; do
+        rm -rf "$probe_root"
+        [[ ! -e "$probe_root" ]] && break
+        /bin/sleep 0.01
+    done
+    if [[ -e "$probe_root" ]]; then
+        cleanup_failed=true
+    fi
+    if [[ "$cleanup_failed" == true ]]; then
+        print -u2 "Anonymous probe cleanup was incomplete."
+        return 1
+    fi
+}
+
+handle_exit() {
+    local original_status=$?
+
+    trap - EXIT INT TERM
+    if ! cleanup; then
+        original_status=1
+    fi
+    exit "$original_status"
+}
+
+handle_signal() {
+    local signal_status=$1
+
+    trap - EXIT INT TERM
+    if ! cleanup; then
+        signal_status=1
+    fi
+    exit "$signal_status"
+}
+
+trap handle_exit EXIT
+trap 'handle_signal 130' INT
+trap 'handle_signal 143' TERM
+
+wait_for_file() {
+    local file_path=$1
+
+    for _ in {1..300}; do
+        [[ -s "$file_path" ]] && return 0
+        /bin/sleep 0.01
+    done
+    print -u2 "Timed out waiting for anonymous probe evidence."
+    return 1
+}
+
+assert_heartbeat_advances() {
+    local process_id=$1
+    local heartbeat_path=$2
+    local first_value
+    local second_value
+
+    wait_for_file "$heartbeat_path"
+    first_value=$(cat "$heartbeat_path")
+    /bin/sleep 0.4
+    second_value=$(cat "$heartbeat_path")
+    if ! process_is_live "$process_id" || (( second_value <= first_value )); then
+        print -u2 "Expected escaped descendant did not remain live."
+        return 1
+    fi
+}
+
+assert_reparented_to_launchd() {
+    local process_id=$1
+    local current_parent
+
+    current_parent=$(ps -o ppid= -p "$process_id" 2>/dev/null | tr -d ' ')
+    if [[ "$current_parent" != 1 ]]; then
+        print -u2 "Expected escaped descendant was not reparented to launchd."
+        return 1
+    fi
+}
+
+assert_launch_job_stopped() {
+    local service_target=$1
+
+    for _ in {1..100}; do
+        if /bin/launchctl print "$service_target" 2>/dev/null | \
+            grep -Fq 'state = not running'
+        then
+            return 0
+        fi
+        /bin/sleep 0.01
+    done
+    print -u2 "Temporary launchd probe leader did not exit."
+    return 1
+}
+
+write_heartbeat_child() {
+    local source_path=$1
+
+    cat > "$source_path" <<'EOF'
+#include <fcntl.h>
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+
+int main(int argument_count, char **arguments) {
+    if (argument_count != 3) {
+        return 64;
+    }
+    FILE *identity = fopen(arguments[1], "w");
+    if (identity == NULL) {
+        return 65;
+    }
+    fprintf(
+        identity,
+        "%d %d %d %d\n",
+        getpid(),
+        getpgrp(),
+        getsid(0),
+        getppid()
+    );
+    fclose(identity);
+    for (int iteration = 0; iteration < 300; iteration++) {
+        int descriptor = open(
+            arguments[2],
+            O_WRONLY | O_CREAT | O_TRUNC,
+            0600
+        );
+        if (descriptor >= 0) {
+            dprintf(descriptor, "%d\n", iteration);
+            close(descriptor);
+        }
+        struct timespec interval = {
+            .tv_sec = 0,
+            .tv_nsec = 100000000,
+        };
+        nanosleep(&interval, NULL);
+    }
+    return 0;
+}
+EOF
+}
+
+print -r -- "codex.version=$codex_version"
+print -r -- "host.architecture=$host_architecture"
+
+codex_root="$probe_root/codex"
+codex_runtime="$codex_root/runtime"
+codex_home="$codex_root/home"
+codex_work="$codex_root/work"
+mkdir -p -m 700 "$codex_runtime" "$codex_home" "$codex_work"
+
+cat > "$codex_runtime/config.toml" <<EOF
+default_permissions = "stornaut-r3-lifecycle"
+cli_auth_credentials_store = "ephemeral"
+
+[permissions.stornaut-r3-lifecycle.filesystem]
+":root" = "read"
+"$codex_runtime" = "write"
+
+[permissions.stornaut-r3-lifecycle.network]
+enabled = true
+mode = "full"
+enable_socks5 = false
+allow_local_binding = false
+dangerously_allow_non_loopback_proxy = false
+dangerously_allow_all_unix_sockets = false
+
+[permissions.stornaut-r3-lifecycle.network.domains]
+"*" = "allow"
+
+[features.network_proxy]
+enabled = true
+mode = "full"
+enable_socks5 = false
+allow_local_binding = false
+dangerously_allow_non_loopback_proxy = false
+dangerously_allow_all_unix_sockets = false
+
+[features.network_proxy.domains]
+"*" = "allow"
+EOF
+chmod 600 "$codex_runtime/config.toml"
+
+cat > "$codex_work/direct-setsid.py" <<'EOF'
+import os
+import pathlib
+import sys
+import time
+
+os.setsid()
+identity_path = pathlib.Path(sys.argv[1])
+heartbeat_path = pathlib.Path(sys.argv[2])
+identity_path.write_text(
+    f"{os.getpid()} {os.getpgrp()} {os.getsid(0)} {os.getppid()}\n",
+    encoding="utf-8",
+)
+for iteration in range(300):
+    heartbeat_path.write_text(f"{iteration}\n", encoding="utf-8")
+    time.sleep(0.1)
+EOF
+chmod 500 "$codex_work/direct-setsid.py"
+
+cat > "$codex_work/direct-launcher.zsh" <<EOF
+#!/bin/zsh
+unsetopt BG_NICE
+/usr/bin/python3 \
+    "$codex_work/direct-setsid.py" \
+    "$codex_runtime/direct.identity" \
+    "$codex_runtime/direct.heartbeat" \
+    </dev/null >/dev/null 2>&1 &
+for _ in {1..300}; do
+    [[ -s "$codex_runtime/direct.identity" ]] && exit 0
+    /bin/sleep 0.01
+done
+exit 70
+EOF
+chmod 500 "$codex_work/direct-launcher.zsh"
+
+CODEX_HOME="$codex_runtime" \
+HOME="$codex_home" \
+TMPDIR="$codex_runtime" \
+PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+LANG="en_US.UTF-8" \
+    "$codex_executable" sandbox \
+        -P stornaut-r3-lifecycle \
+        -C "$codex_work" \
+        -- /bin/zsh "$codex_work/direct-launcher.zsh"
+
+read -r direct_pid direct_group direct_session direct_parent \
+    < "$codex_runtime/direct.identity"
+tracked_pids+=("$direct_pid")
+assert_heartbeat_advances \
+    "$direct_pid" \
+    "$codex_runtime/direct.heartbeat"
+assert_reparented_to_launchd "$direct_pid"
+if [[ "$direct_pid" != "$direct_group" || "$direct_pid" != "$direct_session" ]]; then
+    print -u2 "Direct setsid descendant did not create a new session."
+    exit 1
+fi
+print -r -- "lifecycle.direct_setsid_escape=observed"
+
+strict_root="$probe_root/strict"
+strict_runtime="$strict_root/runtime"
+strict_work="$strict_root/work"
+mkdir -p -m 700 "$strict_runtime" "$strict_work"
+write_heartbeat_child "$strict_work/heartbeat-child.c"
+
+cat > "$strict_work/spawn-parent.c" <<'EOF'
+#include <fcntl.h>
+#include <spawn.h>
+#include <stdio.h>
+#include <unistd.h>
+
+extern char **environ;
+
+int main(int argument_count, char **arguments) {
+    if (argument_count != 5) {
+        return 64;
+    }
+    posix_spawnattr_t attributes;
+    posix_spawn_file_actions_t actions;
+    if (posix_spawnattr_init(&attributes) != 0) {
+        return 65;
+    }
+    if (
+        posix_spawnattr_setflags(
+            &attributes,
+            POSIX_SPAWN_SETSID
+        ) != 0
+    ) {
+        return 66;
+    }
+    if (posix_spawn_file_actions_init(&actions) != 0) {
+        return 67;
+    }
+    posix_spawn_file_actions_addopen(
+        &actions,
+        STDIN_FILENO,
+        "/dev/null",
+        O_RDONLY,
+        0
+    );
+    posix_spawn_file_actions_addopen(
+        &actions,
+        STDOUT_FILENO,
+        "/dev/null",
+        O_WRONLY,
+        0
+    );
+    posix_spawn_file_actions_addopen(
+        &actions,
+        STDERR_FILENO,
+        "/dev/null",
+        O_WRONLY,
+        0
+    );
+    pid_t child_pid = 0;
+    char *child_arguments[] = {
+        arguments[1],
+        arguments[2],
+        arguments[3],
+        NULL,
+    };
+    int result = posix_spawn(
+        &child_pid,
+        arguments[1],
+        &actions,
+        &attributes,
+        child_arguments,
+        environ
+    );
+    posix_spawn_file_actions_destroy(&actions);
+    posix_spawnattr_destroy(&attributes);
+    FILE *result_file = fopen(arguments[4], "w");
+    if (result_file != NULL) {
+        fprintf(result_file, "%d %d\n", result, child_pid);
+        fclose(result_file);
+    }
+    return result;
+}
+EOF
+
+/usr/bin/clang \
+    -O2 \
+    -Wall \
+    -Wextra \
+    "$strict_work/heartbeat-child.c" \
+    -o "$strict_work/heartbeat-child"
+/usr/bin/clang \
+    -O2 \
+    -Wall \
+    -Wextra \
+    "$strict_work/spawn-parent.c" \
+    -o "$strict_work/spawn-parent"
+chmod 500 "$strict_work/heartbeat-child" "$strict_work/spawn-parent"
+
+cat > "$strict_runtime/profile.sb" <<EOF
+(version 1)
+(deny default)
+(allow process-exec process-fork)
+(allow signal (target same-sandbox))
+(allow process-info* (target same-sandbox))
+(allow file-read*)
+(allow file-write* (subpath "$strict_runtime"))
+(allow file-write-data
+  (require-all
+    (path "/dev/null")
+    (vnode-type CHARACTER-DEVICE)))
+(deny syscall-unix (syscall-number SYS_setsid SYS_setpgid))
+EOF
+chmod 600 "$strict_runtime/profile.sb"
+
+/usr/bin/sandbox-exec \
+    -f "$strict_runtime/profile.sb" \
+    -- "$strict_work/spawn-parent" \
+        "$strict_work/heartbeat-child" \
+        "$strict_runtime/spawn.identity" \
+        "$strict_runtime/spawn.heartbeat" \
+        "$strict_runtime/spawn.result"
+
+read -r spawn_result spawn_pid < "$strict_runtime/spawn.result"
+tracked_pids+=("$spawn_pid")
+if [[ "$spawn_result" != 0 ]]; then
+    print -u2 "POSIX_SPAWN_SETSID did not launch the anonymous child."
+    exit 1
+fi
+wait_for_file "$strict_runtime/spawn.identity"
+read -r recorded_spawn_pid spawn_group spawn_session spawn_parent \
+    < "$strict_runtime/spawn.identity"
+if [[ "$recorded_spawn_pid" != "$spawn_pid" ]]; then
+    print -u2 "Spawned descendant identity did not match."
+    exit 1
+fi
+assert_heartbeat_advances \
+    "$spawn_pid" \
+    "$strict_runtime/spawn.heartbeat"
+assert_reparented_to_launchd "$spawn_pid"
+if [[ "$spawn_pid" != "$spawn_group" || "$spawn_pid" != "$spawn_session" ]]; then
+    print -u2 "POSIX_SPAWN_SETSID did not create a new session."
+    exit 1
+fi
+print -r -- "lifecycle.posix_spawn_setsid_escape=observed"
+
+launch_root="$probe_root/launchd"
+mkdir -p -m 700 "$launch_root"
+cp "$strict_work/heartbeat-child" "$launch_root/heartbeat-child"
+cp "$strict_work/spawn-parent" "$launch_root/spawn-parent"
+chmod 500 "$launch_root/heartbeat-child" "$launch_root/spawn-parent"
+launch_uuid=$(/usr/bin/uuidgen | tr '[:upper:]' '[:lower:]')
+launch_label="com.eriklee.stornaut.r3-lifecycle.$launch_uuid"
+
+cat > "$launch_root/job.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \
+"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$launch_label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$launch_root/spawn-parent</string>
+    <string>$launch_root/heartbeat-child</string>
+    <string>$launch_root/launch.identity</string>
+    <string>$launch_root/launch.heartbeat</string>
+    <string>$launch_root/launch.result</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>AbandonProcessGroup</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
+EOF
+
+launch_bootstrapped=true
+/bin/launchctl bootstrap \
+    "gui/$(id -u)" \
+    "$launch_root/job.plist"
+wait_for_file "$launch_root/launch.result"
+read -r launch_result launch_pid < "$launch_root/launch.result"
+tracked_pids+=("$launch_pid")
+if [[ "$launch_result" != 0 ]]; then
+    print -u2 "launchd probe parent did not launch the anonymous child."
+    exit 1
+fi
+wait_for_file "$launch_root/launch.identity"
+read -r recorded_launch_pid launch_group launch_session launch_parent \
+    < "$launch_root/launch.identity"
+if [[ "$recorded_launch_pid" != "$launch_pid" ]]; then
+    print -u2 "launchd descendant identity did not match."
+    exit 1
+fi
+assert_heartbeat_advances \
+    "$launch_pid" \
+    "$launch_root/launch.heartbeat"
+assert_launch_job_stopped "gui/$(id -u)/$launch_label"
+assert_reparented_to_launchd "$launch_pid"
+if [[ "$launch_pid" != "$launch_group" || "$launch_pid" != "$launch_session" ]]; then
+    print -u2 "launchd descendant did not create a new session."
+    exit 1
+fi
+print -r -- "lifecycle.launchd_job_escape=observed"
+
+/bin/launchctl bootout \
+    "gui/$(id -u)/$launch_label" >/dev/null 2>&1 || true
+for _ in {1..100}; do
+    if ! /bin/launchctl print \
+        "gui/$(id -u)/$launch_label" >/dev/null 2>&1
+    then
+        launch_bootstrapped=false
+        break
+    fi
+    /bin/sleep 0.01
+done
+if [[ "$launch_bootstrapped" == true ]]; then
+    print -u2 "Temporary launchd probe job survived bootout."
+    exit 1
+fi
+
+if ! cleanup; then
+    print -u2 "Anonymous probe cleanup was incomplete."
+    exit 1
+fi
+trap - EXIT INT TERM
+print -r -- "lifecycle.cleanup=complete"
+print -r -- "probe.verdict=behaviorBlocked"

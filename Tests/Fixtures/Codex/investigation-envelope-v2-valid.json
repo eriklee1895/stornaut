@@ -1,0 +1,65 @@
+{
+  "protocolVersion": 2,
+  "investigationID": "investigation-synthetic",
+  "runID": "run-synthetic",
+  "summary": "Synthetic advisory investigation result.",
+  "coverage": {
+    "investigatedTargetIDs": [
+      "target-a"
+    ],
+    "unresolvedTargets": [
+      {
+        "targetID": "target-b",
+        "reason": "runtime.capability.liveSearchUnavailable"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "id": "evidence-probe",
+      "targetID": "target-a",
+      "source": "probeBroker",
+      "summary": "Bounded structured metadata was observed.",
+      "publicURL": null
+    },
+    {
+      "id": "evidence-web",
+      "targetID": "target-a",
+      "source": "liveSearch",
+      "summary": "Public documentation was consulted.",
+      "publicURL": "https://example.com/docs/cache?query=private#fragment"
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-a",
+      "targetID": "target-a",
+      "summary": "The target appears rebuildable.",
+      "evidenceIDs": [
+        "evidence-probe",
+        "evidence-web"
+      ],
+      "confidence": "high",
+      "uncertainty": "Current activity still requires Swift revalidation."
+    }
+  ],
+  "candidateProposals": [
+    {
+      "candidateID": "candidate-a",
+      "targetID": "target-a",
+      "summary": "Consider this candidate during a future deterministic review.",
+      "evidenceIDs": [
+        "evidence-probe"
+      ],
+      "confidence": "medium",
+      "uncertainty": "This proposal grants no cleanup authority."
+    }
+  ],
+  "capabilityDegradations": [
+    {
+      "capability": "liveSearch",
+      "reasonKey": "runtime.capability.liveSearchUnavailable",
+      "summary": "Live search coverage was unavailable for one target."
+    }
+  ]
+}

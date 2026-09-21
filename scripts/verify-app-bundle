@@ -1,0 +1,67 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+expected_app="$repo_root/.derivedData/app/Build/Products/Debug/Stornaut.app"
+app_path=${1:-$expected_app}
+app_path=${app_path:A}
+
+if [[ "$app_path" != "$expected_app" ]]; then
+    print -u2 "Refusing to inspect unexpected path: $app_path"
+    exit 1
+fi
+
+info_plist="$app_path/Contents/Info.plist"
+executable="$app_path/Contents/MacOS/Stornaut"
+
+test "$(plutil -extract CFBundleIdentifier raw "$info_plist")" = \
+    "com.eriklee.stornaut"
+test "$(plutil -extract CFBundlePackageType raw "$info_plist")" = "APPL"
+test "$(plutil -extract CFBundleExecutable raw "$info_plist")" = "Stornaut"
+test "$(plutil -extract LSMinimumSystemVersion raw "$info_plist")" = "26.0"
+test "$(lipo -archs "$executable")" = "arm64"
+
+codesign --verify --deep --strict --verbose=2 "$app_path"
+
+requirement=$(codesign -d -r- "$app_path" 2>&1 | tail -1)
+test "$requirement" = \
+    'designated => identifier "com.eriklee.stornaut"'
+
+entitlements_file=$(mktemp)
+trap 'rm -f "$entitlements_file"' EXIT
+codesign -d --entitlements :- "$app_path" > "$entitlements_file" 2>/dev/null
+test "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$entitlements_file")" = \
+    "false"
+
+test -f "$app_path/Contents/Resources/en.lproj/Localizable.strings"
+test -f "$app_path/Contents/Resources/zh-Hans.lproj/Localizable.strings"
+runtime_catalog=$(
+    find "$app_path/Contents/Resources" \
+        -type f \
+        -name BuiltInRuleCatalog.json \
+        -print -quit
+)
+test -n "$runtime_catalog"
+test "$(
+    shasum -a 256 "$runtime_catalog" | awk '{print $1}'
+)" = "d94ef23f9dc0d772499a192e9205d09aafa9618a1adbe7ec41c6aacc927a913a"
+test "$(jq '.rules | length' "$runtime_catalog")" = "67"
+test "$(jq -r '.catalogVersion' "$runtime_catalog")" = \
+    "builtin-runtime-tool-residue-v2"
+runtime_profiles=$(
+    find "$app_path/Contents/Resources" \
+        -type f \
+        -name BuiltInExecutionProfileCatalog.json \
+        -print -quit
+)
+test -n "$runtime_profiles"
+test "$(
+    shasum -a 256 "$runtime_profiles" | awk '{print $1}'
+)" = "f43aa94da659fb6b5c64f5e2822e21141cd882390f96cb5f69452f2de5b467f2"
+test "$(jq '.profiles | length' "$runtime_profiles")" = "3"
+test "$(jq -r '.catalogVersion' "$runtime_profiles")" = \
+    "safe-execution-v1"
+test ! -d "$app_path/Contents/PlugIns"
+
+print "App bundle verification passed: $app_path"

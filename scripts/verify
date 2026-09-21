@@ -1,0 +1,434 @@
+#!/bin/zsh
+
+set -euo pipefail
+zmodload zsh/datetime
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+function print_usage() {
+    print "Usage: scripts/verify [--headless|--full] [--list-steps] [--step <name>]"
+    print
+    print "  --headless   Deterministic build/test gates for ordinary CI."
+    print "  --full       Headless gates plus local XCUITest and performance evidence."
+    print "  --list-steps Print the selected ordered step names without running them."
+    print "  --step <name> Run one mode-owned step for diagnostic only; dependencies are not run."
+    print "  --help       Show this help."
+}
+
+mode=full
+mode_was_selected=false
+list_steps=false
+requested_step=""
+step_was_selected=false
+
+while (( $# > 0 )); do
+    case $1 in
+        --headless)
+            if [[ "$mode_was_selected" == true && "$mode" != headless ]]; then
+                print -u2 "Choose only one verification mode."
+                print_usage >&2
+                exit 64
+            fi
+            mode=headless
+            mode_was_selected=true
+            ;;
+        --full)
+            if [[ "$mode_was_selected" == true && "$mode" != full ]]; then
+                print -u2 "Choose only one verification mode."
+                print_usage >&2
+                exit 64
+            fi
+            mode=full
+            mode_was_selected=true
+            ;;
+        --list-steps)
+            list_steps=true
+            ;;
+        --step)
+            if [[ "$step_was_selected" == true ]]; then
+                print -u2 "Choose only one diagnostic verification step."
+                print_usage >&2
+                exit 64
+            fi
+            if (( $# < 2 )) || [[ "$2" == --* ]]; then
+                print -u2 -- "--step requires an exact step name."
+                print_usage >&2
+                exit 64
+            fi
+            requested_step=$2
+            step_was_selected=true
+            shift
+            ;;
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
+        *)
+            print -u2 "Unknown verification argument: $1"
+            print_usage >&2
+            exit 64
+            ;;
+    esac
+    shift
+done
+
+typeset -a headless_steps=(
+    source-boundaries
+    localization-contract
+    verifier-contract
+    docs-and-diff
+    swiftpm-tests-serialized
+    rule-compiler
+    app-contract-tests
+    phase-c-product
+)
+
+typeset -a full_steps=(
+    phase-c-trash-diagnostic-contract
+    ui-automation-readiness
+    clean-derived-data
+    xcuitest
+    ui-screenshot-contract
+    swiftpm-build
+    swiftpm-tests
+    investigation-benchmarks
+    matcher-benchmarks
+    phase-b-product
+    source-boundaries
+    automation-parser-self-test
+    app-tests-and-snapshots
+    debug-app-build
+    debug-app-sign
+    app-bundle
+    debug-release-fixture-boundary
+    localization-contract
+    rule-compiler
+    verifier-contract
+    docs-and-diff
+    phase-c-product
+    phase-c-signed-app-trash-receipt
+)
+
+typeset -a selected_steps
+if [[ "$mode" == headless ]]; then
+    selected_steps=("${headless_steps[@]}")
+else
+    selected_steps=("${full_steps[@]}")
+fi
+
+function selected_mode_contains_step() {
+    local candidate=$1
+    local available_step
+    for available_step in "${selected_steps[@]}"; do
+        if [[ "$available_step" == "$candidate" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if [[ "$step_was_selected" == true ]]; then
+    if [[ "$mode_was_selected" != true ]]; then
+        print -u2 -- "--step requires an explicit --headless or --full mode."
+        print_usage >&2
+        exit 64
+    fi
+    if [[ "$list_steps" == true ]]; then
+        print -u2 -- "--step cannot be combined with --list-steps."
+        print_usage >&2
+        exit 64
+    fi
+    if ! selected_mode_contains_step "$requested_step"; then
+        print -u2 \
+            "Verification step is not available in $mode mode: $requested_step"
+        print_usage >&2
+        exit 64
+    fi
+    selected_steps=("$requested_step")
+fi
+
+if [[ "$list_steps" == true ]]; then
+    printf '%s\n' "${selected_steps[@]}"
+    exit 0
+fi
+
+STORNAUT_PHASE_C_TRASH_EVIDENCE_ROOT= \
+    scripts/verify-phase-c-trash-receipt >/dev/null
+
+timing_temp=$(mktemp "${TMPDIR:-/tmp}/stornaut-verify-timings.XXXXXX")
+if [[ "$step_was_selected" == true ]]; then
+    timing_file="$repo_root/.derivedData/verification/steps/$mode/$requested_step-timings.tsv"
+else
+    timing_file="$repo_root/.derivedData/verification/$mode-timings.tsv"
+fi
+trap 'rm -f "$timing_temp"' EXIT
+print -r -- $'mode\tstep\tseconds\tstatus' > "$timing_temp"
+
+function persist_timings() {
+    mkdir -p "${timing_file:h}"
+    cp "$timing_temp" "$timing_file"
+}
+
+function run_step() {
+    local step_name=$1
+    shift
+    local started_at=$EPOCHREALTIME
+    local step_status=0
+
+    print "[verify][$mode] START $step_name"
+    "$@" || step_status=$?
+
+    local finished_at=$EPOCHREALTIME
+    local elapsed_seconds
+    elapsed_seconds=$(printf '%.3f' "$(( finished_at - started_at ))")
+
+    if (( step_status == 0 )); then
+        print -r -- "$mode"$'\t'"$step_name"$'\t'"$elapsed_seconds"$'\tpass' \
+            >> "$timing_temp"
+        persist_timings
+        print "[verify][$mode] PASS  $step_name (${elapsed_seconds}s)"
+        return 0
+    fi
+
+    print -r -- "$mode"$'\t'"$step_name"$'\t'"$elapsed_seconds"$'\tfail' \
+        >> "$timing_temp"
+    print -u2 "[verify][$mode] FAIL  $step_name (${elapsed_seconds}s, exit $step_status)"
+    persist_timings
+    print "Verification timings: $timing_file"
+    return "$step_status"
+}
+
+function clean_derived_data() {
+    rm -rf "$repo_root/.derivedData"
+}
+
+function run_xcuitest() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/ui-tests \
+        -resultBundlePath .derivedData/ui-tests.xcresult \
+        -only-testing:StornautAppUITests \
+        test
+}
+
+function verify_ui_screenshots() {
+    scripts/export-ui-screenshots
+    scripts/verify-ui-screenshots
+}
+
+function build_swift_package() {
+    swift package clean
+    swift build
+}
+
+function test_swift_package() {
+    local isolated_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded|investigationSourceProjectionMaximumStreamingBenchmark|investigationCandidatePlannerHundredThousandRowBenchmark)'
+    SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=2 \
+        swift test --parallel --num-workers 4 --skip "$isolated_benchmarks"
+}
+
+function test_swift_package_serialized() {
+    local isolated_benchmarks='(cumulativeCatalogMatchingBenchmarkStaysBounded|completeCacheCatalogMatchingBenchmarkStaysBounded|completeCatalogMatchingBenchmarkStaysBounded|investigationSourceProjectionMaximumStreamingBenchmark|investigationCandidatePlannerHundredThousandRowBenchmark)'
+    swift test --no-parallel --skip "$isolated_benchmarks"
+}
+
+function run_investigation_benchmarks() {
+    local benchmark
+    for benchmark in \
+        investigationSourceProjectionMaximumStreamingBenchmark \
+        investigationCandidatePlannerHundredThousandRowBenchmark; do
+        swift test --no-parallel --filter "$benchmark"
+    done
+}
+
+function run_matcher_benchmarks() {
+    local benchmark
+    for benchmark in \
+        cumulativeCatalogMatchingBenchmarkStaysBounded \
+        completeCacheCatalogMatchingBenchmarkStaysBounded \
+        completeCatalogMatchingBenchmarkStaysBounded; do
+        swift test --filter "$benchmark"
+    done
+}
+
+function verify_source_boundaries() {
+    local boundary
+    for boundary in \
+        scripts/verify-activity-boundaries \
+        scripts/verify-quick-scan-boundaries \
+        scripts/verify-investigation-boundaries \
+        scripts/verify-task-40-boundaries \
+        scripts/verify-task-41-boundaries \
+        scripts/verify-review-boundaries \
+        scripts/verify-review-workflow-boundaries \
+        scripts/verify-cleanup-policy-boundaries \
+        scripts/verify-cleanup-execution-boundaries \
+        scripts/verify-cleanup-result-boundaries \
+        scripts/verify-codex-no-executor-boundary \
+        scripts/verify-app-state-boundaries \
+        scripts/verify-overview-boundaries \
+        scripts/verify-scan-boundaries \
+        scripts/verify-history-boundaries \
+        scripts/verify-settings-boundaries; do
+        "$boundary" || return $?
+    done
+}
+
+function test_app_and_snapshots() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/tests \
+        -skip-testing:StornautAppUITests \
+        test
+}
+
+function test_app_contracts() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/tests \
+        -skip-testing:StornautAppUITests \
+        -skip-testing:StornautAppTests/DesignSystemSnapshotTests \
+        -skip-testing:StornautAppTests/OverviewSnapshotTests \
+        test
+}
+
+function build_debug_app() {
+    xcodebuild -quiet \
+        -project Stornaut.xcodeproj \
+        -scheme Stornaut \
+        -configuration Debug \
+        -destination 'platform=macOS,arch=arm64' \
+        -derivedDataPath .derivedData/app \
+        build
+}
+
+function verify_localization_contract() {
+    local localization
+    for localization in StornautApp/Resources/*.lproj/Localizable.strings; do
+        plutil -lint "$localization"
+    done
+
+    diff -u \
+        <(rg -o '^"[^"]+"' StornautApp/Resources/en.lproj/Localizable.strings | sort) \
+        <(rg -o '^"[^"]+"' StornautApp/Resources/zh-Hans.lproj/Localizable.strings | sort)
+
+    rg -q 'SettingsLink' StornautApp/AppShell/RootView.swift
+    rg -q '\.keyboardShortcut\(",", modifiers: \.command\)' StornautApp/StornautApp.swift
+}
+
+function verify_docs_and_diff() {
+    scripts/check-doc-links
+    git diff --check
+}
+
+function execute_step() {
+    local step_name=$1
+
+    case $step_name in
+        phase-c-trash-diagnostic-contract)
+            run_step "$step_name" \
+                scripts/verify-phase-c-trash-diagnostic-contract
+            ;;
+        ui-automation-readiness)
+            run_step "$step_name" scripts/verify-ui-automation-mode --allow-auth-prompt
+            ;;
+        clean-derived-data)
+            run_step "$step_name" clean_derived_data
+            ;;
+        xcuitest)
+            run_step "$step_name" run_xcuitest
+            ;;
+        ui-screenshot-contract)
+            run_step "$step_name" verify_ui_screenshots
+            ;;
+        swiftpm-build)
+            run_step "$step_name" build_swift_package
+            ;;
+        swiftpm-tests)
+            run_step "$step_name" test_swift_package
+            ;;
+        swiftpm-tests-serialized)
+            run_step "$step_name" test_swift_package_serialized
+            ;;
+        investigation-benchmarks)
+            run_step "$step_name" run_investigation_benchmarks
+            ;;
+        matcher-benchmarks)
+            run_step "$step_name" run_matcher_benchmarks
+            ;;
+        phase-b-product)
+            run_step "$step_name" scripts/verify-phase-b-gate --product-only
+            ;;
+        phase-c-product)
+            run_step "$step_name" scripts/verify-phase-c-gate --product-only
+            ;;
+        phase-c-signed-app-trash-receipt)
+            run_step "$step_name" \
+                scripts/verify-phase-c-gate --signed-app-trash-receipt
+            ;;
+        source-boundaries)
+            run_step "$step_name" verify_source_boundaries
+            ;;
+        automation-parser-self-test)
+            run_step "$step_name" scripts/verify-ui-automation-mode --self-test
+            ;;
+        app-tests-and-snapshots)
+            run_step "$step_name" test_app_and_snapshots
+            ;;
+        app-contract-tests)
+            run_step "$step_name" test_app_contracts
+            ;;
+        debug-app-build)
+            run_step "$step_name" build_debug_app
+            ;;
+        debug-app-sign)
+            run_step "$step_name" scripts/sign-local-app
+            ;;
+        app-bundle)
+            run_step "$step_name" scripts/verify-app-bundle
+            ;;
+        debug-release-fixture-boundary)
+            run_step "$step_name" scripts/verify-app-release-boundaries
+            ;;
+        localization-contract)
+            run_step "$step_name" verify_localization_contract
+            ;;
+        rule-compiler)
+            run_step "$step_name" scripts/verify-rule-compiler
+            ;;
+        verifier-contract)
+            run_step "$step_name" scripts/verify-contract
+            ;;
+        docs-and-diff)
+            run_step "$step_name" verify_docs_and_diff
+            ;;
+        *)
+            print -u2 "Unknown internal verification step: $step_name"
+            return 70
+            ;;
+    esac
+}
+
+for verification_step in "${selected_steps[@]}"; do
+    execute_step "$verification_step"
+done
+
+persist_timings
+print "Verification timings: $timing_file"
+if [[ "$step_was_selected" == true ]]; then
+    print \
+        "Verification diagnostic only step passed: $requested_step ($mode scope)."
+    print "Authoritative $mode verification was not run."
+else
+    print "Verification passed in $mode mode."
+fi

@@ -1,0 +1,151 @@
+import AppKit
+import SwiftUI
+
+struct RootView: View {
+    @Environment(StornautAppModel.self) private var appModel
+#if DEBUG
+    @Environment(\.openSettings) private var openSettings
+#endif
+    @State private var selection: AppDestination?
+
+    init() {
+#if DEBUG
+        _selection = State(
+            initialValue: DebugInitialDestination.selection(
+                arguments: CommandLine.arguments
+            )
+        )
+#else
+        _selection = State(initialValue: .overview)
+#endif
+    }
+
+    var body: some View {
+        NavigationSplitView {
+            VStack(spacing: 0) {
+                List(AppDestination.allCases, selection: $selection) { destination in
+                    Label(destination.title, systemImage: destination.systemImage)
+                        .tag(destination)
+                        .accessibilityIdentifier("sidebar.\(destination.rawValue)")
+                }
+                .listStyle(.sidebar)
+
+                Divider()
+
+                SettingsLink {
+                    Label("settings.title", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sidebar.settings")
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
+            .navigationTitle("app.name")
+            .navigationSplitViewColumnWidth(min: 210, ideal: 224, max: 240)
+        } detail: {
+            destinationContent(selection ?? .overview)
+        }
+        .frame(minWidth: 1_340, minHeight: 640)
+        .task {
+            async let page: Void = appModel.refreshIfNeeded()
+            async let settings: Void = appModel.refreshSettingsIfNeeded()
+            _ = await (page, settings)
+#if DEBUG
+            if CommandLine.arguments.contains(
+                "--stornaut-debug-open-settings"
+            ) {
+                openSettings()
+            }
+#endif
+        }
+#if DEBUG
+        .background {
+            ZStack {
+                if let color = LaunchAppearanceOverride.backgroundColor {
+                    color.ignoresSafeArea()
+                }
+                DebugAppStateProbe(phase: appModel.pageState.phase)
+                    .frame(width: 1, height: 1)
+                DebugScanStateProbe(phase: appModel.scanState.phase)
+                    .frame(width: 1, height: 1)
+                DebugHistoryStateProbe(
+                    phase: appModel.historyState.phase
+                )
+                .frame(width: 1, height: 1)
+                DebugReviewStateProbe(
+                    phase: appModel.reviewState.phase
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultStateProbe(
+                    phase: appModel.cleanupResultState.phase
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultOutcomeProbe(
+                    outcome: CleanupResultModel(
+                        state: appModel.cleanupResultState
+                    ).outcome
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultPersistenceProbe(
+                    persistence: CleanupResultModel(
+                        state: appModel.cleanupResultState
+                    ).manifestPersistence
+                )
+                .frame(width: 1, height: 1)
+                DebugCleanupResultSummaryProbe(
+                    model: CleanupResultModel(
+                        state: appModel.cleanupResultState
+                    )
+                )
+                .frame(width: 1, height: 1)
+            }
+        }
+#endif
+    }
+
+    @ViewBuilder
+    private func destinationContent(
+        _ destination: AppDestination
+    ) -> some View {
+        switch destination {
+        case .overview:
+            OverviewView(
+                model: OverviewModel(
+                    pageState: appModel.pageState,
+                    scanActivity: appModel.scanActivity
+                ),
+                openScan: {
+                    selection = .scan
+                },
+                retryLatestSnapshot: {
+                    Task {
+                        await appModel.refresh()
+                    }
+                }
+            )
+        case .scan:
+            ScanView()
+        case .history:
+            HistoryView {
+                selection = .scan
+            }
+        case .investigations:
+            DestinationPlaceholder(destination: destination)
+        }
+    }
+}
+
+private struct DestinationPlaceholder: View {
+    let destination: AppDestination
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(destination.title, systemImage: destination.systemImage)
+        } description: {
+            Text("placeholder.foundation")
+        }
+        .navigationTitle(destination.title)
+    }
+}

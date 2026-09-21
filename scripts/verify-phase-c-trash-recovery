@@ -1,0 +1,516 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+cd "$repo_root"
+
+sealed_receipt="$repo_root/docs/reports/evidence/epic-8-task-35-signed-trash-receipt.json"
+if [[ -s "$sealed_receipt" && ! -L "$sealed_receipt" ]]; then
+    print -u2 \
+        "Task 35 recovery mutation is sealed; verify the checked receipt instead."
+    exit 65
+fi
+
+if [[ $# != 2 ]]; then
+    print -u2 "Usage: $0 <retained-diagnostic-root> <validated-recovery-report-output>"
+    exit 64
+fi
+
+run_root=${1:A}
+output_report=${2:A}
+[[ -d "$run_root" && ! -L "$run_root" ]]
+[[ "$run_root:t" == stornaut-phase-c-trash.* ]]
+[[ "$(/usr/bin/stat -f '%u' "$run_root")" == "$EUID" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$run_root")" == 0700 ]]
+[[ ! -e "$output_report" && ! -L "$output_report" ]]
+[[ -d "$output_report:h" && ! -L "$output_report:h" ]]
+
+app="$repo_root/.derivedData/app/Build/Products/Debug/Stornaut.app"
+executable="$app/Contents/MacOS/Stornaut"
+[[ -d "$app" && ! -L "$app" && -x "$executable" ]]
+/usr/bin/codesign --verify --deep --strict "$app"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+    "$app/Contents/Info.plist")" == "com.eriklee.stornaut" ]]
+
+retained_config="$run_root/config.json"
+retained_report="$run_root/report.json"
+database="$run_root/support/com.eriklee.stornaut/Evidence.sqlite"
+for path in "$retained_config" "$retained_report" "$database"; do
+    [[ -s "$path" && ! -L "$path" ]]
+    [[ "$(/usr/bin/stat -f '%u' "$path")" == "$EUID" ]]
+    [[ "$(/usr/bin/stat -f '%Mp%Lp' "$path")" == 0600 ]]
+done
+
+recovery_opt_in=${STORNAUT_PHASE_C_TRASH_RECOVERY_OPT_IN:-}
+if ! /usr/bin/python3 - "$recovery_opt_in" <<'PY'
+import sys
+import uuid
+
+try:
+    value = uuid.UUID(sys.argv[1])
+except (ValueError, IndexError):
+    raise SystemExit(1)
+if str(value) != sys.argv[1]:
+    raise SystemExit(1)
+PY
+then
+    print -u2 \
+        "A fresh lowercase STORNAUT_PHASE_C_TRASH_RECOVERY_OPT_IN UUID is required."
+    exit 64
+fi
+
+recovery_nonce=$(/usr/bin/uuidgen | /usr/bin/tr '[:upper:]' '[:lower:]')
+recovery_config="$run_root/recovery-config-$recovery_nonce.json"
+recovery_report="$run_root/recovery-report-$recovery_nonce.json"
+recovery_preflight_error="$run_root/recovery-preflight-error-$recovery_nonce.json"
+for path in \
+    "$recovery_config" \
+    "$recovery_report" \
+    "$recovery_preflight_error"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || {
+        print -u2 "Refusing prior recovery artifact: $path"
+        exit 1
+    }
+done
+recovery_executable_sha=$(
+    /usr/bin/shasum -a 256 "$executable" | /usr/bin/awk '{print $1}'
+)
+retained_config_sha=$(
+    /usr/bin/shasum -a 256 "$retained_config" | /usr/bin/awk '{print $1}'
+)
+retained_report_sha=$(
+    /usr/bin/shasum -a 256 "$retained_report" | /usr/bin/awk '{print $1}'
+)
+database_sha=$(
+    /usr/bin/shasum -a 256 "$database" | /usr/bin/awk '{print $1}'
+)
+issued_at=$(/bin/date +%s)
+expires_at=$(( issued_at + 300 ))
+
+/usr/bin/python3 - \
+    "$run_root" \
+    "$retained_config" \
+    "$retained_report" \
+    "$database" \
+    "$recovery_config" \
+    "$recovery_report" \
+    "$recovery_nonce" \
+    "$recovery_opt_in" \
+    "$recovery_executable_sha" \
+    "$retained_config_sha" \
+    "$retained_report_sha" \
+    "$database_sha" \
+    "$issued_at" \
+    "$expires_at" <<'PY'
+import json
+import os
+import pathlib
+import sqlite3
+import stat
+import sys
+
+(
+    run_root,
+    retained_config_path,
+    retained_report_path,
+    database_path,
+    recovery_config_path,
+    recovery_report_path,
+    recovery_nonce,
+    recovery_opt_in,
+    recovery_executable_sha,
+    retained_config_sha,
+    retained_report_sha,
+    database_sha,
+    issued_at,
+    expires_at,
+) = sys.argv[1:]
+
+with open(retained_config_path, encoding="utf-8") as stream:
+    retained_config = json.load(stream)
+with open(retained_report_path, encoding="utf-8") as stream:
+    retained_report = json.load(stream)
+
+expected_config_keys = {
+    "schemaVersion",
+    "nonce",
+    "optInStatement",
+    "optInNonce",
+    "diagnosticRoot",
+    "fixtureRoot",
+    "applicationSupportBase",
+    "cachesBase",
+    "reportPath",
+    "expectedBundleIdentifier",
+    "expectedExecutableSHA256",
+    "expectedRelativePath",
+    "issuedAt",
+    "expiresAt",
+}
+if set(retained_config) != expected_config_keys:
+    raise SystemExit("Retained Trash config schema drifted.")
+if retained_config["diagnosticRoot"] != run_root:
+    raise SystemExit("Retained Trash config root mismatch.")
+if retained_config["reportPath"] != retained_report_path:
+    raise SystemExit("Retained Trash report path mismatch.")
+if retained_config["expectedRelativePath"] != ".npm/_cacache":
+    raise SystemExit("Retained Trash target mismatch.")
+if retained_config["expectedBundleIdentifier"] != "com.eriklee.stornaut":
+    raise SystemExit("Retained Trash bundle mismatch.")
+
+if (
+    retained_report.get("schemaVersion") != 2
+    or retained_report.get("nonce") != retained_config["nonce"]
+    or retained_report.get("outcome") != "signedAppTrashBlocked"
+    or retained_report.get("configured") is not True
+    or retained_report.get("planned") is not True
+    or retained_report.get("contained") is not False
+    or retained_report.get("restored") is not False
+    or retained_report.get("trashAttemptCount") != 1
+    or retained_report.get("originalIdentity")
+        != retained_report.get("destinationIdentity")
+    or retained_report.get("executableSHA256")
+        != retained_config["expectedExecutableSHA256"]
+    or retained_report.get("error") != "executionFailed"
+    or retained_report.get("errorStage") != "execution"
+    or retained_report.get("residual")
+        != {
+            "originalPresent": False,
+            "trashPresent": True,
+            "fixtureRootPresent": True,
+        }
+):
+    raise SystemExit("Retained Trash report is not the exact recovery candidate.")
+
+connection = sqlite3.connect(
+    f"file:{pathlib.Path(database_path).as_posix()}?mode=ro",
+    uri=True,
+)
+rows = connection.execute(
+    "SELECT id, stage, payload FROM cleanup_run_journals"
+).fetchall()
+connection.close()
+if len(rows) != 1:
+    raise SystemExit("Retained Store must contain exactly one cleanup journal.")
+journal_id, stage, payload_text = rows[0]
+journal = json.loads(payload_text)
+if (
+    stage != "actionOutcomeRecorded"
+    or journal.get("stage") != stage
+    or journal.get("id") != journal_id
+    or len(journal.get("entries", [])) != 1
+):
+    raise SystemExit("Retained cleanup journal is not recovery-only eligible.")
+entry = journal["entries"][0]
+outcome = entry.get("outcome")
+identity = retained_report["originalIdentity"]
+if (
+    entry.get("state") != "outcomeRecorded"
+    or entry.get("expectedIdentity") != identity
+    or not isinstance(outcome, dict)
+    or outcome.get("result") != "succeeded"
+    or outcome.get("recovery") != "movedToTrash"
+    or outcome.get("destinationIdentity") != identity
+    or outcome.get("measures", {}).get(
+        "permanentlyReleasedLogicalBytes"
+    )
+        != 0
+):
+    raise SystemExit("Retained cleanup journal outcome mismatch.")
+
+def file_identity(path):
+    information = os.lstat(path)
+    return {
+        "device": information.st_dev,
+        "inode": information.st_ino,
+        "mode": information.st_mode,
+        "ownerUserID": information.st_uid,
+        "ownerGroupID": information.st_gid,
+        "linkCount": information.st_nlink,
+        "size": information.st_size,
+        "allocatedBytes": information.st_blocks * 512,
+        "modificationSeconds": information.st_mtime_ns // 1_000_000_000,
+        "modificationNanoseconds": information.st_mtime_ns % 1_000_000_000,
+    }
+
+returned_trash = retained_report.get("returnedTrashPath")
+if not isinstance(returned_trash, str):
+    raise SystemExit("Retained Trash report omitted destination.")
+trash_path = pathlib.Path(returned_trash)
+expected_trash_parent = pathlib.Path.home() / ".Trash"
+if (
+    not trash_path.is_absolute()
+    or trash_path.parent != expected_trash_parent
+    or trash_path.name != "_cacache"
+    or file_identity(trash_path) != identity
+):
+    raise SystemExit("Retained Trash destination identity mismatch.")
+
+original_path = (
+    pathlib.Path(retained_config["fixtureRoot"])
+    / retained_config["expectedRelativePath"]
+)
+if original_path.exists() or original_path.is_symlink():
+    raise SystemExit("Original fixture unexpectedly exists before recovery.")
+parent_identity = file_identity(original_path.parent)
+if not stat.S_ISDIR(parent_identity["mode"]):
+    raise SystemExit("Original fixture parent is not a directory.")
+
+payload = {
+    "schemaVersion": 1,
+    "recoveryNonce": recovery_nonce,
+    "recoveryOptInStatement": (
+        "I authorize Stornaut Task 35 to recover the retained journal "
+        "and restore only its exact disposable fixture without another "
+        "Trash attempt."
+    ),
+    "recoveryOptInNonce": recovery_opt_in,
+    "diagnosticNonce": retained_config["nonce"],
+    "diagnosticRoot": run_root,
+    "retainedConfigPath": retained_config_path,
+    "retainedReportPath": retained_report_path,
+    "applicationSupportBase": retained_config["applicationSupportBase"],
+    "cachesBase": retained_config["cachesBase"],
+    "evidenceDatabasePath": database_path,
+    "recoveryReportPath": recovery_report_path,
+    "expectedBundleIdentifier": "com.eriklee.stornaut",
+    "expectedRecoveryExecutableSHA256": recovery_executable_sha,
+    "expectedOriginalExecutableSHA256":
+        retained_config["expectedExecutableSHA256"],
+    "expectedRetainedConfigSHA256": retained_config_sha,
+    "expectedRetainedReportSHA256": retained_report_sha,
+    "expectedDatabaseSHA256": database_sha,
+    "expectedRelativePath": retained_config["expectedRelativePath"],
+    "expectedJournalID": journal_id,
+    "expectedManifestID": journal["manifestID"],
+    "expectedOriginalIdentity": identity,
+    "expectedDestinationParentIdentity": parent_identity,
+    "expectedReturnedTrashPath": returned_trash,
+    "issuedAt": int(issued_at),
+    "expiresAt": int(expires_at),
+}
+
+descriptor = os.open(
+    recovery_config_path,
+    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+    0o600,
+)
+with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+    json.dump(payload, stream, sort_keys=True, indent=2)
+    stream.write("\n")
+PY
+
+[[ -s "$recovery_config" && ! -L "$recovery_config" ]]
+[[ "$(/usr/bin/stat -f '%u' "$recovery_config")" == "$EUID" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$recovery_config")" == 0600 ]]
+
+/usr/bin/open -W -n \
+    --env "STORNAUT_PHASE_C_TRASH_RECOVERY_OPT_IN=$recovery_opt_in" \
+    "$app" \
+    --args \
+    "--stornaut-phase-c-trash-recovery-config=$recovery_config"
+
+if [[ ! -e "$recovery_report" && -s "$recovery_preflight_error" \
+    && ! -L "$recovery_preflight_error" ]]; then
+    [[ "$(/usr/bin/stat -f '%u' "$recovery_preflight_error")" == "$EUID" ]]
+    [[ "$(/usr/bin/stat -f '%Mp%Lp' "$recovery_preflight_error")" == 0600 ]]
+    print -u2 "Phase C Trash recovery blocked during preflight:"
+    /bin/cat "$recovery_preflight_error" >&2
+    exit 1
+fi
+
+[[ -s "$recovery_report" && ! -L "$recovery_report" ]]
+[[ "$(/usr/bin/stat -f '%u' "$recovery_report")" == "$EUID" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$recovery_report")" == 0600 ]]
+
+/usr/bin/python3 - \
+    "$recovery_report" \
+    "$output_report" \
+    "$recovery_nonce" \
+    "$recovery_executable_sha" \
+    "$retained_config_sha" \
+    "$retained_report_sha" \
+    "$database_sha" \
+    "$database" \
+    "$retained_config" \
+    "$retained_report" <<'PY'
+import hashlib
+import json
+import os
+import pathlib
+import sqlite3
+import sys
+import time
+
+(
+    recovery_report_path,
+    output_report,
+    recovery_nonce,
+    recovery_executable_sha,
+    retained_config_sha,
+    retained_report_sha,
+    database_sha,
+    database_path,
+    retained_config_path,
+    retained_report_path,
+) = sys.argv[1:]
+
+with open(recovery_report_path, encoding="utf-8") as stream:
+    report = json.load(stream)
+with open(retained_config_path, encoding="utf-8") as stream:
+    retained_config = json.load(stream)
+with open(retained_report_path, encoding="utf-8") as stream:
+    retained_report = json.load(stream)
+
+expected_keys = {
+    "schemaVersion",
+    "recoveryNonce",
+    "diagnosticNonce",
+    "startedAt",
+    "finishedAt",
+    "outcome",
+    "bundleIdentifier",
+    "recoveryExecutablePath",
+    "recoveryExecutableSHA256",
+    "originalExecutableSHA256",
+    "retainedConfigSHA256",
+    "retainedReportSHA256",
+    "databaseSHA256BeforeRecovery",
+    "databaseSHA256AfterRecovery",
+    "expectedRelativePath",
+    "journalID",
+    "journalStageBeforeRecovery",
+    "journalStageAfterRecovery",
+    "manifestID",
+    "manifestRecordCount",
+    "succeededCount",
+    "failedCount",
+    "cancelledCount",
+    "unknownCount",
+    "selectedLogicalBytes",
+    "processedLogicalBytes",
+    "movedToTrashLogicalBytes",
+    "permanentlyReleasedLogicalBytes",
+    "retainedTrashAttemptCount",
+    "executorInvocationCount",
+    "restoreOutcome",
+    "originalPresent",
+    "trashPresent",
+    "error",
+    "limitations",
+}
+if set(report) != expected_keys:
+    raise SystemExit("Phase C recovery report schema drifted.")
+if (
+    report["schemaVersion"] != 1
+    or report["recoveryNonce"] != recovery_nonce
+    or report["diagnosticNonce"] != retained_config["nonce"]
+    or report["outcome"] != "signedAppTrashRecoveryReady"
+    or report["bundleIdentifier"] != "com.eriklee.stornaut"
+    or report["recoveryExecutableSHA256"] != recovery_executable_sha
+    or report["originalExecutableSHA256"]
+        != retained_config["expectedExecutableSHA256"]
+    or report["retainedConfigSHA256"] != retained_config_sha
+    or report["retainedReportSHA256"] != retained_report_sha
+    or report["databaseSHA256BeforeRecovery"] != database_sha
+    or report["expectedRelativePath"] != ".npm/_cacache"
+    or report["journalStageBeforeRecovery"] != "actionOutcomeRecorded"
+    or report["journalStageAfterRecovery"] != "finalized"
+    or report["retainedTrashAttemptCount"] != 1
+    or report["executorInvocationCount"] != 0
+    or report["restoreOutcome"] != "restored"
+    or report["originalPresent"] is not True
+    or report["trashPresent"] is not False
+    or report["error"] is not None
+):
+    raise SystemExit(f"Phase C recovery did not close safely: {report}")
+
+expected_counts = {
+    "manifestRecordCount": 1,
+    "succeededCount": 1,
+    "failedCount": 0,
+    "cancelledCount": 0,
+    "unknownCount": 0,
+    "permanentlyReleasedLogicalBytes": 0,
+}
+for key, expected in expected_counts.items():
+    if report[key] != expected:
+        raise SystemExit(f"Phase C recovery count mismatch: {key}.")
+selected = report["selectedLogicalBytes"]
+if (
+    not isinstance(selected, int)
+    or selected <= 0
+    or report["processedLogicalBytes"] != selected
+    or report["movedToTrashLogicalBytes"] != selected
+):
+    raise SystemExit("Phase C recovery accounting mismatch.")
+
+expected_limitations = {
+    "recovery-only continuation of one retained Trash attempt",
+    "no Executor or Trash replay",
+    "diagnostic-owned disposable fixture only",
+    "release distribution not evaluated",
+}
+if set(report["limitations"]) != expected_limitations:
+    raise SystemExit("Phase C recovery limitations are incomplete.")
+
+started = report["startedAt"]
+finished = report["finishedAt"]
+if (
+    not isinstance(started, (int, float))
+    or not isinstance(finished, (int, float))
+    or started > finished
+    or finished > time.time() + 5
+    or time.time() - started > 300
+):
+    raise SystemExit("Phase C recovery report time binding is invalid.")
+
+database_after = hashlib.sha256(
+    pathlib.Path(database_path).read_bytes()
+).hexdigest()
+if report["databaseSHA256AfterRecovery"] != database_after:
+    raise SystemExit("Phase C recovery database digest mismatch.")
+
+connection = sqlite3.connect(
+    f"file:{pathlib.Path(database_path).as_posix()}?mode=ro",
+    uri=True,
+)
+journals = connection.execute(
+    "SELECT id, stage, payload FROM cleanup_run_journals"
+).fetchall()
+manifests = connection.execute(
+    "SELECT id, payload FROM cleanup_manifests"
+).fetchall()
+connection.close()
+if (
+    len(journals) != 1
+    or journals[0][0] != report["journalID"]
+    or journals[0][1] != "finalized"
+    or len(manifests) != 1
+    or manifests[0][0] != report["manifestID"]
+):
+    raise SystemExit("Phase C recovery Store truth mismatch.")
+
+original = (
+    pathlib.Path(retained_config["fixtureRoot"])
+    / retained_config["expectedRelativePath"]
+)
+returned = pathlib.Path(retained_report["returnedTrashPath"])
+if not original.is_dir() or returned.exists() or returned.is_symlink():
+    raise SystemExit("Phase C recovery residual mismatch.")
+
+descriptor = os.open(
+    output_report,
+    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+    0o600,
+)
+with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+    json.dump(report, stream, sort_keys=True, indent=2)
+    stream.write("\n")
+PY
+
+[[ -s "$output_report" && ! -L "$output_report" ]]
+[[ "$(/usr/bin/stat -f '%Mp%Lp' "$output_report")" == 0600 ]]
+
+print "Signed App recovery-only journal finalization and restore passed."

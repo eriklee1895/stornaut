@@ -1,0 +1,80 @@
+#!/bin/zsh
+
+typeset -gr STORNAUT_XCODEBUILDMCP_VERSION="2.7.0"
+typeset -gr STORNAUT_PEEKABOO_VERSION="3.10.0"
+typeset -gr STORNAUT_PEEKABOO_ARCHIVE_SHA256="87af985e9617b9b6bc3f21036b5cc7d42c99293bd2df614b6d4e6872162787b3"
+typeset -gr STORNAUT_PEEKABOO_BINARY_SHA256="6a41bd8723326f02fa2006e3b4f67925ff2e36ea66c14e90cdf340058f2e046e"
+typeset -gr STORNAUT_PEEKABOO_DYLIB_SHA256="beb882008d3958b3e15c3065ef928833c0ade1ee2c4909762304401b80500e24"
+typeset -gr STORNAUT_PEEKABOO_TEAM_ID="FWJYW4S8P8"
+typeset -gr STORNAUT_PEEKABOO_TOOLS="image,see,inspect_ui,list,permissions"
+
+function stornaut_xcodebuildmcp_binary() {
+    print "$repo_root/tools/xcodebuildmcp/node_modules/.bin/xcodebuildmcp"
+}
+
+function stornaut_peekaboo_dir() {
+    print "$repo_root/.dev-tools/peekaboo/$STORNAUT_PEEKABOO_VERSION"
+}
+
+function stornaut_peekaboo_binary() {
+    print "$(stornaut_peekaboo_dir)/peekaboo"
+}
+
+function verify_xcodebuildmcp_install() {
+    local binary
+    binary=$(stornaut_xcodebuildmcp_binary)
+
+    if [[ ! -x "$binary" ]]; then
+        print -u2 "XcodeBuildMCP is not installed. Run scripts/bootstrap-dev-tools."
+        return 1
+    fi
+
+    local actual_version
+    actual_version=$("$binary" --version)
+    if [[ "$actual_version" != "$STORNAUT_XCODEBUILDMCP_VERSION" ]]; then
+        print -u2 "Unexpected XcodeBuildMCP version: $actual_version"
+        return 1
+    fi
+}
+
+function verify_peekaboo_install() {
+    local install_dir binary dylib
+    install_dir=$(stornaut_peekaboo_dir)
+    binary="$install_dir/peekaboo"
+    dylib="$install_dir/libswiftCompatibilitySpan.dylib"
+
+    if [[ ! -x "$binary" || ! -f "$dylib" ]]; then
+        print -u2 "Peekaboo is not installed. Run scripts/bootstrap-dev-tools."
+        return 1
+    fi
+
+    local binary_sha dylib_sha
+    binary_sha=$(shasum -a 256 "$binary" | awk '{ print $1 }')
+    dylib_sha=$(shasum -a 256 "$dylib" | awk '{ print $1 }')
+
+    if [[ "$binary_sha" != "$STORNAUT_PEEKABOO_BINARY_SHA256" ]]; then
+        print -u2 "Peekaboo binary checksum mismatch: $binary"
+        return 1
+    fi
+
+    if [[ "$dylib_sha" != "$STORNAUT_PEEKABOO_DYLIB_SHA256" ]]; then
+        print -u2 "Peekaboo compatibility library checksum mismatch: $dylib"
+        return 1
+    fi
+
+    codesign --verify --strict "$binary"
+
+    local team_id
+    team_id=$(codesign -d --verbose=4 "$binary" 2>&1 | sed -n 's/^TeamIdentifier=//p')
+    if [[ "$team_id" != "$STORNAUT_PEEKABOO_TEAM_ID" ]]; then
+        print -u2 "Unexpected Peekaboo signing team: $team_id"
+        return 1
+    fi
+
+    local version_output
+    version_output=$("$binary" --version)
+    if [[ "$version_output" != "Peekaboo $STORNAUT_PEEKABOO_VERSION "* ]]; then
+        print -u2 "Unexpected Peekaboo version: $version_output"
+        return 1
+    fi
+}

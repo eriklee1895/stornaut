@@ -1,0 +1,123 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root=${0:A:h:h}
+result_bundle=${1:-$repo_root/.derivedData/ui-tests.xcresult}
+output_dir=${2:-$repo_root/.derivedData/ui-screenshots}
+
+result_bundle=${result_bundle:A}
+output_dir=${output_dir:A}
+
+expected_result_bundle="$repo_root/.derivedData/ui-tests.xcresult"
+expected_output_dir="$repo_root/.derivedData/ui-screenshots"
+
+if [[ "$result_bundle" != "$expected_result_bundle" ]]; then
+    print -u2 "Refusing to read unexpected result bundle: $result_bundle"
+    exit 1
+fi
+
+if [[ "$output_dir" != "$expected_output_dir" ]]; then
+    print -u2 "Refusing to write unexpected screenshot directory: $output_dir"
+    exit 1
+fi
+
+rm -rf "$output_dir"
+
+xcrun xcresulttool export attachments \
+    --path "$result_bundle" \
+    --output-path "$output_dir"
+
+ruby -rjson -rfileutils - "$output_dir" <<'RUBY' || exit 1
+output_dir = ARGV.fetch(0)
+manifest_path = File.join(output_dir, "manifest.json")
+manifest = JSON.parse(File.read(manifest_path))
+
+attachments = manifest.flat_map { |entry| entry.fetch("attachments") }
+expected_names = %w[
+  stornaut-shell-light
+  stornaut-settings-light
+  stornaut-shell-dark
+  stornaut-settings-dark
+  stornaut-overview-limited
+  stornaut-overview-zh-Hans
+  stornaut-scan-progress-dark
+  stornaut-scan-partial-light
+  stornaut-scan-results-inspector-light
+  stornaut-review-default-light
+  stornaut-review-default-dark
+  stornaut-review-inspector-dark
+  stornaut-review-stale-dark
+  stornaut-review-empty-light
+  stornaut-review-zh-Hans
+  stornaut-cleanup-completed-light
+  stornaut-cleanup-completed-dark
+  stornaut-cleanup-manifest-light
+  stornaut-cleanup-partial-dark
+  stornaut-cleanup-audit-pending-dark
+  stornaut-cleanup-outcome-unknown-dark
+  stornaut-cleanup-zh-Hans
+  stornaut-history-populated-light
+  stornaut-history-expired-dark
+  stornaut-history-corrupt-light
+  stornaut-history-trend-dark
+  stornaut-settings-scanning-light
+  stornaut-settings-privacy-light
+  stornaut-settings-codex-dark
+  stornaut-settings-knowledge-dark
+]
+
+expected_names.each do |expected_name|
+  attachment = attachments.find do |candidate|
+    candidate.fetch("suggestedHumanReadableName").start_with?(expected_name)
+  end
+  abort("Missing UI screenshot attachment: #{expected_name}") unless attachment
+
+  source = File.join(output_dir, attachment.fetch("exportedFileName"))
+  destination = File.join(output_dir, "#{expected_name}.png")
+  FileUtils.cp(source, destination)
+end
+RUBY
+
+for screenshot in \
+    stornaut-shell-light.png \
+    stornaut-settings-light.png \
+    stornaut-shell-dark.png \
+    stornaut-settings-dark.png \
+    stornaut-overview-limited.png \
+    stornaut-overview-zh-Hans.png \
+    stornaut-scan-progress-dark.png \
+    stornaut-scan-partial-light.png \
+    stornaut-scan-results-inspector-light.png \
+    stornaut-review-default-light.png \
+    stornaut-review-default-dark.png \
+    stornaut-review-inspector-dark.png \
+    stornaut-review-stale-dark.png \
+    stornaut-review-empty-light.png \
+    stornaut-review-zh-Hans.png \
+    stornaut-cleanup-completed-light.png \
+    stornaut-cleanup-completed-dark.png \
+    stornaut-cleanup-manifest-light.png \
+    stornaut-cleanup-partial-dark.png \
+    stornaut-cleanup-audit-pending-dark.png \
+    stornaut-cleanup-outcome-unknown-dark.png \
+    stornaut-cleanup-zh-Hans.png \
+    stornaut-history-populated-light.png \
+    stornaut-history-expired-dark.png \
+    stornaut-history-corrupt-light.png \
+    stornaut-history-trend-dark.png \
+    stornaut-settings-scanning-light.png \
+    stornaut-settings-privacy-light.png \
+    stornaut-settings-codex-dark.png \
+    stornaut-settings-knowledge-dark.png; do
+    test -f "$output_dir/$screenshot"
+done
+
+for crash_report in "$output_dir"/*.ips(N); do
+    if head -1 "$crash_report" | rg -q '"app_name":"Stornaut"|"bundleID":"com\.eriklee\.stornaut"'; then
+        print -u2 "Stornaut crash attachment found: $crash_report"
+        exit 1
+    fi
+done
+
+print "UI screenshots exported to: $output_dir"

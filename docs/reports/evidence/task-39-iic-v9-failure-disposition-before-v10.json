@@ -1,0 +1,116 @@
+{
+  "admission" : "rejected",
+  "artifactSHA256" : {
+    "01-preflight/source-build.json" : "3f7e005c8308f5704450e383b6c4f188c41efb35145d6360d58d34483c1d89ff",
+    "02-install/installed.json" : "b916ad26c70aebcbbda7f8ecb6789192068851b9f4a9b2fe0becaf48d3e52047",
+    "03-authorization/attempt-event-0001.bin" : "2147b015c2f93c7fc5ccf4be1600ced29c2a20a03d5d915ba0d2a678308f19a8",
+    "03-authorization/attempt-event-0002.bin" : "3e2c1668058fee096c6d1c85d1b56a1f944b5c4e638d59ddd19e8cc99ef972c8",
+    "03-authorization/attempt-event-0003.bin" : "6cf1c6abf3c09abdf1336c9e823342aa8af3a9abc547fdea03571b497d9d84e6",
+    "03-authorization/attempt-event-0004.bin" : "7b1a160ded5c3f70e4033b05ecd36b7c3dc999534329f32ac85b93a281cebda4",
+    "03-authorization/capability-counts.json" : "84cdb8064ca681d08ee56eb0b6e91994a3db2379d249b8f4670cf6cff5c23921",
+    "03-authorization/human-attestation.json" : "f9ab6e3ed22494a4f6fbb5ce211a329e2370231f0e565708ec8689fda3fbd798",
+    "03-authorization/policy-probe.json" : "e8712a44514e56b8eecf17ab7d8947f3832d3814bda21f0d33a6781e72aab23a"
+  },
+  "attemptUUID" : "b856e976-e74a-4f6d-9079-0d6859fab67d",
+  "campaignUUID" : "fd4bac12-d40d-4470-b6d2-7dcd0f1661d0",
+  "classification" : "consumedDriverExecutionPolicyDenial",
+  "domain" : "stornaut.task39.iic.failure-disposition.v3",
+  "eventChain" : [
+    "prepared",
+    "armedConsumed",
+    "spawnUncertain",
+    "terminal"
+  ],
+  "evidenceSetSHA256" : "e667c03a4e7c9f61f893cb9174e7d27746fc50e2c96df2af8f4ca8c97289d6a7",
+  "nonClaims" : [
+    "no manifest or external seal",
+    "no uninstall or global post-teardown artifact",
+    "no machine admission",
+    "no L3c3d authenticated model success",
+    "no Task 39 readiness",
+    "no verified recovery of removed Gate capsule",
+    "owner-lock-only state is not successful campaign cleanup"
+  ],
+  "parentIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "515639987",
+    "size" : "96"
+  },
+  "postDispositionMutation" : {
+    "classification" : "testFixtureStaleRecoveryRemovedConsumedGateResidue",
+    "observedAtUTC" : "2026-09-07T09:57:23Z",
+    "priorDispositionSHA256" : "9a1af7d3c2750429b660be92805bb5f51b43da75360cfc05618899dd34b44252",
+    "recoverySearchResult" : "exactCapsuleBytesUnavailable",
+    "schemaVersion" : 1,
+    "source" : "swiftTestingSerialRegression",
+    "testName" : "userOwnedTemporaryGateFailsClosedBeforeSpawn",
+    "testSuite" : "Investigation fixed gate handoff physical evidence",
+    "verifierRejection" : "consumed Gate attempt absent"
+  },
+  "priorGateResidueObservation" : {
+    "gateAttemptName" : "attempt-b856e976-e74a-4f6d-9079-0d6859fab67d",
+    "gateCapsuleByteCount" : 28997,
+    "gateCapsuleName" : "projected-cohort-c4e325d6a26ffb7b9eb074bd665d9fd7b84a2efe85c1e0b748486bce974b30eb.bin",
+    "gateCapsuleSHA256" : "74be60f6fab16aba9e73fc090bbcf6c38def74726473b8ddc61ca5d7b84459f8"
+  },
+  "requiredMissingArtifacts" : [
+    "manifest.bin",
+    "../seal.json",
+    "04-driver-epochs/coordinator-receipt.bin",
+    "04-driver-epochs/diagnostic-output.bin",
+    "05-uninstall/uninstall.json",
+    "06-verifier/global-post-teardown.json",
+    "06-verifier/verification-input.json"
+  ],
+  "retry" : "forbidden",
+  "rootCauseObservation" : {
+    "driverAdHoc" : true,
+    "driverEntitlementKeys" : [
+      "com.apple.application-identifier"
+    ],
+    "driverExecutableSHA256" : "e748a5171481a70e44864a4a9d8e6cd19d19d539bbd2731fff2f30be8633b676",
+    "driverSigningIdentifier" : "com.eriklee.stornaut.investigation.machine-driver",
+    "errorCode" : -423,
+    "errorDomain" : "AppleMobileFileIntegrityError",
+    "observedAtUTC" : "2026-09-07T01:31:20.854626Z",
+    "process" : "/usr/libexec/amfid",
+    "reason" : "adhocSignedOrUnknownCertificateChain",
+    "source" : "macOSUnifiedLog"
+  },
+  "rootIdentity" : {
+    "device" : "16777229",
+    "generation" : "0",
+    "inode" : "515639988",
+    "size" : "256"
+  },
+  "schemaVersion" : 3,
+  "sourceBinding" : {
+    "attemptUUID" : "b856e976-e74a-4f6d-9079-0d6859fab67d",
+    "buildProvenanceSHA256" : "b70accb75a5fe676cd848ca416cebda6dfd8ac2fffc23e347b83c65e31d7fec9",
+    "campaignUUID" : "fd4bac12-d40d-4470-b6d2-7dcd0f1661d0",
+    "canonicalSourceManifestSHA256" : "7cfa85ed06fd0ba283608f4234dd6f49a32a0ab417876055c3be3a75b3f20431",
+    "preArmFrameSHA256" : "e667c03a4e7c9f61f893cb9174e7d27746fc50e2c96df2af8f4ca8c97289d6a7",
+    "repositoryHEAD" : "55c574d21449ca38838ee6b219c219e6671fe5b9",
+    "repositoryTree" : "da258decb2e12fd7c935a502090ef5fff125beb8",
+    "role" : "sourceBuildIdentity",
+    "schemaVersion" : 1,
+    "signedRuntimeBindingSHA256" : "9d7844cac8223dfa328c63b7778ac1c66da0ac9867e76a35104b3f522f6fea69"
+  },
+  "systemObservation" : {
+    "fixedPathsAbsent" : true,
+    "fixedProcessCount" : 0,
+    "fixedServiceAbsent" : true,
+    "gateBaseChangeTimeNanoseconds" : "1788779295142023470",
+    "gateBaseDevice" : "16777229",
+    "gateBaseGeneration" : "0",
+    "gateBaseInode" : "499810932",
+    "gateBaseState" : "ownConsumedAttemptRemovedByTestFixture",
+    "ownerLockChangeTimeNanoseconds" : "1787992800592752249",
+    "ownerLockDevice" : "16777229",
+    "ownerLockGeneration" : "0",
+    "ownerLockInode" : "499810933",
+    "ownerLockSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "verifierExecutableSHA256" : "848955e1ea62e194990163558f8217c47ad28b85bd4a8a6d1de0660b35ef40e1"
+}

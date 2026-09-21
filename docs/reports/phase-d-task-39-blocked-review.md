@@ -1,0 +1,91 @@
+# Phase D Task 39 blocked/no-go gate audit
+
+> Status: failure disposition complete / Task 39 blocked and incomplete
+>
+> Date: 2026-09-05
+>
+> Implementation baseline before disposition: `700bb5e85cd8a4f523171d5b964412b1b8ac12b4`
+>
+> Historical status note: this audit closed the v8 result. The user later
+> authorized one fresh replacement v9 and, after v9's consumed no-go, one
+> independent v10 campaign; v11 also ran and failed. The preserved-capsule
+> repair completed and the user rebound one fresh v12 campaign to `0a17726`.
+> v12 subsequently ran once from `212320f` and is consumed/non-admitting/
+> non-retryable after post-arm authorization-path deadline exhaustion; its bounded repair is
+> complete/non-admitting；persistent Gate P1/P2 later completed. Fresh v13 ran
+> once from pushed descendant `8885161` and is consumed/non-admitting/
+> non-retryable after a closed post-arm failure.
+> The v14 authorization from `d5a7df3` was stopped before launch by the exact
+> v13 preservation P0. It is superseded/unconsumed; the prerequisite is complete/
+> non-admitting. Fresh v15 based on `facf3ea` was stopped before launch by
+> aggregate scope/xattr evidence gaps and is superseded/unconsumed. The fixes
+> are pushed at `103a4836` and verified/non-admitting; v16 subsequently ran once
+> and is consumed/non-admitting/non-retryable after the checked closed failure.
+> Task 39 remains incomplete. v17 was authorized from `a69bd33` but is
+> superseded-before-launch/unconsumed after external v13 TMPDIR evidence loss;
+> Task 40
+> remains blocked.
+
+## Outcome
+
+Task 39's implementation and non-privileged verification work to this point is
+complete. The machine gate is not Ready: the only authorized privileged
+campaign, v8, reached
+`armedConsumed` and then ended with `spawnUncertain`. Its exact classification
+is `consumedTransportLoss`, so the attempt is non-admitting and non-retryable.
+
+The root cause was repaired in current source and passed the focused, 1,924-test
+serial, source/mutation, Debug/Release component and independent-review gates.
+That repair does not alter the historical v8 result and does not authorize a
+replacement campaign.
+
+The dedicated
+[`v8 failure disposition`](phase-d-task-39b2c-iic-v8-failure-disposition.md)
+validates the preserved evidence and current system state without writing the
+evidence root. It leaves ADR 0018 Proposed, `signedInvestigationRuntimeReady`
+unissued and production Deep Dive unavailable.
+
+## L3c3d and L3c4
+
+The existing contracts require L3c3d to run only after a green ii-c machine
+cohort and require L3c4 to revalidate that cohort before readiness. v8 has no
+manifest, external seal, uninstall artifact or global post-teardown artifact,
+so it cannot satisfy either condition. Running a standalone model call would not
+be L3c3d evidence because it would lack the same installed topology, nonce and
+three-plane binding.
+
+Accordingly:
+
+- L3c3d authenticated real-model success is unproven;
+- L3c4 readiness and its reserved authoritative full are not run;
+- no Ready receipt is created;
+- no replacement privileged attempt was created by this v8 disposition; and
+- no missing v8 artifact is reconstructed or appended.
+
+This is the final v8 gate result under the authorization at that time. It is a
+completed negative evaluation, not Task 39 completion or successful runtime
+admission.
+
+## Successor plan
+
+Under the approved sequential plan, Task 40 remains blocked on a pushed Task 39
+Ready baseline. Starting it from this failed gate would require an explicit plan
+amendment; this audit does not grant one.
+
+Task 44 remains the only normal-product admission gate. Its `go` path continues
+to require a fresh successful, explicitly authorized machine cohort and real
+signed-App Codex vertical slice. Without that evidence it must publish `blocked`
+and retain `.implementationUnavailable`.
+
+## Validation
+
+- real v8 read-only failure verifier: passed;
+- six focused failure-disposition tests, including alias, fake-`HOME` and shared-
+  ancestor-churn coverage plus frozen-v8 integration: passed;
+- failure-disposition structural boundary: passed;
+- full CampaignEvidence focused suite: passed before final review fixes; the
+  directly affected five-test slice passed again after all fixes;
+- documentation links and diff hygiene: passed before final commit;
+- independent review: no unresolved P0--P2 after any findings were closed;
+- authoritative `scripts/verify --full`: intentionally not run because L3c4's
+  green-machine-cohort precondition is false.

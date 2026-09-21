@@ -1,0 +1,425 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "protected-browser-arc-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Arc/User Data/Default/History",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-browser-arc-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Arc/User Data Backup/History",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-browser-brave-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/BraveSoftware/Brave-Browser/Default/History",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-browser-brave-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/BraveSoftware/Brave-Browser-Backup/History",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-browser-chrome-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Google/Chrome/Default/History",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-browser-chrome-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Google/Chrome Canary/Default/History",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-browser-edge-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Microsoft Edge/Default/History",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-browser-edge-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Microsoft Edge Beta/Default/History",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-browser-firefox-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Firefox/Profiles/example.default",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-browser-firefox-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Firefox/ProfileSnapshots/example",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-browser-safari-positive",
+      "scope": "homeRelative",
+      "path": "Library/Safari/History.db",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-browser-safari-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Safari Preview/History.db",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-aws-positive",
+      "scope": "homeRelative",
+      "path": "Projects/example/.aws/credentials",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-aws-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/.aws-backup/README.md",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-azure-positive",
+      "scope": "homeRelative",
+      "path": ".azure/accessTokens.json",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-azure-lookalike",
+      "scope": "homeRelative",
+      "path": ".azure-samples/README.md",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-docker-positive",
+      "scope": "homeRelative",
+      "path": ".docker/config.json",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-docker-lookalike",
+      "scope": "homeRelative",
+      "path": ".docker-examples/config.json",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-gcloud-positive",
+      "scope": "homeRelative",
+      "path": ".config/gcloud/application_default_credentials.json",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-gcloud-lookalike",
+      "scope": "homeRelative",
+      "path": ".config/gcloud-samples/README.md",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-gh-positive",
+      "scope": "homeRelative",
+      "path": ".config/gh/hosts.yml",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-gh-lookalike",
+      "scope": "homeRelative",
+      "path": ".config/gh-examples/hosts.yml",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-gnupg-positive",
+      "scope": "homeRelative",
+      "path": ".gnupg/private-keys-v1.d/key",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-gnupg-lookalike",
+      "scope": "homeRelative",
+      "path": ".gnupg-archive/README.md",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-keychains-positive",
+      "scope": "homeRelative",
+      "path": "Library/Keychains/login.keychain-db",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-keychains-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Keychains Backup/README.md",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-kubernetes-positive",
+      "scope": "homeRelative",
+      "path": "Projects/example/.kube/config",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-kubernetes-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/.kube-samples/config",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-op-positive",
+      "scope": "homeRelative",
+      "path": ".config/op/config",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-op-lookalike",
+      "scope": "homeRelative",
+      "path": ".config/op-examples/config",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-credential-ssh-positive",
+      "scope": "homeRelative",
+      "path": "Projects/example/.ssh/id_ed25519",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-credential-ssh-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/.ssh-backup/id_ed25519.pub",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-password-1password-config-positive",
+      "scope": "homeRelative",
+      "path": ".config/1Password/settings",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-password-1password-config-lookalike",
+      "scope": "homeRelative",
+      "path": ".config/1Password Examples/settings",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-password-1password-library-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/1Password/settings",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-password-1password-library-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/1Password Backup/settings",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-password-bitwarden-config-positive",
+      "scope": "homeRelative",
+      "path": ".config/Bitwarden/data.json",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-password-bitwarden-config-lookalike",
+      "scope": "homeRelative",
+      "path": ".config/Bitwarden Examples/data.json",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-password-bitwarden-library-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Bitwarden/data.json",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-password-bitwarden-library-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/Bitwarden Backup/data.json",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-password-lastpass-positive",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/LastPass/data",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-password-lastpass-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Application Support/LastPass Backup/data",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-personal-mail-positive",
+      "scope": "homeRelative",
+      "path": "Library/Mail/V10/message.emlx",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-personal-mail-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Mail Archive/message.emlx",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-personal-messages-positive",
+      "scope": "homeRelative",
+      "path": "Library/Messages/chat.db",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-personal-messages-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Messages Export/chat.txt",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-personal-photos-container-positive",
+      "scope": "homeRelative",
+      "path": "Library/Photos/Libraries.photoslibrary/database",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-personal-photos-container-lookalike",
+      "scope": "homeRelative",
+      "path": "Library/Photos Export/database",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-personal-photos-library-positive",
+      "scope": "homeRelative",
+      "path": "Pictures/Photos Library.photoslibrary/database",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-personal-photos-library-lookalike",
+      "scope": "homeRelative",
+      "path": "Pictures/Photos Library.photoslibrary.backup/database",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-secret-credentials-json-positive",
+      "scope": "homeRelative",
+      "path": "Projects/example/credentials.json",
+      "expected": "secretFile"
+    },
+    {
+      "id": "protected-secret-credentials-json-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/credentials.json.example",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-secret-env-positive",
+      "scope": "homeRelative",
+      "path": "Projects/example/.env",
+      "expected": "secretFile"
+    },
+    {
+      "id": "protected-secret-env-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/environment.example",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-secret-private-key-positive",
+      "scope": "homeRelative",
+      "path": "Projects/example/private.key",
+      "expected": "secretFile"
+    },
+    {
+      "id": "protected-secret-private-key-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/private.keys",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-mail-unicode-case-collision",
+      "scope": "homeRelative",
+      "path": "Library/MAİL/V10/message.emlx",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-mail-mixed-case-collision",
+      "scope": "homeRelative",
+      "path": "LiBrArY/mAiL/V10/message.emlx",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-applications-positive",
+      "scope": "absolute",
+      "path": "/Applications/Utilities",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-applications-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/Applications/Utilities",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-system-library-positive",
+      "scope": "absolute",
+      "path": "/Library/Preferences",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-library-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/Library/Preferences",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-system-opt-positive",
+      "scope": "absolute",
+      "path": "/opt/homebrew/bin",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-opt-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/opt/homebrew/bin",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-system-private-positive",
+      "scope": "absolute",
+      "path": "/private/etc",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-private-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/private/etc",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-system-system-positive",
+      "scope": "absolute",
+      "path": "/System/Library/CoreServices",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-system-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/System/Library",
+      "expected": "allowed"
+    },
+    {
+      "id": "protected-system-usr-positive",
+      "scope": "absolute",
+      "path": "/usr/bin",
+      "expected": "sensitiveDirectory"
+    },
+    {
+      "id": "protected-system-usr-lookalike",
+      "scope": "homeRelative",
+      "path": "Projects/example/usr/bin",
+      "expected": "allowed"
+    }
+  ]
+}

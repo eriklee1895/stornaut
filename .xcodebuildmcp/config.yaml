@@ -1,0 +1,13 @@
+schemaVersion: 1
+sentryDisabled: true
+enabledWorkflows:
+  - macos
+  - project-discovery
+  - swift-package
+  - coverage
+sessionDefaults:
+  projectPath: ./Stornaut.xcodeproj
+  scheme: Stornaut
+  configuration: Debug
+  derivedDataPath: ./.derivedData/xcodebuildmcp
+  arch: arm64

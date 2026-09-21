@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "safe-execution-v1",
+  "ruleCatalogVersion": "builtin-runtime-tool-residue-v2",
+  "profiles": [
+    {
+      "id": "phase-c.go-build-cache-v1",
+      "ruleID": "cache-go-build",
+      "relativePath": "Library/Caches/go-build",
+      "expectedKind": "directory",
+      "resolverBindings": [
+        {
+          "key": "evidence.cache.layout",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.cache.reclaimable",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.cache.tool-owned",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.scope.user-owned",
+          "resolver": "currentFilesystem"
+        },
+        {
+          "key": "activity.process.inactive",
+          "resolver": "currentActivity"
+        }
+      ],
+      "processSubjects": {
+        "bundleIdentifiers": [],
+        "exactNames": [
+          "go",
+          "compile",
+          "link",
+          "asm",
+          "cgo"
+        ],
+        "versionedFamilies": []
+      },
+      "defaultSuggestion": "never",
+      "fixtureIDs": [
+        "cache-go-build-positive",
+        "cache-go-build-active",
+        "cache-go-build-config",
+        "cache-go-build-other"
+      ]
+    },
+    {
+      "id": "phase-c.npm-cacache-v1",
+      "ruleID": "cache-npm-content",
+      "relativePath": ".npm/_cacache",
+      "expectedKind": "directory",
+      "resolverBindings": [
+        {
+          "key": "evidence.cache.layout",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.cache.reclaimable",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.cache.tool-owned",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.scope.user-owned",
+          "resolver": "currentFilesystem"
+        },
+        {
+          "key": "activity.process.inactive",
+          "resolver": "currentActivity"
+        }
+      ],
+      "processSubjects": {
+        "bundleIdentifiers": [],
+        "exactNames": [
+          "node",
+          "npm",
+          "npx",
+          "corepack"
+        ],
+        "versionedFamilies": []
+      },
+      "defaultSuggestion": "readyWhenEligible",
+      "fixtureIDs": [
+        "cache-npm-content-positive",
+        "cache-npm-content-active",
+        "cache-npm-content-config",
+        "cache-npm-content-other"
+      ]
+    },
+    {
+      "id": "phase-c.pip-cache-v1",
+      "ruleID": "cache-pip",
+      "relativePath": "Library/Caches/pip",
+      "expectedKind": "directory",
+      "resolverBindings": [
+        {
+          "key": "evidence.cache.layout",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.cache.reclaimable",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.cache.tool-owned",
+          "resolver": "compilerAttested"
+        },
+        {
+          "key": "evidence.scope.user-owned",
+          "resolver": "currentFilesystem"
+        },
+        {
+          "key": "activity.process.inactive",
+          "resolver": "currentActivity"
+        }
+      ],
+      "processSubjects": {
+        "bundleIdentifiers": [],
+        "exactNames": [
+          "python",
+          "pip"
+        ],
+        "versionedFamilies": [
+          "python",
+          "pip"
+        ]
+      },
+      "defaultSuggestion": "readyWhenEligible",
+      "fixtureIDs": [
+        "cache-pip-positive",
+        "cache-pip-active",
+        "cache-pip-config",
+        "cache-pip-other"
+      ]
+    }
+  ]
+}

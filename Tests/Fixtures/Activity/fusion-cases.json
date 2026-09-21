@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "all-required-inactive",
+      "baseDisposition": "reviewRecommended",
+      "requiredKeys": [
+        "activity.git.clean",
+        "activity.git.upstream-synced",
+        "activity.process.inactive"
+      ],
+      "observations": [
+        {
+          "key": "activity.git.clean",
+          "state": "satisfied",
+          "source": "git",
+          "origin": "external",
+          "observedAt": 1786310000000
+        },
+        {
+          "key": "activity.git.upstream-synced",
+          "state": "satisfied",
+          "source": "git",
+          "origin": "external",
+          "observedAt": 1786310000000
+        },
+        {
+          "key": "activity.process.inactive",
+          "state": "satisfied",
+          "source": "runningApplication",
+          "origin": "external",
+          "observedAt": 1786310000000
+        }
+      ],
+      "expectedDisposition": "reviewRecommended",
+      "expectedMissing": []
+    },
+    {
+      "id": "dirty-git-protects",
+      "baseDisposition": "reviewRecommended",
+      "requiredKeys": [
+        "activity.git.clean",
+        "activity.process.inactive"
+      ],
+      "observations": [
+        {
+          "key": "activity.git.clean",
+          "state": "contradicted",
+          "source": "git",
+          "origin": "external",
+          "observedAt": 1786310000000
+        },
+        {
+          "key": "activity.process.inactive",
+          "state": "satisfied",
+          "source": "runningProcess",
+          "origin": "external",
+          "observedAt": 1786310000000
+        }
+      ],
+      "expectedDisposition": "protected",
+      "expectedMissing": []
+    },
+    {
+      "id": "missing-provider-is-unknown",
+      "baseDisposition": "reviewRecommended",
+      "requiredKeys": [
+        "activity.git.clean",
+        "activity.process.inactive"
+      ],
+      "observations": [
+        {
+          "key": "activity.git.clean",
+          "state": "unavailable",
+          "source": "git",
+          "origin": "external",
+          "observedAt": 1786310000000
+        },
+        {
+          "key": "activity.process.inactive",
+          "state": "satisfied",
+          "source": "runningApplication",
+          "origin": "external",
+          "observedAt": 1786310000000
+        }
+      ],
+      "expectedDisposition": "unknown",
+      "expectedMissing": [
+        "activity.git.clean"
+      ]
+    },
+    {
+      "id": "conflict-prefers-active",
+      "baseDisposition": "reviewRecommended",
+      "requiredKeys": [
+        "activity.process.inactive"
+      ],
+      "observations": [
+        {
+          "key": "activity.process.inactive",
+          "state": "satisfied",
+          "source": "runningApplication",
+          "origin": "external",
+          "observedAt": 1786310000000
+        },
+        {
+          "key": "activity.process.inactive",
+          "state": "contradicted",
+          "source": "runningProcess",
+          "origin": "external",
+          "observedAt": 1786310001000
+        }
+      ],
+      "expectedDisposition": "protected",
+      "expectedMissing": []
+    }
+  ]
+}

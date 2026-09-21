@@ -1,0 +1,369 @@
+# Epic 3 Production Quick Scan Upstream Study
+
+> 状态：Accepted as the study gate for Epic 3 Tasks 12–13 and 20
+>
+> 日期：2026-08-09
+>
+> Coding Agent：TRAE CLI
+>
+> 目标模块：production Surveyor、streaming、partial/cancel、volume baseline、Space Ledger
+
+## 1. Executive Conclusion
+
+Production Quick Scan should evolve the validated Epic 1 Swift Surveyor rather
+than replace it:
+
+- retain bounded GCD/POSIX traversal, no-follow and same-device defaults;
+- separate immutable path facts from transient progress events;
+- persist facts in bounded batches instead of retaining a whole object graph;
+- use a session state machine with explicit completed, partial, cancelled and
+  failed terminal states;
+- keep five approved UI stages stable while internal traversal remains dynamic;
+- sample volume capacity/free space through Foundation as separately timestamped
+  observations;
+- never derive Free or reclaimable bytes from raw entry sums;
+- preserve permission/race/mount gaps as typed Unmeasurable/partial evidence;
+- enforce one active Quick Scan and zero Codex/Adapter/cleanup dependencies.
+
+No upstream code or taxonomy is copied. This study revalidates the exact
+commits used by the accepted Epic 1 Surveyor study and records only the
+production deltas.
+
+## 2. Upstream Snapshots
+
+| Source | Version/commit | License | Material read |
+| --- | --- | --- | --- |
+| [Mole](https://github.com/tw93/Mole) | `e83f44f8ca56bb49f93c0479c82a984601b22d5d` | GPL-3.0 | `cmd/analyze/scanner.go`, `live_scan.go`, `model.go`, `cache.go`, `scanner_test.go` |
+| [ClearDisk](https://github.com/bysiber/cleardisk) | tag `v1.9.0`, `1aaec92b91c40fdc0c2fce92fef20df08b5f5c43` | MIT | `Sources/ClearDisk/DiskMonitor.swift`, `MainView.swift`, README |
+| [kondo](https://github.com/tbillington/kondo) | `1d351ca80b3d3adfad9bbe7db872c27359190210` | MIT | `kondo-lib/src/lib.rs`, manifests, README |
+| Apple Foundation | Xcode 26.6 / macOS 26.5 SDK | Apple documentation terms | `URLResourceValues` volume capacity APIs, `FileManager.attributesOfFileSystem`, [Files and directories](https://developer.apple.com/documentation/technologyoverviews/files-and-directories) |
+| Stornaut Epic 1 | commit `a043188753d4777cfa3d26900b387312c863393f` | MIT | [Surveyor study](epic-1-surveyor.md), [ADR 0005](../adr/0005-swift-surveyor-performance.md), tests and benchmark |
+
+### Source fingerprints
+
+| File | SHA-256 |
+| --- | --- |
+| Mole `scanner.go` | `d89a94421c57ee35c4dda37acd3013ad40c23eef2be68b8a0c3b4198b5dc303b` |
+| Mole `live_scan.go` | `d3962a729a2409cabe54baa41fc43383382dded17d983088ca98f91ba6d52468` |
+| ClearDisk `DiskMonitor.swift` | `4e0d766d3f6be1989e7d71efe2104461823c767fcb80735c10f08b18788cc7fb` |
+| ClearDisk `MainView.swift` | `9314b5dce074d52cbbd87c3102e92a9344b196443c7167f4c3cdae877999b82f` |
+| kondo `kondo-lib/src/lib.rs` | `0ddd4a6e218e3c3a67f37eb7f1f393b946b6b9bf9e907270cdede0409e540d64` |
+
+The commits and key scanner fingerprints match the 2026-08-09 Epic 1 study;
+no upstream drift requires revisiting the Swift performance decision.
+
+## 3. Observed Upstream Behavior
+
+### 3.1 Mole
+
+Useful:
+
+- separates entry, recursive walker, `du`, queue and fallback budgets;
+- streams initial rows and child updates;
+- uses explicit context cancellation;
+- deduplicates hard links by `(device,inode)`;
+- avoids persisting scan-order-dependent hard-link cache results;
+- bounds top-N and queue memory separately.
+
+Rejected:
+
+- GPL implementation reuse;
+- shell/Spotlight/`du` as the production scanner;
+- cache reuse before Stornaut has stable snapshot identity/invalidation;
+- cleanup and scan in one module;
+- treating a successfully measured path size as reclaimability.
+
+### 3.2 ClearDisk
+
+Useful:
+
+- allocated-size awareness for sparse files;
+- prevents overlapping scans;
+- keeps project/cache results understandable in a native UI;
+- history-clear wording distinguishes deleting records from restoring files.
+
+Rejected:
+
+- serial recursive scanning and swallowed `try?` errors;
+- menu-bar lifecycle and background/predictive behavior;
+- removing result rows before executor success;
+- broad "safe cache" labels without Stornaut evidence/activity gates;
+- coupling UI state to disk mutation.
+
+### 3.3 kondo
+
+Useful:
+
+- explicit `follow_symlinks` and `same_file_system`;
+- shared project-detection core;
+- stopping at project boundaries can prevent nested double counting;
+- artifact taxonomy provides fixture ideas.
+
+Rejected:
+
+- Rust introduction after Swift met the measured gate;
+- direct recursive deletion;
+- logical-only directory sizing and dropped traversal errors;
+- static project cleanup as a substitute for a volume ledger.
+
+## 4. Foundation Volume Baseline Evidence
+
+A read-only Task 9 probe sampled `/` through current Foundation APIs:
+
+```text
+volumeTotalCapacity                  494,384,795,648
+volumeAvailableCapacity               80,288,444,416
+volumeAvailableCapacityForImportant   82,639,392,992
+volumeAvailableCapacityForOpportunistic
+                                      68,634,177,406
+volumeIsReadOnly                       false
+FileManager.systemSize              494,384,795,648
+FileManager.systemFreeSize            80,288,440,320
+```
+
+The two general free-space APIs differed slightly even in one process, and
+"important" versus "opportunistic" capacity differed by many gigabytes. This
+is direct evidence that:
+
+- Free requires a source label and sample time;
+- different capacity semantics cannot be collapsed into one unexplained number;
+- path-snapshot sums cannot replace a volume API;
+- an accounting reconciliation must tolerate live changes between samples.
+
+## 5. Production Quick Scan Brief
+
+### Session state
+
+```text
+idle
+  → indexingVolumes
+  → mappingProjects
+  → classifyingArtifacts
+  → checkingActivity
+  → finalizingSnapshot
+  → completed | partial | cancelled | failed
+```
+
+The five product stages are user-facing milestones. They are not persisted in
+every path row and do not claim traversal knows total work in advance.
+
+### Events
+
+The production stream distinguishes:
+
+- `stageChanged`;
+- `progress`;
+- `factObserved`;
+- `issueObserved`;
+- `scopeFinished`;
+- `terminal`.
+
+Progress includes bounded counters and current summarized scope, not a
+scrolling path log. Persisted final facts do not embed a copy of global
+progress.
+
+### Cancellation and partial results
+
+- cancellation is explicit and idempotent;
+- no new directories are scheduled after cancellation;
+- bounded committed batches remain queryable;
+- unfinished roots/scopes are persisted;
+- cancellation is not rewritten as an empty success or generic failure;
+- UI navigation never owns scanner lifetime;
+- a second start intent cannot create another uncontrolled scan.
+
+### Persistence and memory
+
+- fixed worker, queue and stream bounds remain;
+- a `ScanSessionWriter` consumes events in bounded transactions;
+- progress is transient; session/facts/issues/unfinished scopes are durable;
+- paging and indexes replace an in-memory full-tree object graph;
+- store failure stops the producer and marks the session failed/partial without
+  pretending all prior facts are invalid.
+
+### No-write and no-Codex boundaries
+
+Quick Scan:
+
+- opens scanned directories read-only;
+- has no `StornautCodex` dependency;
+- cannot obtain Probe Bridge, Adapter, Policy or Executor instances;
+- writes only through an injected Stornaut store root;
+- includes a fake-Codex marker and before/after target audit in Task 20.
+
+## 6. Space Accounting Inputs
+
+Task 13 must model:
+
+- volume total/free observations, each with source and sampled-at time;
+- disjoint accounting owners rather than parent-plus-child sums;
+- logical and allocated path observations separately;
+- hard-link identity;
+- permission/mount/race gaps;
+- residual measured-but-unclassified bytes;
+- APFS clone/compression/sparse/purgeable caveats.
+
+The resulting ledger keeps occupancy separate from disposition. A path becoming
+`Ready to Reclaim` does not change Known/Unknown/Unmeasurable/Free totals.
+
+## 7. Fixtures and Benchmark
+
+Tasks 12–13 and 20 require:
+
+- deterministic high-fanout/deep/sparse/hardlink/symlink fixtures;
+- root identity replacement and permission/mount injection;
+- consumer backpressure and store-failure seams;
+- cancellation with committed partial facts and unfinished scopes;
+- overlapping parent/child accounting fixtures;
+- volume samples that drift during a scan;
+- target before/after path/type/identity/mtime/hash audit;
+- fake Codex marker that remains absent;
+- three synthetic production-path runs;
+- final real-machine run recording first-result time, elapsed, RSS, store size,
+  issue counts, ledger explanations and cancellation latency.
+
+## 8. License and Reuse Boundary
+
+Mole remains GPL behavior-only. ClearDisk and kondo are MIT but no code is
+copied and neither becomes a dependency. Task 9 adds no shipped notice.
+
+## 9. Relative Improvement
+
+Stornaut combines the useful bounded/cancellable behavior observed upstream
+with stronger partial-error semantics, durable session identity and a
+source-bearing volume ledger. Unlike the compared tools, it makes "measured",
+"classified", "reclaimable" and "free" separate facts and proves Quick Scan has
+no model or cleanup call path.
+
+## 10. Task 12 Production Delta
+
+Task 12 uses the studied APIs without upstream drift and makes these concrete
+changes from the Epic 1 benchmark:
+
+- rename the spike façade to production `Surveyor` while preserving its fixed
+  GCD worker pool, bounded queue, no-follow POSIX traversal, same-device default
+  and fail-on-stream-overflow behavior;
+- keep one low-level `ScanRequest` equal to one root/scope. Multi-root product
+  orchestration remains Task 20 so Task 12 does not invent classifier or
+  Activity behavior before Tasks 14–19;
+- add a `ScanSessionWriter` that consumes Surveyor observations, writes bounded
+  batches and emits the five approved product stages in monotonic order;
+- persist a fail-safe provisional partial session before child facts, then
+  replace it with completed/partial/cancelled/failed terminal truth. A crash can
+  therefore leave an unfinished partial record, never false success;
+- add a closed `VolumeBaseline` value and explicit Evidence schema v1-to-v2
+  migration. Capacity/free variants retain their Foundation source and sample
+  time; root identity is captured independently from path sums;
+- persist localized permission/mount/race issues through their typed
+  `PathSnapshot` measurement status. Progress and current-scope labels remain
+  transient;
+- use bounded database batches and a bounded event stream. Consumer overflow
+  fails the run and preserves committed partial data instead of silently losing
+  facts;
+- represent normal user cancellation as a persisted cancelled terminal session,
+  not an empty result or a thrown scanner failure.
+
+No upstream code, package or license notice is added by this delta. The initial
+production benchmark continues to use synthetic fixtures; the real-machine
+Phase B rerun remains Task 26.
+
+## 11. Task 13 Accounting Delta
+
+Task 13 uses the same accepted Apple/Mole/ClearDisk/kondo snapshots; no
+upstream drift or new dependency is introduced.
+
+The concrete accounting decision is:
+
+- use end-volume `total - general available` as Volume Used;
+- subtract only non-overlapping, hardlink-deduplicated, non-Unknown classified
+  owners to produce Unknown;
+- treat `unknownLargeConsumers` as Unknown even when a Classification exists;
+- use entry facts assigned to the nearest classified ancestor, never recursive
+  directory aggregate plus descendants;
+- represent permission/mount gaps as unavailable Unmeasurable coverage while
+  declaring that the Unknown residual already includes those bytes;
+- retain logical and allocated diagnostics separately; reconcile the volume
+  with allocated bytes only;
+- never derive purgeable, clone, compressed or reclaimable estimates;
+- attach source, sample time, formula key and explanation key to every displayed
+  measure;
+- expose free-space delta only as an unattributed start/end system observation.
+
+This improves on the compared tools by making the residual equation and
+double-count suppression explicit and fixture-verifiable. No upstream code is
+copied.
+
+## 12. Task 20 Composition Gate Refresh
+
+Task 20 revalidated the complete Tasks 12–19 dependency graph on 2026-08-10.
+
+### Existing lifecycle boundary
+
+`ScanSessionWriter` remains the bounded single-root Surveyor/persistence
+subflow. Its Task 12 `classifyArtifacts`, `checkActivity` and
+`finalizeSnapshot` events are compatibility milestones only; no classifier or
+activity provider runs there. The product coordinator must suppress those
+placeholder events and emit the same stages only when the corresponding real
+work executes.
+
+The writer may persist a scan terminal before post-scan composition. The
+coordinator owns the authoritative product terminal event and may replace the
+stored session with partial/failed truth if a required post-scan store step
+fails. Previously committed path facts remain queryable.
+
+### Runtime catalog boundary
+
+The App/Core target cannot parse strict authoring source or depend on the
+host-only `RuleCompilerKit`. Task 20 therefore consumes a checked-in immutable
+compiled catalog artifact generated by the existing deterministic compiler.
+Machine verification regenerates and byte-compares it from the five versioned
+sources; runtime never loads rule source from a scanned target.
+
+### Deterministic evidence boundary
+
+Path matching produces candidates, not safety. The coordinator may satisfy only
+a closed set of facts directly established by scan context and bounded local
+providers. In particular:
+
+- legal scanned names that are outside the rule matcher's glob grammar produce
+  no candidate and remain Unknown; they do not invalidate unrelated paths;
+- protected/veto rules can classify Protected without activity;
+- rule miss remains Unknown;
+- path, kind or apparent size cannot establish recovery, no-user-data,
+  detached, abandoned, not-current, unreferenced or rebuildability facts;
+- missing required evidence remains visible and cannot produce Ready;
+- provider errors invalidate only dependent activity requirements.
+
+When one rule requires both Git cleanliness and upstream synchronization, the
+provider collects one repository snapshot and selects both observations from
+that same result. It does not combine facts from separate points in time.
+
+Task 20 does not add manifest parsing, Git-ignore inference or product-specific
+runtime lifecycle guesses merely to increase Ready counts.
+
+### Product state and intent policy
+
+The coordinator emits page-preserving typed projections for stages, persisted
+facts, classifications, ledger and terminal truth. One actor owns one active
+intent. A second start while active is rejected with the existing
+`scanAlreadyRunning` contract; cancellation is explicit/idempotent, and stream
+consumer or App navigation lifetime does not own the scan.
+
+Restart projection loads the latest valid persisted session and its paged
+snapshots/classifications/ledger. Corrupt rows remain isolated and dependent
+projections become partial rather than erasing healthy state.
+
+### Safety audit
+
+Task 20 adds:
+
+- a fake Codex marker that must remain absent;
+- before/after scanned-target path/type/identity/size/mtime/content audit;
+- verification that only the injected Stornaut Application Support/Caches root
+  changes;
+- a source/dependency gate rejecting Codex, Probe Bridge, Adapter, Policy,
+  Action and mutation references from Quick Scan product paths.
+
+These are behavioral and source-graph evidence, not syscall-level proof. No
+upstream code, dependency, entitlement, background process or permission is
+added.

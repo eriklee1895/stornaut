@@ -1,0 +1,87 @@
+{
+  "admission" : "rejected",
+  "campaignUUID" : "864065f6-8c9e-48e1-bedf-b0f6becd7b21",
+  "classification" : "externalRawEvidenceLoss",
+  "domain" : "stornaut.task39.iic.raw-evidence-loss.v1",
+  "evidenceRootObservation" : {
+    "acceptedLiveStates" : [
+      "exactRetainedEmptyPhaseTree"
+    ],
+    "expectedMissingArtifactCount" : 9,
+    "parentIdentity" : {
+      "device" : "16777229",
+      "generation" : "0",
+      "inode" : "523653077",
+      "size" : "96"
+    },
+    "phaseDirectories" : {
+      "01-preflight" : {
+        "changeTimeNanoseconds" : "1789328136427750159",
+        "device" : "16777229",
+        "generation" : "0",
+        "inode" : "523653079"
+      },
+      "02-install" : {
+        "changeTimeNanoseconds" : "1789328136423385373",
+        "device" : "16777229",
+        "generation" : "0",
+        "inode" : "523653080"
+      },
+      "03-authorization" : {
+        "changeTimeNanoseconds" : "1789328136426892352",
+        "device" : "16777229",
+        "generation" : "0",
+        "inode" : "523653081"
+      },
+      "04-driver-epochs" : {
+        "changeTimeNanoseconds" : "1789013747265479895",
+        "device" : "16777229",
+        "generation" : "0",
+        "inode" : "523653082"
+      },
+      "05-uninstall" : {
+        "changeTimeNanoseconds" : "1789013747265827650",
+        "device" : "16777229",
+        "generation" : "0",
+        "inode" : "523653083"
+      },
+      "06-verifier" : {
+        "changeTimeNanoseconds" : "1789013747266180114",
+        "device" : "16777229",
+        "generation" : "0",
+        "inode" : "523653084"
+      }
+    },
+    "rootIdentity" : {
+      "device" : "16777229",
+      "generation" : "0",
+      "inode" : "523653078",
+      "size" : "256"
+    },
+    "stateAtObservation" : "exactRetainedEmptyPhaseTree"
+  },
+  "nonClaims" : [
+    "no attribution of the deleting actor",
+    "no recovery or reconstruction of removed raw evidence",
+    "no successful v13 or v16 machine admission",
+    "no v17 campaign launch or authorization consumption",
+    "no L3c3d authenticated model success",
+    "no Task 39 readiness"
+  ],
+  "originalDispositionSHA256" : "09c62579bf4a78ce00f491993ccfbeb5f4cd22ed11e0e8744f1e52922080bafd",
+  "originalEvidenceSetSHA256" : "95834147f74c92d932d27d0b261a1ebc8edf4a33f0d34d9e8217e2fbbf116dbb",
+  "recoverySearchResult" : "exactRawArtifactBytesUnavailable",
+  "retry" : "forbidden",
+  "schemaVersion" : 1,
+  "temporalCorrelation" : {
+    "cacheDeleteEventUTC" : "2026-09-13T19:35:18.065Z",
+    "cacheDeleteFreeSpaceBytes" : "10730471424",
+    "cacheDeletePurgeGoalBytes" : "4087165747",
+    "deletingActor" : "notIndependentlyBound",
+    "firstObservedMissingUTC" : "2026-09-13T23:51:40Z",
+    "phaseDirectoryChangeWindowUTC" : "2026-09-13T19:35:36.423385Z/2026-09-13T19:35:36.427750Z",
+    "relationship" : "strongTemporalCorrelationOnly",
+    "source" : "macOSUnifiedLogAndReadOnlyFilesystemObservation"
+  },
+  "v16DispositionSHA256" : "9705e4d659cd316a74aefbc5510a66af942e6e024763baeb52c5d192e37e08f6"
+}

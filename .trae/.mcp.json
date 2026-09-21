@@ -1,0 +1,33 @@
+{
+  "mcpServers": {
+    "stornaut-xcodebuild": {
+      "type": "stdio",
+      "command": "./scripts/xcodebuildmcp",
+      "args": [
+        "mcp"
+      ],
+      "cwd": ".",
+      "startup_timeout_sec": 60.0,
+      "tool_timeout_sec": 1200.0,
+      "default_tools_approval_mode": "prompt"
+    },
+    "stornaut-peekaboo": {
+      "type": "stdio",
+      "command": "./scripts/peekaboo-readonly",
+      "args": [
+        "mcp"
+      ],
+      "cwd": ".",
+      "startup_timeout_sec": 30.0,
+      "tool_timeout_sec": 120.0,
+      "default_tools_approval_mode": "approve",
+      "enabled_tools": [
+        "image",
+        "see",
+        "inspect_ui",
+        "list",
+        "permissions"
+      ]
+    }
+  }
+}

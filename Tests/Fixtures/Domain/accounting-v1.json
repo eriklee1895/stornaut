@@ -1,0 +1,54 @@
+{
+  "free": {
+    "bytes": 8589934592,
+    "explanationKey": "accounting.free.systemObservation",
+    "source": {
+      "identifier": "fixture.volume.available",
+      "kind": "volumeResourceValues",
+      "sampledAt": 1786233720000
+    },
+    "status": "measured"
+  },
+  "known": {
+    "bytes": 15728640,
+    "explanationKey": "accounting.known.classified",
+    "source": {
+      "identifier": "fixture.classification.v1",
+      "kind": "classifier",
+      "sampledAt": 1786233710000
+    },
+    "status": "measured"
+  },
+  "schemaVersion": 1,
+  "sessionID": "scan-fixture-cancelled",
+  "unknown": {
+    "bytes": 4194304,
+    "explanationKey": "accounting.unknown.measuredResidual",
+    "source": {
+      "identifier": "fixture.surveyor.v1",
+      "kind": "surveyor",
+      "sampledAt": 1786233710000
+    },
+    "status": "measured"
+  },
+  "unmeasurable": {
+    "bytes": null,
+    "explanationKey": "accounting.unmeasurable.permission",
+    "source": {
+      "identifier": "fixture.permission.limited",
+      "kind": "permissionGap",
+      "sampledAt": 1786233710000
+    },
+    "status": "unmeasurable"
+  },
+  "volumeCapacity": {
+    "bytes": 107374182400,
+    "explanationKey": "accounting.volume.capacity",
+    "source": {
+      "identifier": "fixture.volume.capacity",
+      "kind": "volumeResourceValues",
+      "sampledAt": 1786233720000
+    },
+    "status": "measured"
+  }
+}
