@@ -371,7 +371,8 @@ func debugFixturesCoverEveryApprovedPhaseDeterministically() async throws {
     let reviewInspector = try #require(reviewModel.inspector)
     #expect(reviewModel.summary.selectedCount == 2)
     #expect(
-        reviewModel.summary.estimatedTrashBytes == ByteCount(300_000)!
+        reviewModel.summary.estimatedTrashBytes
+            == ByteCount(11_000_000_000)!
     )
     #expect(reviewInspector.producer?.rawValue == "Go command")
     #expect(

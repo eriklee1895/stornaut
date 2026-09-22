@@ -2208,7 +2208,7 @@ private enum DebugProjectionFactory {
                 sessionID: sessionID,
                 scopeID: scopeID,
                 relativePath: ".npm/_cacache",
-                allocatedBytes: 180_000,
+                allocatedBytes: 7_800_000_000,
                 inode: 102
             ),
             measuredSnapshot(
@@ -2217,7 +2217,7 @@ private enum DebugProjectionFactory {
                 sessionID: sessionID,
                 scopeID: scopeID,
                 relativePath: "Library/Caches/pip",
-                allocatedBytes: 120_000,
+                allocatedBytes: 3_200_000_000,
                 inode: 103
             ),
             measuredSnapshot(
@@ -2226,7 +2226,7 @@ private enum DebugProjectionFactory {
                 sessionID: sessionID,
                 scopeID: scopeID,
                 relativePath: "Library/Caches/go-build",
-                allocatedBytes: 50_000,
+                allocatedBytes: 1_400_000_000,
                 inode: 104
             ),
             measuredSnapshot(
@@ -2235,7 +2235,7 @@ private enum DebugProjectionFactory {
                 sessionID: sessionID,
                 scopeID: scopeID,
                 relativePath: ".cache/uv",
-                allocatedBytes: 40_000,
+                allocatedBytes: 2_600_000_000,
                 inode: 105
             ),
             measuredSnapshot(
@@ -2244,7 +2244,7 @@ private enum DebugProjectionFactory {
                 sessionID: sessionID,
                 scopeID: scopeID,
                 relativePath: ".ssh",
-                allocatedBytes: 10_000,
+                allocatedBytes: 24_000_000,
                 inode: 106
             ),
         ]

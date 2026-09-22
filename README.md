@@ -2,12 +2,22 @@
 
 > Map the known. Investigate the unknown. Reclaim with evidence.
 
-Stornaut 是一款面向 macOS 开发者的原生磁盘调查工具。它用 Swift 扫描磁盘、
-识别开发缓存与项目产物，并把大小、活动状态、恢复成本和权限缺口整理成可复核的
-空间账本。
+<p align="center">
+  <img src="StornautApp/Resources/AppIcon.icon/Assets/stornaut-nautilus-probe.png" alt="Stornaut Nautilus Probe app icon" width="144">
+</p>
+
+Stornaut 是我为自己的 macOS 开发机做的原生磁盘清理工具。它用 Swift 扫描磁盘、
+识别开发缓存与项目产物，并把大小、活动状态、恢复成本和权限缺口整理成可勾选的
+清理建议。
 
 `Stornaut` 读作 `STORE-naut`，由 `storage + -naut` 构成，意为“存储空间
 探索者”。
+
+<p align="center">
+  <img src="docs/assets/product/review-reclaim-plan-dark.webp" alt="Stornaut Review Reclaim Plan showing ready, review recommended, and protected developer storage">
+</p>
+
+<p align="center"><sub>实际 macOS App · Dark appearance · 内置演示数据，不读取宿主磁盘</sub></p>
 
 ## 它解决什么问题
 
