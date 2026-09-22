@@ -76,8 +76,25 @@ public struct RuleCatalogMatcher: Sendable {
         guard isValidCandidatePath(relativePath) else {
             throw RuleCatalogError.invalidPattern
         }
+        return matchingRulesForValidatedPath(
+            relativePath: relativePath,
+            kind: kind,
+            caseSensitive: caseSensitive
+        )
+    }
+
+    // Surveyor constructs relative paths from validated directory entries, so
+    // the hot product-scan path can skip the second full component-validation
+    // pass. Public callers still use `matchingRules`, which preserves strict
+    // input validation.
+    func matchingRulesForValidatedPath(
+        relativePath: String,
+        kind: RuleExpectedKind,
+        caseSensitive: Bool = true
+    ) -> [CompiledRule] {
+        let rawTerminal = terminalComponent(relativePath)
         let terminal = normalizedTerminalComponent(
-            relativePath,
+            rawTerminal,
             caseSensitive: caseSensitive
         )
         let key = RuleMatcherKey(
@@ -224,14 +241,10 @@ private func normalizedComponents(
 }
 
 private func normalizedTerminalComponent(
-    _ path: String,
+    _ terminal: Substring,
     caseSensitive: Bool
 ) -> String {
-    let start = path.lastIndex(of: "/").map {
-        path.index(after: $0)
-    } ?? path.startIndex
-    let component = path[start...]
-    let normalized = String(component)
+    let normalized = String(terminal)
         .precomposedStringWithCanonicalMapping
     return caseSensitive
         ? normalized
@@ -239,6 +252,13 @@ private func normalizedTerminalComponent(
             options: [.caseInsensitive, .diacriticInsensitive],
             locale: Locale(identifier: "en_US_POSIX")
         )
+}
+
+private func terminalComponent(_ path: String) -> Substring {
+    let start = path.lastIndex(of: "/").map {
+        path.index(after: $0)
+    } ?? path.startIndex
+    return path[start...]
 }
 
 private func terminalLiteral(

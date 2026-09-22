@@ -250,14 +250,10 @@ private extension ProductScanAccumulator {
         else {
             return []
         }
-        do {
-            return try matcher.matchingRules(
-                relativePath: snapshot.relativePath,
-                kind: kind
-            )
-        } catch RuleCatalogError.invalidPattern {
-            return []
-        }
+        return matcher.matchingRulesForValidatedPath(
+            relativePath: snapshot.relativePath,
+            kind: kind
+        )
     }
 
     func nearestOwner(for relativePath: String) -> SnapshotID? {

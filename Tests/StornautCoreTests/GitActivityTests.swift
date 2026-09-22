@@ -54,22 +54,26 @@ func gitActivityProviderUsesOnlyFixedReadOnlyRequests() async throws {
             && $0.timeout == .seconds(2)
     })
     #expect(
-        requests[0].arguments
-            == GitActivityProvider.fixedPrefix(for: repositoryURL) + [
+        requests.contains {
+            $0.arguments
+                == GitActivityProvider.fixedPrefix(for: repositoryURL) + [
                 "status",
                 "--porcelain=v2",
                 "--branch",
                 "--untracked-files=normal",
                 "--no-renames",
             ]
+        }
     )
     #expect(
-        requests[1].arguments
-            == GitActivityProvider.fixedPrefix(for: repositoryURL) + [
+        requests.contains {
+            $0.arguments
+                == GitActivityProvider.fixedPrefix(for: repositoryURL) + [
                 "log",
                 "-1",
                 "--format=%ct",
             ]
+        }
     )
     #expect(!requests.flatMap(\.arguments).contains(where: {
         ["sh", "bash", "commit", "reset", "checkout"].contains($0)
@@ -271,6 +275,25 @@ func gitActivityProviderDoesNotMutateARealRepository() async throws {
 }
 
 @Test
+func foundationGitRunnerClosesOutputPipesAfterACommandExits() async throws {
+    let started = ContinuousClock.now
+    let output = try await FoundationGitCommandRunner().run(
+        GitCommandRequest(
+            executableURL: URL(filePath: "/usr/bin/git"),
+            arguments: ["--version"],
+            environment: GitActivityProvider.fixedEnvironment,
+            standardOutputLimit: 4_096,
+            standardErrorLimit: 4_096,
+            timeout: .seconds(2)
+        )
+    )
+
+    #expect(output.exitStatus == 0)
+    #expect(String(decoding: output.stdout, as: UTF8.self).hasPrefix("git version "))
+    #expect(started.duration(to: .now) < .seconds(10))
+}
+
+@Test
 func gitActivityInvalidInputFailsWithoutLaunching() async {
     let runner = RecordingGitCommandRunner(outputs: [])
     let result = await GitActivityProvider(runner: runner).collect(
@@ -296,7 +319,9 @@ private actor RecordingGitCommandRunner: GitCommandRunning {
         guard !outputs.isEmpty else {
             throw GitCommandRunnerError.outputReadFailed
         }
-        switch outputs.removeFirst() {
+        let outputIndex = request.arguments.contains("log")
+            && outputs.count > 1 ? 1 : 0
+        switch outputs.remove(at: outputIndex) {
         case let .success(output):
             return output
         case let .failure(error):

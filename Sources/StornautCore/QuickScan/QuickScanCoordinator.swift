@@ -65,12 +65,31 @@ protocol QuickScanHistoryPersisting: Sendable {
 extension EvidenceStore: QuickScanHistoryPersisting {}
 
 protocol QuickScanActivityProviding: Sendable {
+    func prefetch(
+        _ requests: [QuickScanActivityRequest],
+        rootURL: URL,
+        observedAt: Date
+    ) async
+
     func observations(
         for snapshot: PathSnapshot,
         rule: CompiledRule,
         rootURL: URL,
         observedAt: Date
     ) async throws -> [ActivityObservation]
+}
+
+struct QuickScanActivityRequest: Sendable {
+    let snapshot: PathSnapshot
+    let rule: CompiledRule
+}
+
+extension QuickScanActivityProviding {
+    func prefetch(
+        _ requests: [QuickScanActivityRequest],
+        rootURL: URL,
+        observedAt: Date
+    ) async {}
 }
 
 protocol QuickScanGitActivityCollecting: Sendable {
@@ -114,13 +133,70 @@ struct ConservativeQuickScanActivityProvider:
 struct NativeQuickScanActivityProvider:
     QuickScanActivityProviding
 {
-    private let gitProvider: any QuickScanGitActivityCollecting
+    private static let maximumConcurrentGitProbes = 4
+
+    private let gitCache: QuickScanGitActivityCache
 
     init(
         gitProvider: any QuickScanGitActivityCollecting =
             GitActivityProvider()
     ) {
-        self.gitProvider = gitProvider
+        gitCache = QuickScanGitActivityCache(provider: gitProvider)
+    }
+
+    func prefetch(
+        _ requests: [QuickScanActivityRequest],
+        rootURL: URL,
+        observedAt: Date
+    ) async {
+        guard let sessionID = requests.first?.snapshot.sessionID else {
+            return
+        }
+        let repositories: Set<URL> = Set(
+            requests.compactMap { request in
+                guard request.rule.requiredActivityKeys.contains(where: {
+                    $0.rawValue == ActivityKey.gitClean.rawValue
+                        || $0.rawValue
+                            == ActivityKey.gitUpstreamSynchronized.rawValue
+                }) else {
+                    return nil
+                }
+                return findRepositoryURL(
+                    for: request.snapshot,
+                    rootURL: rootURL
+                )
+            }
+        )
+        var iterator = repositories.makeIterator()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<min(
+                Self.maximumConcurrentGitProbes,
+                repositories.count
+            ) {
+                guard let repository = iterator.next() else {
+                    break
+                }
+                group.addTask {
+                    _ = await gitCache.snapshot(
+                        repositoryURL: repository,
+                        sessionID: sessionID,
+                        observedAt: observedAt
+                    )
+                }
+            }
+            while await group.next() != nil {
+                guard let repository = iterator.next() else {
+                    continue
+                }
+                group.addTask {
+                    _ = await gitCache.snapshot(
+                        repositoryURL: repository,
+                        sessionID: sessionID,
+                        observedAt: observedAt
+                    )
+                }
+            }
+        }
     }
 
     func observations(
@@ -137,12 +213,15 @@ struct NativeQuickScanActivityProvider:
             $0 == .gitClean || $0 == .gitUpstreamSynchronized
         }
         let gitObservations: [ActivityObservation]
-        if requiresGit {
-            let candidateURL = rootURL.appending(
-                path: snapshot.relativePath
-            )
-            gitObservations = await gitProvider.collect(
-                repositoryURL: candidateURL.deletingLastPathComponent(),
+        if requiresGit,
+           let repositoryURL = findRepositoryURL(
+               for: snapshot,
+               rootURL: rootURL
+           )
+        {
+            gitObservations = await gitCache.snapshot(
+                repositoryURL: repositoryURL,
+                sessionID: snapshot.sessionID,
                 observedAt: observedAt
             ).observations
         } else {
@@ -184,6 +263,79 @@ struct NativeQuickScanActivityProvider:
         }
         return observations
     }
+
+    private func findRepositoryURL(
+        for snapshot: PathSnapshot,
+        rootURL: URL
+    ) -> URL? {
+        let standardizedRoot = rootURL.standardizedFileURL
+        var candidate = standardizedRoot.appending(
+            path: snapshot.relativePath
+        ).deletingLastPathComponent().standardizedFileURL
+        let rootPath = standardizedRoot.path
+        while candidate.path == rootPath
+            || candidate.path.hasPrefix(rootPath + "/")
+        {
+            let gitMetadata = candidate.appending(
+                path: ".git"
+            )
+            if FileManager.default.fileExists(atPath: gitMetadata.path) {
+                return candidate
+            }
+            guard candidate.path != rootPath else {
+                break
+            }
+            let parent = candidate.deletingLastPathComponent()
+            guard parent.path != candidate.path else {
+                break
+            }
+            candidate = parent
+        }
+        return nil
+    }
+}
+
+private actor QuickScanGitActivityCache {
+    private let provider: any QuickScanGitActivityCollecting
+    private var snapshots: [String: GitActivitySnapshot] = [:]
+    private var inFlight: [String: Task<GitActivitySnapshot, Never>] = [:]
+    private var cacheSessionID: ScanSessionID?
+
+    init(provider: any QuickScanGitActivityCollecting) {
+        self.provider = provider
+    }
+
+    func snapshot(
+        repositoryURL: URL,
+        sessionID: ScanSessionID,
+        observedAt: Date
+    ) async -> GitActivitySnapshot {
+        if cacheSessionID != sessionID {
+            snapshots.removeAll(keepingCapacity: true)
+            inFlight.removeAll(keepingCapacity: true)
+            cacheSessionID = sessionID
+        }
+        let repositoryURL = repositoryURL.standardizedFileURL
+        let key = repositoryURL.path
+        if let cached = snapshots[key] {
+            return cached
+        }
+        if let task = inFlight[key] {
+            return await task.value
+        }
+        let provider = provider
+        let task = Task {
+            await provider.collect(
+                repositoryURL: repositoryURL,
+                observedAt: observedAt
+            )
+        }
+        inFlight[key] = task
+        let snapshot = await task.value
+        inFlight[key] = nil
+        snapshots[key] = snapshot
+        return snapshot
+    }
 }
 
 public actor QuickScanCoordinator {
@@ -213,7 +365,7 @@ public actor QuickScanCoordinator {
     private let executableEvidenceResolver: ExecutableEvidenceResolver?
     private let volumeSampler: any VolumeBaselineSampling
     private let now: @Sendable () -> Date
-    private let snapshotID: SnapshotIDSource
+    private let snapshotID: SnapshotIDSource?
     private let classificationID: ClassificationIDSource
     private let evidenceID: EvidenceIDSource
     private let executionEvidenceID: ExecutionEvidenceIDSource
@@ -286,7 +438,7 @@ public actor QuickScanCoordinator {
         volumeSampler: any VolumeBaselineSampling =
             FoundationVolumeBaselineSampler(),
         now: @escaping @Sendable () -> Date = Date.init,
-        snapshotID: @escaping SnapshotIDSource = { _ in SnapshotID() },
+        snapshotID: SnapshotIDSource? = nil,
         classificationID: @escaping ClassificationIDSource = {
             _ in ClassificationID()
         },
@@ -676,13 +828,19 @@ public actor QuickScanCoordinator {
             matcher: matcher,
             displayFactLimit: Self.projectionRecordLimit
         )
+        let normalizedObservedAt: (@Sendable (String) -> Date)?
+        if snapshotID == nil {
+            normalizedObservedAt = nil
+        } else {
+            normalizedObservedAt = { _ in observationTime }
+        }
         let writer = ScanSessionWriter(
             store: store,
             volumeSampler: volumeSampler,
             now: now,
             sessionStartedAt: observationTime,
             snapshotID: snapshotID,
-            snapshotObservedAt: { _ in observationTime },
+            snapshotObservedAt: normalizedObservedAt,
             defersProductFinalization: true,
             productAccumulator: productAccumulator
         )
@@ -1231,6 +1389,26 @@ public actor QuickScanCoordinator {
                 snapshots: page.records,
                 candidates: candidates
             )
+            await activityProvider.prefetch(
+                page.records.compactMap { snapshot in
+                    guard targetIDs.contains(snapshot.id),
+                          let rules = candidates[snapshot.id],
+                          rules.count == 1,
+                          let rule = rules.first,
+                          !rule.veto,
+                          !rule.requiredActivityKeys.isEmpty
+                    else {
+                        return nil
+                    }
+                    return QuickScanActivityRequest(
+                        snapshot: snapshot,
+                        rule: rule
+                    )
+                },
+                rootURL: request.rootURL,
+                observedAt: classifiedAt
+            )
+            try checkProductCancellation()
             if result.fallbackProjectedSnapshots.count
                 < Self.projectionRecordLimit
             {

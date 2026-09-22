@@ -259,18 +259,63 @@ public struct PathSnapshot: Codable, Sendable, Equatable {
     }
 
     private static func isValidRelativePath(_ path: String) -> Bool {
-        guard path == "." || !path.isEmpty,
-              !path.hasPrefix("/"),
-              !path.contains("\0"),
-              path.utf8.count <= 16_384
-        else {
-            return false
-        }
         if path == "." {
             return true
         }
-        return path.split(separator: "/", omittingEmptySubsequences: false)
-            .allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
+        let bytes = path.utf8
+        guard !bytes.isEmpty,
+              bytes.count <= 16_384,
+              bytes.first != UInt8(ascii: "/")
+        else {
+            return false
+        }
+
+        var componentLength = 0
+        var firstByte: UInt8 = 0
+        var secondByte: UInt8 = 0
+        for byte in bytes {
+            if byte == 0 {
+                return false
+            }
+            if byte == UInt8(ascii: "/") {
+                guard validComponent(
+                    length: componentLength,
+                    firstByte: firstByte,
+                    secondByte: secondByte
+                ) else {
+                    return false
+                }
+                componentLength = 0
+                firstByte = 0
+                secondByte = 0
+                continue
+            }
+            componentLength += 1
+            if componentLength == 1 {
+                firstByte = byte
+            } else if componentLength == 2 {
+                secondByte = byte
+            }
+        }
+        return validComponent(
+            length: componentLength,
+            firstByte: firstByte,
+            secondByte: secondByte
+        )
+    }
+
+    private static func validComponent(
+        length: Int,
+        firstByte: UInt8,
+        secondByte: UInt8
+    ) -> Bool {
+        length > 0
+            && !(length == 1 && firstByte == UInt8(ascii: "."))
+            && !(
+                length == 2
+                    && firstByte == UInt8(ascii: ".")
+                    && secondByte == UInt8(ascii: ".")
+            )
     }
 
     private static func isValidSymlinkTarget(

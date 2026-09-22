@@ -43,7 +43,19 @@ func nativeQuickScanActivityProviderUsesOneGitSnapshotPerRule()
     let snapshot = try task20BoundaryCompatibleSnapshot(
         relativePath: "projects/sample/derived"
     )
-    let rootURL = URL(filePath: "/tmp/task20-git-snapshot")
+    let rootURL = FileManager.default.temporaryDirectory.appending(
+        path: "task20-git-snapshot-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+    let repositoryURL = rootURL.appending(
+        path: "projects/sample",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: repositoryURL.appending(path: ".git"),
+        withIntermediateDirectories: true
+    )
     let observedAt = Date(timeIntervalSince1970: 1_786_320_050)
     let gitProvider = Task20GitActivityCollector(observedAt: observedAt)
     let provider = NativeQuickScanActivityProvider(
@@ -59,10 +71,7 @@ func nativeQuickScanActivityProviderUsesOneGitSnapshotPerRule()
 
     #expect(await gitProvider.callCount == 1)
     #expect(
-        await gitProvider.lastRepositoryURL
-            == rootURL.appending(
-                path: snapshot.relativePath
-            ).deletingLastPathComponent()
+        await gitProvider.lastRepositoryURL == repositoryURL
     )
     #expect(
         observations.map(\.key) == [
@@ -71,6 +80,104 @@ func nativeQuickScanActivityProviderUsesOneGitSnapshotPerRule()
         ]
     )
     #expect(observations.allSatisfy { $0.observedAt == observedAt })
+}
+
+@Test
+func nativeQuickScanActivityProviderPrefetchesEachRepositoryOnce() async throws {
+    let rootURL = FileManager.default.temporaryDirectory.appending(
+        path: "stornaut-git-prefetch-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+    let repositoryURL = rootURL.appending(
+        path: "projects/sample",
+        directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(
+        at: repositoryURL.appending(path: ".git"),
+        withIntermediateDirectories: true
+    )
+    let catalog = try task20Catalog()
+    let rule = try #require(
+        catalog.rules.first {
+            $0.requiredActivityKeys.contains {
+                $0.rawValue == ActivityKey.gitClean.rawValue
+            }
+        }
+    )
+    let snapshots = try [
+        "projects/sample/node_modules",
+        "projects/sample/target",
+    ].map(task20BoundaryCompatibleSnapshot(relativePath:))
+    let observedAt = Date(timeIntervalSince1970: 1_786_320_051)
+    let gitProvider = Task20GitActivityCollector(observedAt: observedAt)
+    let provider = NativeQuickScanActivityProvider(
+        gitProvider: gitProvider
+    )
+
+    await provider.prefetch(
+        snapshots.map {
+            QuickScanActivityRequest(snapshot: $0, rule: rule)
+        },
+        rootURL: rootURL,
+        observedAt: observedAt
+    )
+    for snapshot in snapshots {
+        _ = try await provider.observations(
+            for: snapshot,
+            rule: rule,
+            rootURL: rootURL,
+            observedAt: observedAt
+        )
+    }
+
+    #expect(await gitProvider.callCount == 1)
+    #expect(await gitProvider.lastRepositoryURL == repositoryURL)
+}
+
+@Test
+func nativeQuickScanActivityProviderSkipsGitOutsideARepository() async throws {
+    let rootURL = FileManager.default.temporaryDirectory.appending(
+        path: "stornaut-no-git-prefetch-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+    try FileManager.default.createDirectory(
+        at: rootURL.appending(path: "downloads/node_modules"),
+        withIntermediateDirectories: true
+    )
+    let rule = try #require(
+        try task20Catalog().rules.first {
+            $0.requiredActivityKeys.contains {
+                $0.rawValue == ActivityKey.gitClean.rawValue
+            }
+        }
+    )
+    let snapshot = try task20BoundaryCompatibleSnapshot(
+        relativePath: "downloads/node_modules"
+    )
+    let observedAt = Date(timeIntervalSince1970: 1_786_320_052)
+    let gitProvider = Task20GitActivityCollector(observedAt: observedAt)
+    let provider = NativeQuickScanActivityProvider(
+        gitProvider: gitProvider
+    )
+
+    await provider.prefetch(
+        [QuickScanActivityRequest(snapshot: snapshot, rule: rule)],
+        rootURL: rootURL,
+        observedAt: observedAt
+    )
+    let observations = try await provider.observations(
+        for: snapshot,
+        rule: rule,
+        rootURL: rootURL,
+        observedAt: observedAt
+    )
+
+    #expect(await gitProvider.callCount == 0)
+    #expect(
+        observations.first { $0.key == .gitClean }?.state == .unavailable
+    )
 }
 
 @Test

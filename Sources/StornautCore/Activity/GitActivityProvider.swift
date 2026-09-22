@@ -139,7 +139,7 @@ public struct GitActivityProvider: Sendable {
             )
         }
 
-        let statusResult = await run(
+        async let statusResult = run(
             arguments: Self.fixedPrefix(for: repositoryURL) + [
                 "status",
                 "--porcelain=v2",
@@ -148,17 +148,21 @@ public struct GitActivityProvider: Sendable {
                 "--no-renames",
             ]
         )
-        let lastCommitResult = await run(
+        async let lastCommitResult = run(
             arguments: Self.fixedPrefix(for: repositoryURL) + [
                 "log",
                 "-1",
                 "--format=%ct",
             ]
         )
+        let (resolvedStatusResult, resolvedLastCommitResult) = await (
+            statusResult,
+            lastCommitResult
+        )
 
         let status: ParsedGitStatus?
         let providerStatus: ActivityProviderStatus
-        switch statusResult {
+        switch resolvedStatusResult {
         case let .success(output):
             do {
                 status = try parseStatus(output)
@@ -177,7 +181,7 @@ public struct GitActivityProvider: Sendable {
 
         let lastCommit: Date?
         let lastCommitStatus: ActivityProviderStatus
-        switch lastCommitResult {
+        switch resolvedLastCommitResult {
         case let .success(output):
             do {
                 lastCommit = try parseLastCommit(output)
@@ -532,6 +536,13 @@ private func runGitCommandSynchronously(
         readers.wait()
         throw GitCommandRunnerError.launchFailed
     }
+    // Process keeps the Pipe objects alive while we wait for its termination.
+    // Close the parent's duplicate write endpoints immediately after spawn so
+    // the reader tasks can observe EOF when Git exits. Keeping these endpoints
+    // open made successful, short-lived Git commands wait forever in
+    // `read(upToCount:)`.
+    stdoutPipe.fileHandleForWriting.closeFile()
+    stderrPipe.fileHandleForWriting.closeFile()
     guard termination.wait(
         timeout: request.timeout.gitDispatchDeadline
     ) == .success else {
@@ -540,6 +551,9 @@ private func runGitCommandSynchronously(
             kill(process.processIdentifier, SIGKILL)
             _ = termination.wait(timeout: .now() + .seconds(2))
         }
+        stdoutPipe.fileHandleForReading.closeFile()
+        stderrPipe.fileHandleForReading.closeFile()
+        readers.wait()
         throw GitCommandRunnerError.timedOut
     }
 

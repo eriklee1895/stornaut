@@ -14,7 +14,7 @@ public actor ScanSessionWriter {
     private let volumeSampler: any VolumeBaselineSampling
     private let now: @Sendable () -> Date
     private let sessionStartedAt: Date?
-    private let snapshotID: @Sendable (String) -> SnapshotID
+    private let snapshotID: (@Sendable (String) -> SnapshotID)?
     private let snapshotObservedAt: (@Sendable (String) -> Date)?
     private let defersProductFinalization: Bool
     private let productAccumulator: ProductScanAccumulator?
@@ -27,9 +27,7 @@ public actor ScanSessionWriter {
             FoundationVolumeBaselineSampler(),
         now: @escaping @Sendable () -> Date = Date.init,
         sessionStartedAt: Date? = nil,
-        snapshotID: @escaping @Sendable (String) -> SnapshotID = {
-            _ in SnapshotID()
-        },
+        snapshotID: (@Sendable (String) -> SnapshotID)? = nil,
         snapshotObservedAt: (@Sendable (String) -> Date)? = nil,
         defersProductFinalization: Bool = false
     ) {
@@ -51,9 +49,7 @@ public actor ScanSessionWriter {
             FoundationVolumeBaselineSampler(),
         now: @escaping @Sendable () -> Date = Date.init,
         sessionStartedAt: Date? = nil,
-        snapshotID: @escaping @Sendable (String) -> SnapshotID = {
-            _ in SnapshotID()
-        },
+        snapshotID: (@Sendable (String) -> SnapshotID)? = nil,
         snapshotObservedAt: (@Sendable (String) -> Date)? = nil,
         defersProductFinalization: Bool,
         productAccumulator: ProductScanAccumulator?
@@ -408,10 +404,13 @@ public actor ScanSessionWriter {
     private func normalizedObservation(
         _ observation: SurveyorObservation
     ) throws -> SurveyorObservation {
+        guard snapshotID != nil || snapshotObservedAt != nil else {
+            return observation
+        }
         let source = observation.snapshot
         return SurveyorObservation(
             snapshot: try PathSnapshot(
-                id: snapshotID(source.relativePath),
+                id: snapshotID?(source.relativePath) ?? source.id,
                 sessionID: source.sessionID,
                 scopeID: source.scopeID,
                 relativePath: source.relativePath,
